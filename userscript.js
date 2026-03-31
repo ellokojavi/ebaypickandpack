@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         2025 eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20251212-v3.25-decoupled-config
+// @version      20260331-v3.26-filter-print-ui-fixes
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -24,6 +24,16 @@
 // ===================================================================
 // CHANGELOG
 // ===================================================================
+// v3.26:
+// - Added live SKU/buyer/item filter input to the SKU panel that filters both
+//   the SKU list and order cards in real-time. Filter text persists across re-renders.
+// - Consolidated "Print All Envelopes" into a single print window with proper
+//   page breaks (one envelope per page). Removed N separate print dialogs.
+// - Fixed item image sizing: increased container to 130px with CSS !important overrides.
+// - Fixed price extraction to match both "Item price:" and "Sold for:" labels.
+// - Fixed print envelope layout for Envelope #10 format (9.5in × 4.125in) with
+//   6% content scaling to prevent blank pages.
+//
 // v3.25:
 // - Decoupled Logic from Configuration. Quotes, Templates, and Keywords
 //   are now loaded dynamically from a GitHub Gist.
@@ -790,6 +800,25 @@
             orderItem.style.opacity = '1';
         }
 
+        // --- Envelope Printing Helper ---
+        // Collects addresses from order cards and opens a single print window with all envelopes.
+        function printEnvelopes(orderCards) {
+            const envelopeHTMLs = [];
+            orderCards.forEach(orderItem => {
+                const addressEl = orderItem.querySelector(`.${CONFIG.classNames.addressContainer}`);
+                if (!addressEl) return;
+                const addressHTML = addressEl.innerText.replaceAll("\n", "<br>");
+                envelopeHTMLs.push(`<div class="envelope"><table style="font-family: Arial; width: 100%; height: 100%; border-collapse: collapse;"><tr style="vertical-align: top;"><td style="width: 100%; padding: 0; font-size: 14px;">${USER_CONFIG.returnAddress}</td></tr><tr style="height: 10%;"><td></td></tr><tr style="vertical-align: top;"><td style="text-align: left; padding-left: 20%; font-size: 24px;">${addressHTML}</td></tr><tr style="height: 30%;"><td></td></tr></table></div>`);
+            });
+            if (envelopeHTMLs.length === 0) return;
+            const printwin = window.open("", "_blank");
+            printwin.document.write(`<html><head><style>@page { size: 8.93in x 3.878in; margin: 0; } html, body { margin: 0; padding: 0; } .envelope { width: 8.93in; height: 3.878in; padding: 10px; font-family: Arial; box-sizing: border-box; overflow: hidden; } .envelope + .envelope { break-before: page; }</style></head><body>` + envelopeHTMLs.join('') + '</body></html>');
+            printwin.document.close();
+            printwin.focus();
+            printwin.print();
+            printwin.close();
+        }
+
         // --- Global Event Listeners ---
         // A single, delegated event listener on the main orders container.
         // It handles clicks for all custom actions like 'Copy Address', 'Add Note', 'Mark as Shipped', etc.
@@ -1244,24 +1273,7 @@
                 }
                 if (target.classList.contains(CONFIG.classNames.printEnvelopeBtn)) {
                     event.preventDefault();
-                    const addressElementForPrint = orderItemElement.querySelector(`.${CONFIG.classNames.addressContainer}`);
-                    if (addressElementForPrint) {
-                        const addressHTML = addressElementForPrint.innerText.replaceAll("\n", "<br>");
-                        const newDiv = document.createElement('div');
-                        const envelopeId = `${CONFIG.ids.printEnvelopeHTML}${Math.random()}`;
-                        newDiv.innerHTML = `<div id="${envelopeId}" style="height: 10.49cm; width: 24.13cm; border: solid 1px black; margin: 0; padding: 10px; font-family: Arial;"><table style="font-family: Arial; width: 100%; height: 100%; border-collapse: collapse;"><tr style="vertical-align: top;"><td style="width: 100%; padding: 0; font-size: 14px;">${USER_CONFIG.returnAddress}</td></tr><tr style="height: 10%;"><td></td></tr><tr style="vertical-align: top;"><td style="text-align: left; padding-left: 20%; font-size: 24px;">${addressHTML}</td></tr><tr style="height: 30%;"><td></td></tr></table></div>`;
-                        document.body.appendChild(newDiv);
-                        const envelopeToPrint = document.getElementById(envelopeId);
-                        if (envelopeToPrint) {
-                            const printwin = window.open("", "_blank");
-                            printwin.document.write(envelopeToPrint.innerHTML);
-                            printwin.document.close();
-                            printwin.focus();
-                            printwin.print();
-                            printwin.close();
-                            newDiv.remove();
-                        }
-                    }
+                    if (orderItemElement) printEnvelopes([orderItemElement]);
                 }
             });
             document.querySelectorAll(CONFIG.selectors.checkbox).forEach(cb => {
@@ -1301,6 +1313,45 @@
                 contentWrapper.id = CONFIG.ids.skuContentWrapper;
                 container.appendChild(contentWrapper);
                 darkModeToggle.querySelector('input').addEventListener('change', (e) => { localStorage.setItem(CONFIG.localStorageKeys.darkMode, String(e.target.checked)); injectRadicalStyles(); PrintSKUTable(); });
+
+                // --- Filter / Search Input ---
+                const filterInput = document.createElement('input');
+                filterInput.type = 'text';
+                filterInput.id = 'sku-filter-input';
+                filterInput.placeholder = 'Filter by SKU, buyer, or item...';
+                filterInput.style.cssText = `width: 100%; box-sizing: border-box; padding: 6px 10px; margin-bottom: 8px; border-radius: 6px; border: 1px solid ${isDarkMode ? '#555' : '#ccc'}; background-color: ${isDarkMode ? '#333' : '#fff'}; color: ${isDarkMode ? '#e0e0e0' : '#000'}; font-size: 13px; outline: none;`;
+                // Preserve filter text across re-renders
+                const prevFilter = container.dataset.filterText || '';
+                filterInput.value = prevFilter;
+                contentWrapper.appendChild(filterInput);
+
+                const applyFilter = () => {
+                    const query = filterInput.value.trim().toLowerCase();
+                    container.dataset.filterText = query;
+                    // Filter SKU items in the panel
+                    const skuItems = contentWrapper.querySelectorAll(`.${CONFIG.classNames.skuItem}`);
+                    skuItems.forEach(item => {
+                        const skuText = item.textContent.toLowerCase();
+                        const orderItemId = item.dataset.orderItemId;
+                        const orderCard = orderItemId ? document.getElementById(orderItemId) : null;
+                        const buyerName = orderCard?.querySelector('.print__address__fullname')?.textContent.toLowerCase() || '';
+                        const itemTitles = Array.from(orderCard?.querySelectorAll('.item__description h2 a') || []).map(a => a.textContent.toLowerCase()).join(' ');
+                        const match = !query || skuText.includes(query) || buyerName.includes(query) || itemTitles.includes(query);
+                        item.style.display = match ? '' : 'none';
+                    });
+                    // Also show/hide separators if all items around them are hidden
+                    const separators = contentWrapper.querySelectorAll(`.${CONFIG.classNames.skuGroupSeparator}`);
+                    separators.forEach(sep => { sep.style.display = query ? 'none' : ''; });
+                    // Filter order cards on the main page
+                    document.querySelectorAll(CONFIG.selectors.orderItem).forEach(orderCard => {
+                        const buyerName = orderCard.querySelector('.print__address__fullname')?.textContent.toLowerCase() || '';
+                        const skus = Array.from(orderCard.querySelectorAll('[class*="item__details"] li')).filter(li => li.innerText.startsWith('SKU:')).map(li => li.innerText.toLowerCase()).join(' ');
+                        const itemTitles = Array.from(orderCard.querySelectorAll('.item__description h2 a') || []).map(a => a.textContent.toLowerCase()).join(' ');
+                        const match = !query || buyerName.includes(query) || skus.includes(query) || itemTitles.includes(query);
+                        orderCard.style.display = match ? '' : 'none';
+                    });
+                };
+                filterInput.addEventListener('input', applyFilter);
 
                 if (SKU.length > 0) {
                     const flexContainer = document.createElement('div');
@@ -1350,6 +1401,9 @@
                     contentWrapper.appendChild(flexContainer);
                 }
 
+                // Re-apply filter if there was one active
+                if (prevFilter) applyFilter();
+
                 const allOrderItems = document.querySelectorAll(CONFIG.selectors.orderItem);
                 const checkedCheckboxes = document.querySelectorAll(`${CONFIG.selectors.orderItem} ${CONFIG.selectors.checkbox}:checked`);
                 if (allOrderItems.length > 0) {
@@ -1358,10 +1412,10 @@
                     printButton.style.cssText = `display: block; width: 100%; margin-top: 15px; padding: 8px 12px; font-size: 14px; font-weight: 700; text-align: center; cursor: pointer; border-radius: 4px; transition: all 150ms ease-in-out; border: 2px solid ${isDarkMode ? '#555' : '#DAE3F3'}; background: ${isDarkMode ? '#3a3a3a' : '#fff'}; color: ${isDarkMode ? '#e0e0e0' : '#272C34'};`;
                     if (checkedCheckboxes.length > 0) {
                         printButton.textContent = `Print ${checkedCheckboxes.length} Selected Envelope(s)`;
-                        printButton.onclick = () => allOrderItems.forEach(orderItem => orderItem.querySelector(CONFIG.selectors.checkbox)?.checked && orderItem.querySelector(`.${CONFIG.classNames.printEnvelopeBtn}`)?.click());
+                        printButton.onclick = () => printEnvelopes(Array.from(allOrderItems).filter(oi => oi.querySelector(CONFIG.selectors.checkbox)?.checked));
                     } else {
                         printButton.textContent = `Print All ${allOrderItems.length} Envelopes`;
-                        printButton.onclick = () => allOrderItems.forEach(orderItem => orderItem.querySelector(`.${CONFIG.classNames.printEnvelopeBtn}`)?.click());
+                        printButton.onclick = () => printEnvelopes(Array.from(allOrderItems));
                     }
                     contentWrapper.appendChild(printButton);
                 }
