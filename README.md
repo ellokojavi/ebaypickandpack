@@ -57,9 +57,9 @@ A powerful Tampermonkey userscript that transforms eBay's bulk shipping interfac
    - [Firefox](https://addons.mozilla.org/firefox/addon/tampermonkey/)
    - [Safari](https://apps.apple.com/us/app/tampermonkey/id1482490089)
 
-2. **Install this script** by clicking the raw GitHub URL:
+2. **Install this script** by downloading via the raw GitHub URL:
    ```
-   https://raw.githubusercontent.com/[YOUR_REPO]/userscript.js
+   https://raw.githubusercontent.com/ellokojavi/ebaypickandpack/main/userscript.js
    ```
    (Tampermonkey will prompt you to install)
 
@@ -181,18 +181,14 @@ See `userscript.js` header for full changelog. Latest:
 - Fixed image sizing and price extraction
 - Fixed Envelope #10 print layout
 
-**v3.25** (2025-12-12)
-- Decoupled logic from configuration (external Gist)
-- Auto-update URL optimization
-
 ## License
 
 MIT License — Feel free to fork, modify, and redistribute.
 
 ## Credits
 
-- **Javier Irigoyen** — Author
-- **Grok, Gemini, GitHub Copilot** — Code refinement
+- **El Loko Javi** — Author
+- **Grok, Gemini, GitHub Copilot, Claude (Anthropic)** — Code refinement
 - **Claude (Anthropic)** — Recent improvements (v3.26+)
 - **eBay** — Platform (obviously!)
 
