@@ -73,7 +73,7 @@ Edit the `USER_CONFIG` object in the userscript (around line 48) to customize:
 
 ```javascript
 const USER_CONFIG = {
-    returnAddress: "Altheastix ⚡<br>3015 E Howell St.<br>Seattle, WA 98122<br>USA",
+    returnAddress: "Altheastix ⚡<br>3033 W Howdel St.<br>Vancouver, WA 99233<br>USA",
     trackingOrderAmountThreshold: 15,  // Minimum order value to show +tracking link
     useAlternativeTracking: true,       // Use new v2 tracking system
     scriptLoadDelay: 15 * 1000,        // Initial startup delay (ms)
