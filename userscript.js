@@ -73,6 +73,7 @@
         defaultTrackingNumber: "9114 9023 0722 4988 5575 ",
         enableDarkModeByDefault: true,
         enableQuotesInMessages: true,
+        showMicaImage: true,
         orderColors: [
             // Expanded 40-color palette — hues spread across the spectrum and interleaved
             // so that consecutive assignments are always visually distinct
@@ -656,6 +657,12 @@
             document.querySelector('#auto-send-messages-toggle')?.closest('span')?.remove();
             // Attempt to combine orders before proceeding
             ensureOrdersCombined();
+            if (USER_CONFIG.showMicaImage) {
+                const micaImg = document.createElement('img');
+                micaImg.src = 'https://raw.githubusercontent.com/ellokojavi/ebaypickandpack/main/mica.png';
+                micaImg.style.cssText = 'position:fixed;top:0;left:0;max-height:100px;width:auto;z-index:999;pointer-events:none;';
+                document.body.appendChild(micaImg);
+            }
             console.debug('[Tampermonkey][INIT] Header & base layout adjustments complete');
         }
 
