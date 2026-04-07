@@ -33,6 +33,9 @@
 // - Added subtle horizontal dividers between letter groups in the SKU pills list.
 // - Expanded multi-item order pill color palette from 11 to 40 distinct colors,
 //   interleaved across hues to minimize repetition at high order volumes.
+// - Canadian envelopes now include a faint 🇨🇦 + "Int'l Stamp" reminder in the
+//   top-right corner, sized to be fully covered by an international stamp.
+// - Added showMicaImage flag to USER_CONFIG to toggle the Mica image on/off.
 //
 // v3.26:
 // - Added live SKU/buyer/item filter input to the SKU panel that filters both
@@ -836,7 +839,13 @@
                 const addressEl = orderItem.querySelector(`.${CONFIG.classNames.addressContainer}`);
                 if (!addressEl) return;
                 const addressHTML = addressEl.innerText.replaceAll("\n", "<br>");
-                envelopeHTMLs.push(`<div class="envelope"><table style="font-family: Arial; width: 100%; height: 100%; border-collapse: collapse;"><tr style="vertical-align: top;"><td style="width: 100%; padding: 0; font-size: 14px;">${USER_CONFIG.returnAddress}</td></tr><tr style="height: 10%;"><td></td></tr><tr style="vertical-align: top;"><td style="text-align: left; padding-left: 20%; font-size: 24px;">${addressHTML}</td></tr><tr style="height: 30%;"><td></td></tr></table></div>`);
+                const isCanadian = orderItem.dataset.isCanadian === 'true'
+                    || /canada/i.test(addressEl.innerText);
+                // Stamp reminder: sized to fit under a standard USPS international stamp (~1.25in × 1.5in)
+                const stampReminder = isCanadian
+                    ? `<div style="position:absolute;top:40px;right:0;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:5px 6px;border:1px dashed rgba(0,0,0,0.18);border-radius:2px;text-align:center;font-family:Arial;box-sizing:border-box;opacity:0.35;"><span style="font-size:22px;line-height:1;">🇨🇦</span><span style="font-size:10px;font-weight:bold;color:#444;line-height:1.2;white-space:nowrap;">Int'l Stamp</span></div>`
+                    : '';
+                envelopeHTMLs.push(`<div class="envelope" style="position:relative;">${stampReminder}<table style="font-family: Arial; width: 100%; height: 100%; border-collapse: collapse;"><tr style="vertical-align: top;"><td style="width: 100%; padding: 0; font-size: 14px;">${USER_CONFIG.returnAddress}</td></tr><tr style="height: 10%;"><td></td></tr><tr style="vertical-align: top;"><td style="text-align: left; padding-left: 20%; font-size: 24px;">${addressHTML}</td></tr><tr style="height: 30%;"><td></td></tr></table></div>`);
             });
             if (envelopeHTMLs.length === 0) return;
             const printwin = window.open("", "_blank");
