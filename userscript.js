@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         2025 eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260331-v3.26-filter-print-ui-fixes
+// @version      20260407-v3.27-custom-envelope-sku-ui
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -26,6 +26,14 @@
 // ===================================================================
 // CHANGELOG
 // ===================================================================
+// v3.27:
+// - Added "Custom Envelope" feature: a modal (accessible via link in the SKU panel)
+//   that auto-parses a pasted address block into editable fields and prints a single
+//   ad-hoc #10 envelope. Useful for re-sending orders not in the active ship queue.
+// - Added subtle horizontal dividers between letter groups in the SKU pills list.
+// - Expanded multi-item order pill color palette from 11 to 40 distinct colors,
+//   interleaved across hues to minimize repetition at high order volumes.
+//
 // v3.26:
 // - Added live SKU/buyer/item filter input to the SKU panel that filters both
 //   the SKU list and order cards in real-time. Filter text persists across re-renders.
@@ -65,7 +73,18 @@
         defaultTrackingNumber: "9114 9023 0722 4988 5575 ",
         enableDarkModeByDefault: true,
         enableQuotesInMessages: true,
-        orderColors: ['#FFADAD', '#FFD6A5', '#FDFFB6', '#CAFFBF', '#9BF6FF', '#A0C4FF', '#BDB2FF', '#FFC6FF', '#FFC6FF', '#DDFFD0', '#BDE0FE', '#F0D4FF'],
+        orderColors: [
+            // Expanded 40-color palette — hues spread across the spectrum and interleaved
+            // so that consecutive assignments are always visually distinct
+            '#FFADAD', '#A0C4FF', '#CAFFBF', '#FFC6FF', '#FDFFB6',  // red · blue · green · pink · yellow
+            '#9BF6FF', '#FFD6A5', '#BDB2FF', '#DDFFD0', '#F0D4FF',  // cyan · orange · purple · mint · lavender
+            '#FF9AA2', '#B5EAD7', '#FFDAC1', '#C7CEEA', '#E2F0CB',  // rose · teal · peach · periwinkle · sage
+            '#FFE4B5', '#D4F1F4', '#F8C8D4', '#D5F5E3', '#FAD7A0',  // moccasin · ice blue · blush · seafoam · amber
+            '#D7BDE2', '#A9DFBF', '#F9E79F', '#AED6F1', '#F5CBA7',  // soft violet · jade · straw · sky · apricot
+            '#A3E4D7', '#F1948A', '#85C1E9', '#82E0AA', '#F0B27A',  // aquamarine · coral · cornflower · emerald · pumpkin
+            '#C39BD3', '#76D7C4', '#F7DC6F', '#7FB3D3', '#F0A7A0',  // plum · turquoise · gold · steel blue · salmon
+            '#B7D7A8', '#D2B4DE', '#A9CCE3', '#F9C74F', '#90DBB0',  // leaf · mauve · powder blue · sunflower · spearmint
+        ],
         headerLinks: [
             { text: 'Seller Hub', href: 'https://www.ebay.com/sh/ovw' },
             { text: 'All Orders', href: 'https://www.ebay.com/sh/ord/?filter=status%3AALL_ORDERS' },
@@ -195,7 +214,7 @@
                 .${CONFIG.classNames.skuItem} { padding: 4px 8px; border-radius: 4px; font-size: 14px; background-color: ${isDarkMode ? '#3a3a3a' : '#f0f0f0'}; border: 1px solid ${isDarkMode ? '#555' : '#ddd'}; line-height: 1.4; white-space: nowrap; text-decoration: none; color: ${isDarkMode ? '#e0e0e0' : 'inherit'}; cursor: pointer; transition: all 0.2s ease-in-out; }
                 .sku-highlight-hover { transform: scale(1.05); border-color: ${isDarkMode ? '#9BF6FF' : '#0070d2'}; box-shadow: 0 0 8px ${isDarkMode ? '#9BF6FF' : '#0070d2'}; }
                 .${CONFIG.classNames.skuShipped}, .sku-shipped { opacity: 0.5 !important; }
-                .${CONFIG.classNames.skuGroupSeparator} { flex-basis: 100%; height: 0; margin-top: 8px; }
+                .${CONFIG.classNames.skuGroupSeparator} { flex-basis: 100%; height: 0; margin-top: 8px; border-top: 1px solid ${isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}; margin-bottom: 2px; }
                 ${CONFIG.selectors.serviceActions} { margin-left: 400px; }
                 ${CONFIG.selectors.bulkLabelsAppCard} { margin-left: 400px; border: 0px solid #777; }
                 ${CONFIG.selectors.ordersFilters} { margin-left: 0; margin-bottom: 12px; width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 10px 0; background: ${isDarkMode ? '#2a2a2a' : '#fff'}; border: 1px solid #555; border-radius: 12px; }
@@ -1422,6 +1441,17 @@
                     contentWrapper.appendChild(printButton);
                 }
 
+                // --- CUSTOM ENVELOPE FEATURE (link in SKU panel) ---
+                const customEnvLink = document.createElement('a');
+                customEnvLink.href = '#';
+                customEnvLink.textContent = '✉ Custom Envelope';
+                customEnvLink.style.cssText = `display:block;text-align:center;margin-top:6px;font-size:12px;color:${isDarkMode ? '#78BFFF' : '#3665f3'};text-decoration:none;cursor:pointer;opacity:0.75;transition:opacity 0.2s;`;
+                customEnvLink.onmouseenter = () => { customEnvLink.style.opacity = '1'; };
+                customEnvLink.onmouseleave = () => { customEnvLink.style.opacity = '0.75'; };
+                customEnvLink.addEventListener('click', (e) => { e.preventDefault(); showCustomEnvelopeModal(); });
+                contentWrapper.appendChild(customEnvLink);
+                // --- END CUSTOM ENVELOPE FEATURE (link) ---
+
                 // --- Configuration Section (below Print button) ---
                 const configSection = document.createElement('div');
                 configSection.id = 'altheastix-config-panel';
@@ -1616,6 +1646,153 @@
 
             return { createSKUPackingList };
         }
+
+        // --- CUSTOM ENVELOPE FEATURE (modal) ---
+        // Opens a modal that lets the user paste a raw address block, auto-parses it into
+        // structured fields for review/edit, and prints a single ad-hoc envelope.
+        function showCustomEnvelopeModal() {
+            const isDarkMode = localStorage.getItem(CONFIG.localStorageKeys.darkMode) !== 'false';
+            const bg = isDarkMode ? '#1e1e1e' : '#fff';
+            const fg = isDarkMode ? '#e0e0e0' : '#000';
+            const inputBg = isDarkMode ? '#2c2c2c' : '#fff';
+            const inputBorder = isDarkMode ? '#555' : '#ccc';
+            const accent = isDarkMode ? '#3665f3' : '#0070d2';
+            const mutedFg = isDarkMode ? '#999' : '#888';
+
+            // Overlay
+            const overlay = document.createElement('div');
+            overlay.className = 'custom-envelope-overlay';
+            overlay.style.cssText = `position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);z-index:10001;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);`;
+
+            // Modal
+            const modal = document.createElement('div');
+            modal.className = 'custom-envelope-modal';
+            modal.style.cssText = `background:${bg};color:${fg};border-radius:12px;padding:24px;width:460px;max-width:92vw;max-height:88vh;overflow-y:auto;box-shadow:0 8px 30px rgba(0,0,0,0.3);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;`;
+
+            // Header
+            const header = document.createElement('div');
+            header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;';
+            const title = document.createElement('h3');
+            title.textContent = '✉ Custom Envelope';
+            title.style.cssText = `margin:0;font-size:18px;color:${fg};`;
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = '✕';
+            closeBtn.style.cssText = `background:none;border:none;font-size:18px;cursor:pointer;color:${mutedFg};padding:4px 8px;border-radius:4px;`;
+            closeBtn.onclick = () => overlay.remove();
+            header.append(title, closeBtn);
+            modal.appendChild(header);
+
+            // Instruction
+            const hint = document.createElement('p');
+            hint.textContent = 'Paste a full address block below — fields update automatically.';
+            hint.style.cssText = `font-size:12px;color:${mutedFg};margin:0 0 10px;`;
+            modal.appendChild(hint);
+
+            // Textarea
+            const textarea = document.createElement('textarea');
+            textarea.placeholder = 'Pablo Cazenave\n26615 Godfrey Cove Ct\nApt 206\nKaty, TX 77494-0415\nUnited States';
+            textarea.style.cssText = `width:100%;box-sizing:border-box;min-height:110px;padding:10px;border-radius:8px;border:1px solid ${inputBorder};background:${inputBg};color:${fg};font-size:14px;font-family:inherit;resize:vertical;outline:none;transition:border-color 0.2s;`;
+            textarea.addEventListener('focus', () => { textarea.style.borderColor = accent; });
+            textarea.addEventListener('blur', () => { textarea.style.borderColor = inputBorder; });
+            modal.appendChild(textarea);
+
+            // Parsed fields container
+            const fieldsContainer = document.createElement('div');
+            fieldsContainer.style.cssText = 'margin-top:14px;display:flex;flex-direction:column;gap:8px;';
+
+            const fieldDefs = [
+                { key: 'name', label: 'Name' },
+                { key: 'street', label: 'Street' },
+                { key: 'line2', label: 'Apt / Unit / Extra' },
+                { key: 'cityStateZip', label: 'City, State ZIP' },
+                { key: 'country', label: 'Country' }
+            ];
+
+            const fieldInputs = {};
+            fieldDefs.forEach(def => {
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex;align-items:center;gap:8px;';
+                const label = document.createElement('label');
+                label.textContent = def.label;
+                label.style.cssText = `font-size:12px;font-weight:600;color:${mutedFg};width:110px;flex-shrink:0;text-align:right;`;
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.dataset.field = def.key;
+                input.style.cssText = `flex:1;padding:6px 10px;border-radius:6px;border:1px solid ${inputBorder};background:${inputBg};color:${fg};font-size:13px;font-family:inherit;outline:none;transition:border-color 0.2s;`;
+                input.addEventListener('focus', () => { input.style.borderColor = accent; });
+                input.addEventListener('blur', () => { input.style.borderColor = inputBorder; });
+                fieldInputs[def.key] = input;
+                row.append(label, input);
+                fieldsContainer.appendChild(row);
+            });
+            modal.appendChild(fieldsContainer);
+
+            // Live parsing: debounced, fires on every textarea change
+            let parseTimer = null;
+            const runParse = () => {
+                const parsed = parseAddressBlock(textarea.value);
+                fieldDefs.forEach(def => {
+                    fieldInputs[def.key].value = parsed[def.key] || '';
+                });
+            };
+            textarea.addEventListener('input', () => {
+                clearTimeout(parseTimer);
+                parseTimer = setTimeout(runParse, 250);
+            });
+            // Also fire on paste immediately (paste event fires before input)
+            textarea.addEventListener('paste', () => {
+                clearTimeout(parseTimer);
+                setTimeout(runParse, 50);
+            });
+
+            // Buttons row
+            const btnRow = document.createElement('div');
+            btnRow.style.cssText = 'display:flex;justify-content:flex-end;gap:10px;margin-top:18px;';
+
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = 'Cancel';
+            cancelBtn.style.cssText = `padding:8px 18px;border-radius:6px;border:1px solid ${inputBorder};background:${isDarkMode ? '#333' : '#f5f5f5'};color:${fg};font-size:14px;cursor:pointer;font-weight:600;`;
+            cancelBtn.onclick = () => overlay.remove();
+
+            const printBtn = document.createElement('button');
+            printBtn.textContent = 'Print Envelope';
+            printBtn.style.cssText = `padding:8px 18px;border-radius:6px;border:none;background:${accent};color:#fff;font-size:14px;cursor:pointer;font-weight:700;transition:background 0.2s;`;
+            printBtn.onmouseenter = () => { printBtn.style.background = isDarkMode ? '#5a82f5' : '#005fb8'; };
+            printBtn.onmouseleave = () => { printBtn.style.background = accent; };
+
+            printBtn.onclick = () => {
+                // Build address HTML from the editable fields (not the raw textarea)
+                const parts = fieldDefs
+                    .map(def => fieldInputs[def.key].value.trim())
+                    .filter(v => v.length > 0);
+                if (parts.length === 0) { alert('Please paste an address first.'); return; }
+                const addressHTML = parts.join('<br>');
+                const envelopeHTML = `<div class="envelope"><table style="font-family: Arial; width: 100%; height: 100%; border-collapse: collapse;"><tr style="vertical-align: top;"><td style="width: 100%; padding: 0; font-size: 14px;">${USER_CONFIG.returnAddress}</td></tr><tr style="height: 10%;"><td></td></tr><tr style="vertical-align: top;"><td style="text-align: left; padding-left: 20%; font-size: 24px;">${addressHTML}</td></tr><tr style="height: 30%;"><td></td></tr></table></div>`;
+                const printwin = window.open("", "_blank");
+                printwin.document.write(`<html><head><style>@page { size: 8.93in x 3.878in; margin: 0; } html, body { margin: 0; padding: 0; } .envelope { width: 8.93in; height: 3.878in; padding: 10px; font-family: Arial; box-sizing: border-box; overflow: hidden; }</style></head><body>${envelopeHTML}</body></html>`);
+                printwin.document.close();
+                printwin.focus();
+                printwin.print();
+                printwin.close();
+                overlay.remove();
+            };
+
+            btnRow.append(cancelBtn, printBtn);
+            modal.appendChild(btnRow);
+
+            // Close on overlay click (outside modal)
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+            // Close on Escape
+            const escHandler = (e) => { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', escHandler); } };
+            document.addEventListener('keydown', escHandler);
+
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+
+            // Auto-focus textarea
+            setTimeout(() => textarea.focus(), 50);
+        }
+        // --- END CUSTOM ENVELOPE FEATURE (modal) ---
 
         // --- Main Execution Function ---
         // This is the core function that orchestrates the script's execution on the main page.
@@ -2273,5 +2450,95 @@
     function applyTemplate(template, data) {
         return template.replace(/\{([A-Z0-9_]+)\}/g, (m, key) => (key in data ? data[key] : m));
     }
+
+    // --- CUSTOM ENVELOPE FEATURE ---
+    // Parses a free-form address block into structured fields.
+    // Handles name, street, apt/unit/suite/extra line, city+state+zip, and country.
+    function parseAddressBlock(text) {
+        const result = { name: '', street: '', line2: '', cityStateZip: '', country: '' };
+        if (!text || !text.trim()) return result;
+
+        // Split into non-empty lines, trimming each
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        if (lines.length === 0) return result;
+
+        // Known country names / codes (common destinations)
+        const countryPatterns = /^(united states|usa|us|canada|ca|mexico|mx|united kingdom|uk|australia|au|germany|de|france|fr|japan|jp|brazil|br|india|in|italy|it|spain|es|netherlands|nl|sweden|se|norway|no|denmark|dk|finland|fi|new zealand|nz|ireland|ie|portugal|pt|belgium|be|austria|at|switzerland|ch|south korea|kr|poland|pl|czech republic|cz|israel|il|puerto rico|pr|philippines|ph|singapore|sg|hong kong|hk|taiwan|tw|china|cn|colombia|co|argentina|ar|chile|cl|peru|pe|costa rica|cr)$/i;
+
+        // City + State + ZIP pattern (US-style: "City, ST 12345" or "City, ST 12345-6789")
+        const cityStateZipPattern = /^(.+),\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/i;
+
+        // Secondary address line indicators
+        const line2Pattern = /^(apt\.?|apartment|unit|suite|ste\.?|bldg\.?|building|floor|fl\.?|room|rm\.?|lot|front\s*door|back\s*door|side\s*door|gate|door|c\/?o\b|attn:?)/i;
+
+        // Detect which line is the city/state/zip
+        let cszIndex = -1;
+        for (let i = 0; i < lines.length; i++) {
+            if (cityStateZipPattern.test(lines[i])) { cszIndex = i; break; }
+        }
+
+        // Detect country line (usually last)
+        let countryIndex = -1;
+        for (let i = lines.length - 1; i >= 0; i--) {
+            if (countryPatterns.test(lines[i])) { countryIndex = i; break; }
+        }
+
+        // If no city/state/zip pattern found, try a looser heuristic:
+        // a line with a comma followed by 2-letter code (state/province) near the end
+        if (cszIndex === -1) {
+            const looseCSZ = /^(.+),\s*([A-Z]{2})\b/i;
+            for (let i = lines.length - 1; i >= 1; i--) {
+                if (i === countryIndex) continue;
+                if (looseCSZ.test(lines[i])) { cszIndex = i; break; }
+            }
+        }
+
+        // Assign fields based on detected landmarks
+        // Line 0 is always the name
+        result.name = lines[0] || '';
+
+        if (cszIndex > 0) {
+            // Everything between name and csz is address lines
+            const addressLines = lines.slice(1, cszIndex);
+            if (addressLines.length >= 2) {
+                result.street = addressLines[0];
+                result.line2 = addressLines.slice(1).join(', ');
+            } else if (addressLines.length === 1) {
+                result.street = addressLines[0];
+            }
+            result.cityStateZip = lines[cszIndex];
+        } else {
+            // No csz detected — assign by position heuristics
+            if (lines.length >= 2) result.street = lines[1];
+            if (lines.length >= 3) {
+                // Check if line 2 looks like a secondary line
+                const remaining = lines.slice(2, countryIndex > 0 ? countryIndex : undefined);
+                if (remaining.length >= 2) {
+                    // Check if first remaining is apt-like
+                    if (line2Pattern.test(remaining[0])) {
+                        result.line2 = remaining[0];
+                        result.cityStateZip = remaining.slice(1).join(', ');
+                    } else {
+                        result.street = lines[1];
+                        result.line2 = remaining[0];
+                        result.cityStateZip = remaining.slice(1).join(', ');
+                    }
+                } else if (remaining.length === 1) {
+                    if (line2Pattern.test(remaining[0])) {
+                        result.line2 = remaining[0];
+                    } else {
+                        result.cityStateZip = remaining[0];
+                    }
+                }
+            }
+        }
+
+        if (countryIndex > 0) {
+            result.country = lines[countryIndex];
+        }
+
+        return result;
+    }
+    // --- END CUSTOM ENVELOPE FEATURE (utility) ---
 
 })();
