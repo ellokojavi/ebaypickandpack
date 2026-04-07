@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         2025 eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260407-v3.27-custom-envelope-sku-ui
+// @version      20260407-v3.31-isMultiItem-fix
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -26,6 +26,29 @@
 // ===================================================================
 // CHANGELOG
 // ===================================================================
+// v3.31:
+// - Fixed disappearing pills for single-SKU multi-quantity orders (e.g. B01 x2).
+//   isMultiItemOrder was incorrectly set to true when totalQty > 1, causing
+//   colored-pill styling in dark mode (black text on dark bg = invisible).
+//   isMultiItemOrder now only triggers when an order has multiple DISTINCT SKUs,
+//   which is its original intent.
+//
+// v3.30:
+// - Fixed quantity parsing: eBay uses "Qty: 2" (not "Quantity: 2") in the item
+//   details list. All three places that parse quantity now accept both "Quantity:"
+//   and "Qty:" (case-insensitive), so "B01 x 2" pills now render correctly.
+//   The v3.29 SKU+Design consolidation within an order is also retained.
+//
+// v3.29:
+// - Fixed SKU pills for multi-quantity items: when the same SKU appears multiple
+//   times within one order (e.g. eBay renders qty 2 as two separate line items),
+//   the pills now consolidate by SKU+Design per order and show "B01 x 2" instead
+//   of two separate "B01" pills. Cross-order duplicates remain as separate pills.
+//
+// v3.28:
+// - Fixed light-mode quantity badge contrast: #FFA500 (ratio 1.97) → #B45309 (ratio 5.02).
+//   Dark mode keeps #FFA500 (ratio 7.27, unchanged).
+//
 // v3.27:
 // - Added "Custom Envelope" feature: a modal (accessible via link in the SKU panel)
 //   that auto-parses a pasted address block into editable fields and prints a single
@@ -47,10 +70,6 @@
 // - Fixed print envelope layout for Envelope #10 format (9.5in × 4.125in) with
 //   6% content scaling to prevent blank pages.
 //
-// v3.25:
-// - Decoupled Logic from Configuration. Quotes, Templates, and Keywords
-//   are now loaded dynamically from a GitHub Gist.
-// - Fixed URL logic to always pull the latest version of the config.
 
 (function() {
     'use strict';
@@ -296,7 +315,7 @@
                 ${CONFIG.selectors.itemDetailsContainer} li { line-height: 1.3; }
                 ${CONFIG.selectors.itemDetailsContainer} li:first-child { font-size: 1.5em !important; font-weight: bold; color: ${isDarkMode ? '#ffffff' : '#111'}; }
                 ${CONFIG.selectors.itemDetailsContainer} li:nth-child(2) { font-size: 1em !important; font-weight: normal; color: ${isDarkMode ? '#e0e0e0' : 'black'}; }
-                .${CONFIG.classNames.quantityMulti} { font-size: 1.5em !important; font-weight: bold; color: orange !important; }
+                .${CONFIG.classNames.quantityMulti} { font-size: 1.5em !important; font-weight: bold; color: ${isDarkMode ? '#FFA500' : '#B45309'} !important; }
                 .${CONFIG.classNames.reviseLink} {
                     display: inline-block;
                     margin-left: 3px;
@@ -663,7 +682,41 @@
             if (USER_CONFIG.showMicaImage) {
                 const micaImg = document.createElement('img');
                 micaImg.src = 'https://raw.githubusercontent.com/ellokojavi/ebaypickandpack/main/mica.png';
-                micaImg.style.cssText = 'position:fixed;top:0;left:0;max-height:100px;width:auto;z-index:1001;pointer-events:none;';
+                micaImg.style.cssText = 'position:fixed;top:0;left:0;max-height:100px;width:auto;z-index:1001;cursor:pointer;transition:opacity 0.15s;';
+                micaImg.addEventListener('mouseenter', () => { micaImg.style.opacity = '0.85'; });
+                micaImg.addEventListener('mouseleave', () => { micaImg.style.opacity = '1'; });
+                micaImg.addEventListener('click', () => {
+                    const overlay = document.createElement('div');
+                    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:10002;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.25s ease;';
+                    const enlarged = document.createElement('img');
+                    enlarged.src = micaImg.src;
+                    enlarged.style.cssText = `width:${micaImg.naturalWidth * 4}px;height:${micaImg.naturalHeight * 4}px;max-width:90vw;max-height:90vh;object-fit:contain;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.6);transform:scale(0.88);transition:transform 0.25s ease,opacity 0.25s ease;opacity:0;`;
+                    const closeBtn = document.createElement('button');
+                    closeBtn.textContent = '✕';
+                    closeBtn.style.cssText = 'position:fixed;top:20px;right:24px;background:none;border:none;color:rgba(255,255,255,0.7);font-size:28px;cursor:pointer;line-height:1;padding:4px 8px;transition:color 0.15s;';
+                    closeBtn.addEventListener('mouseenter', () => { closeBtn.style.color = '#fff'; });
+                    closeBtn.addEventListener('mouseleave', () => { closeBtn.style.color = 'rgba(255,255,255,0.7)'; });
+                    const close = () => {
+                        overlay.style.opacity = '0';
+                        enlarged.style.opacity = '0';
+                        enlarged.style.transform = 'scale(0.88)';
+                        setTimeout(() => overlay.remove(), 250);
+                    };
+                    closeBtn.addEventListener('click', close);
+                    overlay.addEventListener('click', close);
+                    enlarged.addEventListener('click', (e) => e.stopPropagation());
+                    document.addEventListener('keydown', function escHandler(e) {
+                        if (e.key === 'Escape') { close(); document.removeEventListener('keydown', escHandler); }
+                    });
+                    overlay.append(enlarged, closeBtn);
+                    document.body.appendChild(overlay);
+                    // Trigger fade+scale in on next frame so the transition fires
+                    requestAnimationFrame(() => {
+                        overlay.style.opacity = '1';
+                        enlarged.style.opacity = '1';
+                        enlarged.style.transform = 'scale(1)';
+                    });
+                });
                 document.body.appendChild(micaImg);
             }
             console.debug('[Tampermonkey][INIT] Header & base layout adjustments complete');
@@ -706,9 +759,9 @@
                     const detailsList = itemElement.querySelector(CONFIG.selectors.itemDetailsContainer);
                     if (detailsList) {
                         let qty = 1;
-                        const qtyLi = Array.from(detailsList.querySelectorAll('li')).find(li => li.innerText.trim().startsWith('Quantity:'));
+                        const qtyLi = Array.from(detailsList.querySelectorAll('li')).find(li => /^(Quantity|Qty):/i.test(li.innerText.trim()));
                         if (qtyLi) {
-                            const m = qtyLi.innerText.match(/Quantity:\s*(\d+)/);
+                            const m = qtyLi.innerText.match(/^(?:Quantity|Qty):\s*(\d+)/i);
                             if (m) qty = parseInt(m[1], 10) || 1;
                         }
 
@@ -764,7 +817,7 @@
             let hasManila = false, hasLg = false, skuCount = 0;
             orderItem.querySelectorAll(`${CONFIG.selectors.itemDetailsContainer} li`).forEach(li => {
                 const text = li.innerText;
-                if (text.startsWith("Quantity: ") && parseInt(text.split("Quantity: ")[1]) > 1) li.classList.add(CONFIG.classNames.quantityMulti);
+                if (/^(Quantity|Qty):\s*/i.test(text) && parseInt(text.replace(/^(?:Quantity|Qty):\s*/i, '')) > 1) li.classList.add(CONFIG.classNames.quantityMulti);
                 if (text.startsWith("SKU: ")) {
                     skuCount++;
                     if (text.toLowerCase().includes('manila')) hasManila = true;
@@ -1620,13 +1673,14 @@
                         let skuValue = '', designValue = '', quantity = 1;
                         const detailsList = itemEl.querySelector('[class*="item__details"]');
                         if (!detailsList) return;
-                        const skuLi = Array.from(detailsList.querySelectorAll('li')).find(li => li.innerText.trim().startsWith("SKU:"));
+                        const allLis = Array.from(detailsList.querySelectorAll('li'));
+                        const skuLi = allLis.find(li => li.innerText.trim().startsWith("SKU:"));
                         if (skuLi) skuValue = skuLi.innerText.trim().replace("SKU:", "").trim();
-                        const designLi = Array.from(detailsList.querySelectorAll('li')).find(li => li.innerText.trim().startsWith("Design:"));
+                        const designLi = allLis.find(li => li.innerText.trim().startsWith("Design:"));
                         if (designLi) designValue = designLi.innerText.trim().replace("Design:", "").trim();
-                        const qtyLi = Array.from(detailsList.querySelectorAll('li')).find(li => li.innerText.trim().startsWith("Quantity:"));
+                        const qtyLi = allLis.find(li => /^(Quantity|Qty):/i.test(li.innerText.trim()));
                         if (qtyLi) {
-                            const quantityMatch = qtyLi.innerText.trim().match(/Quantity:\s*(\d+)/);
+                            const quantityMatch = qtyLi.innerText.trim().match(/^(?:Quantity|Qty):\s*(\d+)/i);
                             if (quantityMatch?.[1]) quantity = parseInt(quantityMatch[1], 10);
                         }
                         if (skuValue) itemsInThisOrder.push({ sku: skuValue, design: designValue, quantity: quantity });
@@ -1641,9 +1695,19 @@
                     }
                 });
                 parsedOrders.forEach(order => {
-                    const totalQuantityInOrder = order.items.reduce((sum, item) => sum + item.quantity, 0);
-                    const isMultiItemOrder = totalQuantityInOrder > 1 || order.items.length > 1;
+                    // Consolidate items with the same SKU+Design within one order
+                    const consolidated = new Map();
                     order.items.forEach(item => {
+                        const key = `${item.sku}|||${item.design}`;
+                        if (consolidated.has(key)) {
+                            consolidated.get(key).quantity += item.quantity;
+                        } else {
+                            consolidated.set(key, { sku: item.sku, design: item.design, quantity: item.quantity });
+                        }
+                    });
+                    const mergedItems = Array.from(consolidated.values());
+                    const isMultiItemOrder = mergedItems.length > 1;
+                    mergedItems.forEach(item => {
                         let displayText = item.sku;
                         if (item.design) displayText += ` (${item.design})`;
                         if (item.quantity > 1) displayText += ` x${item.quantity}`;
