@@ -663,7 +663,7 @@
             if (USER_CONFIG.showMicaImage) {
                 const micaImg = document.createElement('img');
                 micaImg.src = 'https://raw.githubusercontent.com/ellokojavi/ebaypickandpack/main/mica.png';
-                micaImg.style.cssText = 'position:fixed;top:0;left:0;max-height:100px;width:auto;z-index:999;pointer-events:none;';
+                micaImg.style.cssText = 'position:fixed;top:0;left:0;max-height:100px;width:auto;z-index:1001;pointer-events:none;';
                 document.body.appendChild(micaImg);
             }
             console.debug('[Tampermonkey][INIT] Header & base layout adjustments complete');
