@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         2025 eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260407-v3.31-isMultiItem-fix
+// @version      20260409-v3.33-subtle-multi-qty-pill
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -26,6 +26,21 @@
 // ===================================================================
 // CHANGELOG
 // ===================================================================
+// v3.33:
+// - Toned down multi-qty pill color: replaced bright orange with a muted warm amber.
+//   Removed bold font-weight, reduced border from 2px to 1px, softened background
+//   and text/border colors. Still warm enough to signal "pack multiple units" without
+//   competing visually with Manila/LG pills.
+// v3.32:
+// - Multi-quantity pills (e.g. "B01 x2") now render with an amber/orange color
+//   scheme: warm dark background + orange border + orange text in dark mode;
+//   warm cream background + amber border + dark amber text in light mode.
+//   This uses the same orange accent already applied to "Qty: 2" badges on order
+//   cards, so the visual language is consistent. The style stacks cleanly with
+//   multi-item-order colored pills (which use inline backgroundColor).
+// - Manila pills take priority over multi-qty styling: a SKU that is both Manila
+//   and qty>1 shows Manila styling only (different envelope = more important).
+//
 // v3.31:
 // - Fixed disappearing pills for single-SKU multi-quantity orders (e.g. B01 x2).
 //   isMultiItemOrder was incorrectly set to true when totalQty > 1, causing
@@ -142,7 +157,7 @@
                 copyAddressButton: 'copyAddressButton', editAddressButton: 'editAddressButton', createTemplateButton: 'createTemplateButton', printEnvelopeHTML: 'HTMLEnvelopeToPrint', printAllEnvelopesButton: 'printAllEnvelopesButton', skuPanelContainer: 'SKUListContainer', skuList: 'SKUsToPackContainer', skuContentWrapper: 'sku-content-wrapper'
             },
             classNames: {
-                addressContainer: 'en-US', editAddressBtn: 'edit-address-btn', cancelAddressBtn: 'cancel-address-btn', copyAddressBtn: 'copy-address-btn', addressEditInput: 'address-edit-input', cancelWrapper: 'cancel-wrapper', addressFullname: 'print__address__fullname', itemContainer: 'item', shippingInfoBlock: 'shipping-info-block', quantityMulti: 'quantity-multi', markAsShippedBtn: 'mark-as-shipped-btn', isEditingAddress: 'is-editing-address', highlightManila: 'order-highlight-manila', highlightLg: 'order-highlight-lg', highlightMultiItem: 'order-highlight-multi-item', borderLg: 'order-border-lg', borderManila: 'order-border-manila', highlightYellow: 'highlight-yellow', skuItem: 'sku-item', skuGroupSeparator: 'sku-group-separator', skuLg: 'sku-lg', skuManila: 'sku-manila', multiItemSkuOrder: 'order-multi-item', darkModeSwitch: 'dark-mode-switch', darkModeSlider: 'slider', zoomOverlay: 'zoomed-image-overlay', zoomContainer: 'zoomed-image-container', zoomImage: 'zoomed-image', zoomCloseButton: 'close-zoom-button',
+                addressContainer: 'en-US', editAddressBtn: 'edit-address-btn', cancelAddressBtn: 'cancel-address-btn', copyAddressBtn: 'copy-address-btn', addressEditInput: 'address-edit-input', cancelWrapper: 'cancel-wrapper', addressFullname: 'print__address__fullname', itemContainer: 'item', shippingInfoBlock: 'shipping-info-block', quantityMulti: 'quantity-multi', markAsShippedBtn: 'mark-as-shipped-btn', isEditingAddress: 'is-editing-address', highlightManila: 'order-highlight-manila', highlightLg: 'order-highlight-lg', highlightMultiItem: 'order-highlight-multi-item', borderLg: 'order-border-lg', borderManila: 'order-border-manila', highlightYellow: 'highlight-yellow', skuItem: 'sku-item', skuGroupSeparator: 'sku-group-separator', skuLg: 'sku-lg', skuManila: 'sku-manila', skuMultiQty: 'sku-multi-qty', multiItemSkuOrder: 'order-multi-item', darkModeSwitch: 'dark-mode-switch', darkModeSlider: 'slider', zoomOverlay: 'zoomed-image-overlay', zoomContainer: 'zoomed-image-container', zoomImage: 'zoomed-image', zoomCloseButton: 'close-zoom-button',
                 printEnvelopeBtn: 'print-envelope-btn', markAsShippedWaiting: 'waiting-confirmation', orderShipped: 'shipped-state', shippedLabel: 'shipped-label', orderPendingShipment: 'order-pending-shipment', pendingOverlay: 'pending-overlay', pendingOverlayContent: 'pending-overlay-content', processingIcon: 'processing-icon', skuShipped: 'sku-shipped', addTrackingLink: 'add-tracking-link', trackingLinkSubmitted: 'tracking-link-submitted', reviseLink: 'revise-link', addNoteLink: 'add-note-link', noteLinkSubmitted: 'note-link-submitted',
                 messageContainer: 'message-container', cannedMessageSelect: 'canned-message-select', sendCannedMessageBtn: 'send-canned-message-btn'
             },
@@ -364,6 +379,7 @@
                 .${CONFIG.classNames.skuItem}.${CONFIG.classNames.multiItemSkuOrder} { background-color: ${isDarkMode ? '#2a4a3f' : '#E8F5E9'}; font-weight: bold; }
                 .${CONFIG.classNames.skuItem}.${CONFIG.classNames.skuLg} { background-color: ${isDarkMode ? '#2a3f4a' : '#B3E5FC'}; font-weight: bold; border: 2px solid #ffffb1 !important; }
                 .${CONFIG.classNames.skuItem}.${CONFIG.classNames.skuManila} { background-color: ${isDarkMode ? '#4a3f2a' : '#FFD54F'}; font-weight: bold; border: 3px solid orange !important; }
+                .${CONFIG.classNames.skuItem}.${CONFIG.classNames.skuMultiQty} { background-color: ${isDarkMode ? '#2e2a1e' : '#FAF3E0'}; color: ${isDarkMode ? '#c8902a' : '#8a5c00'} !important; border: 1px solid ${isDarkMode ? '#7a5c28' : '#c8a060'} !important; }
                 .${CONFIG.classNames.highlightYellow} { color: #111; background-color: #ffffb1; padding: 1px 2px; border-radius: 2px; }
                 .${CONFIG.classNames.zoomOverlay} { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); z-index: 10000; display: flex; justify-content: center; align-items: center; }
                 .${CONFIG.classNames.zoomContainer} { max-width: 80%; max-height: 80%; position: relative; }
@@ -1486,6 +1502,7 @@
                             if (skuObject.text.toLowerCase().includes("lg")) skuItemLink.classList.add(CONFIG.classNames.skuLg);
                             if (skuObject.text.toLowerCase().includes("manila")) skuItemLink.classList.add(CONFIG.classNames.skuManila);
                         }
+                        if (skuObject.quantity > 1 && !skuItemLink.classList.contains(CONFIG.classNames.skuManila)) skuItemLink.classList.add(CONFIG.classNames.skuMultiQty);
                         flexContainer.appendChild(skuItemLink);
                     }
                     contentWrapper.appendChild(flexContainer);
@@ -1713,6 +1730,7 @@
                         if (item.quantity > 1) displayText += ` x${item.quantity}`;
                         SKU.push({
                             text: displayText,
+                            quantity: item.quantity,
                             isMultiItemOrder,
                             orderId: order.orderId,
                             isCanadian: order.isCanadian,
