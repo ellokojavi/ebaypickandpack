@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         2025 eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260409-v3.33-subtle-multi-qty-pill
+// @version      20260412-v3.40-address-validation-canada
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -26,6 +26,54 @@
 // ===================================================================
 // CHANGELOG
 // ===================================================================
+// v3.40:
+// - Extended address validation to Canadian orders. validateAddress() now detects
+//   "Canada" in the address lines and applies CA-specific rules: postal code format
+//   (A1A 1A1), and province/territory code validation against all 13 CA codes
+//   (AB, BC, MB, NB, NL, NS, NT, NU, ON, PE, QC, SK, YT).
+// - Removed the isCanadian exclusion guard in processOrderCard — Canadian orders
+//   now go through the same badge injection path as US orders.
+//
+// v3.39:
+// - Added address validation rule: any line after the buyer name that consists
+//   entirely of digits is flagged as a likely duplicate street number (e.g. eBay
+//   splitting "416577" onto its own line before "416577 flying bridge").
+//
+// v3.38:
+// - Fixed address badge placement for real: eBay injects a <br> inside the
+//   .print__address__fullname span, so appendChild was landing after the line
+//   break. Badge is now inserted before that <br> so it sits inline with the name.
+//
+// v3.37:
+// - Fixed address badge placement: .print__address__fullname is a sibling of .en-US,
+//   not a descendant, so addrEl.querySelector() always returned null. Scoped the
+//   lookup to orderItem.querySelector() — consistent with every other use in the
+//   script — so the badge now correctly appends inside the name element.
+//
+// v3.36:
+// - Moved address validation badges inline, immediately to the right of the recipient
+//   name, instead of appearing as a separate line below the address block.
+// - Badges are now just the symbol (✔ or ⚠) with no label text; the tooltip carries
+//   the message. OK tooltip updated to "Address looks correct".
+//
+// v3.35:
+// - Added ✔ badge for orders that pass all address validation rules.
+//   Hovering shows "Address looks correct". Styled in green, consistent with the
+//   ⚠ warning badge layout.
+//
+// v3.34:
+// - Added address integrity validation for domestic (US) orders. After each order
+//   card is processed, the shipping address is linted against a set of structural
+//   rules: minimum line count, buyer name presence, street starting with a house
+//   number, presence of a valid "City ST XXXXX" line (comma-less, matching eBay's
+//   format), and recognized US state/territory abbreviation.
+//   International addresses (Canada, UK, etc.) are skipped.
+// - When one or more issues are found, a ⚠ "Address issue" badge is injected
+//   between the address text and the Edit/Copy buttons. Hovering the badge shows
+//   a tooltip listing every issue found, styled to match dark/light mode.
+// - Validation lives in a standalone validateAddress(lines) pure function placed
+//   near parseAddressBlock for discoverability.
+//
 // v3.33:
 // - Toned down multi-qty pill color: replaced bright orange with a muted warm amber.
 //   Removed bold font-weight, reduced border from 2px to 1px, softened background
@@ -159,7 +207,9 @@
             classNames: {
                 addressContainer: 'en-US', editAddressBtn: 'edit-address-btn', cancelAddressBtn: 'cancel-address-btn', copyAddressBtn: 'copy-address-btn', addressEditInput: 'address-edit-input', cancelWrapper: 'cancel-wrapper', addressFullname: 'print__address__fullname', itemContainer: 'item', shippingInfoBlock: 'shipping-info-block', quantityMulti: 'quantity-multi', markAsShippedBtn: 'mark-as-shipped-btn', isEditingAddress: 'is-editing-address', highlightManila: 'order-highlight-manila', highlightLg: 'order-highlight-lg', highlightMultiItem: 'order-highlight-multi-item', borderLg: 'order-border-lg', borderManila: 'order-border-manila', highlightYellow: 'highlight-yellow', skuItem: 'sku-item', skuGroupSeparator: 'sku-group-separator', skuLg: 'sku-lg', skuManila: 'sku-manila', skuMultiQty: 'sku-multi-qty', multiItemSkuOrder: 'order-multi-item', darkModeSwitch: 'dark-mode-switch', darkModeSlider: 'slider', zoomOverlay: 'zoomed-image-overlay', zoomContainer: 'zoomed-image-container', zoomImage: 'zoomed-image', zoomCloseButton: 'close-zoom-button',
                 printEnvelopeBtn: 'print-envelope-btn', markAsShippedWaiting: 'waiting-confirmation', orderShipped: 'shipped-state', shippedLabel: 'shipped-label', orderPendingShipment: 'order-pending-shipment', pendingOverlay: 'pending-overlay', pendingOverlayContent: 'pending-overlay-content', processingIcon: 'processing-icon', skuShipped: 'sku-shipped', addTrackingLink: 'add-tracking-link', trackingLinkSubmitted: 'tracking-link-submitted', reviseLink: 'revise-link', addNoteLink: 'add-note-link', noteLinkSubmitted: 'note-link-submitted',
-                messageContainer: 'message-container', cannedMessageSelect: 'canned-message-select', sendCannedMessageBtn: 'send-canned-message-btn'
+                messageContainer: 'message-container', cannedMessageSelect: 'canned-message-select', sendCannedMessageBtn: 'send-canned-message-btn',
+                addrWarningBadge: 'addr-warning-badge', addrWarningTooltip: 'addr-warning-tooltip',
+                addrOkBadge: 'addr-ok-badge', addrOkTooltip: 'addr-ok-tooltip'
             },
             localStorageKeys: {
                 darkMode: 'darkModeEnabled'
@@ -364,6 +414,12 @@
                     text-align: left;
                 }
                 .${CONFIG.classNames.addressEditInput} { display: block; width: 95%; padding: 4px 6px; margin-bottom: 4px; border-radius: 4px; border: 1px solid ${isDarkMode ? '#777' : '#ccc'}; background-color: ${isDarkMode ? '#2a2a2a' : '#fff'}; color: ${isDarkMode ? '#e0e0e0' : '#000'}; }
+                .${CONFIG.classNames.addrWarningBadge} { position: relative; display: inline; margin-left: 5px; font-size: 12px; color: ${isDarkMode ? '#FFB347' : '#B45309'}; cursor: help; user-select: none; }
+                .${CONFIG.classNames.addrWarningTooltip} { display: none; position: absolute; left: 0; top: 1.5em; min-width: 220px; max-width: 320px; background: ${isDarkMode ? '#2a2a2a' : '#fff'}; color: ${isDarkMode ? '#e0e0e0' : '#333'}; border: 1px solid ${isDarkMode ? '#FFB347' : '#B45309'}; border-radius: 5px; padding: 6px 10px; font-size: 11px; line-height: 1.5; white-space: normal; z-index: 999; box-shadow: 0 2px 8px rgba(0,0,0,0.25); pointer-events: none; }
+                .${CONFIG.classNames.addrWarningBadge}:hover .${CONFIG.classNames.addrWarningTooltip} { display: block; }
+                .${CONFIG.classNames.addrOkBadge} { position: relative; display: inline; margin-left: 5px; font-size: 12px; color: ${isDarkMode ? '#6fcf6f' : '#2a7a2a'}; cursor: help; user-select: none; }
+                .${CONFIG.classNames.addrOkTooltip} { display: none; position: absolute; left: 0; top: 1.5em; min-width: 160px; background: ${isDarkMode ? '#2a2a2a' : '#fff'}; color: ${isDarkMode ? '#e0e0e0' : '#333'}; border: 1px solid ${isDarkMode ? '#6fcf6f' : '#2a7a2a'}; border-radius: 5px; padding: 6px 10px; font-size: 11px; line-height: 1.5; white-space: normal; z-index: 999; box-shadow: 0 2px 8px rgba(0,0,0,0.25); pointer-events: none; }
+                .${CONFIG.classNames.addrOkBadge}:hover .${CONFIG.classNames.addrOkTooltip} { display: block; }
                 ${CONFIG.selectors.pageFooter} { background-color: ${isDarkMode ? '#2a2a2a' : '#f5f5f5'}; color: ${isDarkMode ? '#e0e0e0' : '#555'}; margin-top: 0 !important; }
                 ${CONFIG.selectors.pageFooter} a { color: ${isDarkMode ? '#66b3ff' : '#3665f3'} !important; text-decoration: none; }
                 ${CONFIG.selectors.pageFooter} a:hover { text-decoration: underline; }
@@ -759,6 +815,36 @@
                 orderItem.dataset.isCanadian = 'true';
                 orderItem.querySelector(`.${CONFIG.classNames.addressContainer}`).innerHTML = orderItem.querySelector(`.${CONFIG.classNames.addressContainer}`).innerHTML.replace(/Canada/g, '<b><span style="color: red;">Canada</span></b>');
             }
+
+            // --- Address integrity check ---
+            // Validates the structural soundness of domestic shipping addresses and
+            // injects a ⚠ icon with a hover tooltip listing any issues found.
+            {
+                const addrEl = orderItem.querySelector(`.${CONFIG.classNames.addressContainer}`);
+                if (addrEl) {
+                    const addrLines = addrEl.innerText.split('\n').map(l => l.trim()).filter(l => l);
+                    const addrWarnings = validateAddress(addrLines);
+                    const fullnameEl = orderItem.querySelector(`.${CONFIG.classNames.addressFullname}`);
+                    const badgeInsert = el => {
+                        if (!fullnameEl) { addrEl.prepend(el); return; }
+                        const br = fullnameEl.querySelector('br');
+                        br ? fullnameEl.insertBefore(el, br) : fullnameEl.appendChild(el);
+                    };
+                    if (addrWarnings.length > 0) {
+                        const tooltipItems = addrWarnings.map(w => `• ${w}`).join('<br>');
+                        const badge = document.createElement('span');
+                        badge.className = CONFIG.classNames.addrWarningBadge;
+                        badge.innerHTML = `⚠<span class="${CONFIG.classNames.addrWarningTooltip}">${tooltipItems}</span>`;
+                        badgeInsert(badge);
+                    } else {
+                        const badge = document.createElement('span');
+                        badge.className = CONFIG.classNames.addrOkBadge;
+                        badge.innerHTML = `✔<span class="${CONFIG.classNames.addrOkTooltip}">Address looks correct</span>`;
+                        badgeInsert(badge);
+                    }
+                }
+            }
+
             orderItem.querySelectorAll(`${CONFIG.selectors.itemDescription} a[href*="&item="]`).forEach(itemLink => {
                 const itemIDMatch = itemLink.href.match(/&item=(\d+)/);
                 if (itemIDMatch?.[1]) {
@@ -2548,6 +2634,105 @@
     function applyTemplate(template, data) {
         return template.replace(/\{([A-Z0-9_]+)\}/g, (m, key) => (key in data ? data[key] : m));
     }
+
+    // --- ADDRESS INTEGRITY VALIDATION ---
+    // Checks structural soundness of US and Canadian shipping addresses.
+    // Returns an array of human-readable warning strings; empty array = no issues found.
+    // All other international addresses are skipped — too many valid formats to lint reliably.
+    function validateAddress(lines) {
+        const warnings = [];
+        if (!lines || lines.length === 0) {
+            warnings.push('Address is empty');
+            return warnings;
+        }
+
+        // Detect country
+        const isCanadian = lines.some(l => /^canada$/i.test(l.trim()));
+
+        // Skip non-US, non-Canadian destinations
+        const otherInternationalPattern = /^(united kingdom|uk|australia|germany|france|japan|mexico|italy|spain|netherlands|sweden|norway|denmark|finland|new zealand|ireland|portugal|belgium|austria|switzerland|south korea|poland|israel|philippines|singapore|hong kong|taiwan|china|colombia|argentina|chile|peru|costa rica|brazil|india)$/i;
+        if (!isCanadian && lines.some(l => otherInternationalPattern.test(l.trim()))) return warnings;
+
+        // Rule 1: minimum line count (name + street + city/province/postal = 3 minimum)
+        if (lines.length < 3) {
+            warnings.push('Address looks incomplete — fewer than 3 lines');
+            return warnings; // further checks would be noise
+        }
+
+        // Rule 2: name line should have at least two characters and not be purely numeric
+        const nameLine = lines[0].trim();
+        if (nameLine.length < 2) {
+            warnings.push('Buyer name is missing or too short');
+        } else if (/^\d+$/.test(nameLine)) {
+            warnings.push('Buyer name line appears to be a number');
+        }
+
+        // Rule 3: street line (line index 1) should start with a digit
+        const streetLine = lines[1].trim();
+        if (!/^\d/.test(streetLine)) {
+            warnings.push('Street line doesn\'t start with a house/building number');
+        }
+
+        // Rule 3b: any line after the name that is purely digits is a standalone street
+        // number — almost always means eBay split the number from the street name,
+        // producing a duplicate (e.g. "416577" on one line, "416577 flying bridge" on the next).
+        const bareNumberLine = lines.slice(1).find(l => /^\d+$/.test(l.trim()));
+        if (bareNumberLine) {
+            warnings.push(`"${bareNumberLine.trim()}" is a number on its own line — street number may be duplicated`);
+        }
+
+        if (isCanadian) {
+            // Rule 4 (CA): look for a "City Province A1A 1A1" line.
+            // Canadian postal codes follow the pattern: letter-digit-letter space digit-letter-digit.
+            const cszPattern = /^(.+?)\s+([A-Z]{2})\s+([A-Z]\d[A-Z]\s?\d[A-Z]\d)$/i;
+            const cszLine = lines.find(l => cszPattern.test(l.trim()));
+
+            if (!cszLine) {
+                warnings.push('No city/province/postal code line found (expected: "City ON A1A 1A1")');
+            } else {
+                const match = cszLine.trim().match(cszPattern);
+                if (match) {
+                    // Rule 5 (CA): validate province/territory abbreviation
+                    const VALID_CA_PROVINCES = new Set([
+                        'AB','BC','MB','NB','NL','NS','NT','NU','ON','PE','QC','SK','YT'
+                    ]);
+                    const province = match[2].toUpperCase();
+                    if (!VALID_CA_PROVINCES.has(province)) {
+                        warnings.push(`Unrecognized Canadian province/territory code: "${province}"`);
+                    }
+                }
+            }
+        } else {
+            // Rule 4 (US): look for a "City ST 12345" line.
+            // eBay omits the comma between city and state, so the comma is optional here.
+            const cszPattern = /^(.+?)(?:,)?\s+([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/i;
+            const cszLine = lines.find(l => cszPattern.test(l.trim()));
+
+            if (!cszLine) {
+                warnings.push('No city/state/ZIP line found (expected: "City ST 12345")');
+            } else {
+                const match = cszLine.trim().match(cszPattern);
+                if (match) {
+                    // Rule 5 (US): validate state/territory abbreviation
+                    const VALID_US_STATES = new Set([
+                        'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA',
+                        'HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
+                        'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
+                        'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
+                        'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY',
+                        'DC','PR','GU','VI','AS','MP','AA','AE','AP'
+                    ]);
+                    const stateCode = match[2].toUpperCase();
+                    if (!VALID_US_STATES.has(stateCode)) {
+                        warnings.push(`Unrecognized state/territory code: "${stateCode}"`);
+                    }
+                }
+            }
+        }
+
+        return warnings;
+    }
+    // --- END ADDRESS INTEGRITY VALIDATION ---
 
     // --- CUSTOM ENVELOPE FEATURE ---
     // Parses a free-form address block into structured fields.
