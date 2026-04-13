@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         2025 eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260412-v3.40-address-validation-canada
+// @version      20260413-v3.42-address-badge-envelope-fix
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -26,6 +26,11 @@
 // ===================================================================
 // CHANGELOG
 // ===================================================================
+// v3.42:
+// - Fixed envelope line breaks broken by v3.41. Cloning a detached node breaks
+//   innerText (no CSS = no <br> → newline conversion). Now temporarily hides the
+//   badges on the live element, reads innerText normally, then restores them.
+//
 // v3.40:
 // - Extended address validation to Canadian orders. validateAddress() now detects
 //   "Canada" in the address lines and applies CA-specific rules: postal code format
@@ -993,7 +998,10 @@
             orderCards.forEach(orderItem => {
                 const addressEl = orderItem.querySelector(`.${CONFIG.classNames.addressContainer}`);
                 if (!addressEl) return;
+                const addrBadges = addressEl.querySelectorAll(`.${CONFIG.classNames.addrWarningBadge}, .${CONFIG.classNames.addrOkBadge}`);
+                addrBadges.forEach(b => b.style.display = 'none');
                 const addressHTML = addressEl.innerText.replaceAll("\n", "<br>");
+                addrBadges.forEach(b => b.style.display = '');
                 const isCanadian = orderItem.dataset.isCanadian === 'true'
                     || /canada/i.test(addressEl.innerText);
                 // Stamp reminder: sized to fit under a standard USPS international stamp (~1.25in × 1.5in)
