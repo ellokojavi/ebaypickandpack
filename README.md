@@ -1,199 +1,149 @@
-# Altheastix eBay Order Manager
+# Altheastix eBay Pick & Pack Manager
 
-A powerful Tampermonkey userscript that transforms eBay's bulk shipping interface into a streamlined, fast-paced pick-and-pack workflow tool.
-
-## Features
-
-### 🎨 UI Redesign
-- **Modern dark/light mode** with toggle in the SKU panel
-- **Radical layout overhaul** of eBay's native bulk shipping page
-- **Custom header links** (Seller Hub, All Orders, Listings, etc.)
-- **Color-coded order cards** for quick visual identification:
-  - **Manila envelopes** (orange border)
-  - **Large items (LG)** (yellow border)
-  - **Multi-item orders** (green background with per-order colors)
-- **Larger product images** (130px) for better visibility
-
-### 📦 SKU Management
-- **"SKUs to Pack" side panel** with live filtering
-- **Filter by SKU, buyer name, or item title** in real-time
-- **Click-to-scroll navigation** from SKU to order card
-- **Auto-detection** of multi-item orders and special SKU types
-- **Alphabetical sorting** with visual separators
-
-### 🖨️ Printing
-- **Consolidated "Print All Envelopes"** feature
-- Prints all envelopes in a **single print window** with proper page breaks
-- **Envelope #10 format** (9.5in × 4.125in) support
-- **Custom return address** (configurable in `USER_CONFIG`)
-
-### 📋 Order Automation
-- **Mark as Shipped** with optional auto-notes and thank-you messages
-- **Add Tracking** links (both old and new eBay tracking systems)
-- **Add Note** to orders with custom date formatting
-- **Send Messages** to buyers with templated thank-you drafts
-- **Auto-send toggle** for messages (with safety confirmation)
-
-### 💾 Smart Features
-- **Order totals** calculated from item prices and quantities
-- **Automatic tracking suggestion** for orders over $15
-- **Canadian order detection** with flagging and notes
-- **"Revise" item links** to quickly edit listings
-- **Canned message templates** with variable substitution (buyer name, ship date, product type, etc.)
-- **Random quotes** appended to thank-you messages (configurable)
-
-### ⚙️ Configuration
-- **External config loading** from GitHub Gist (decoupled logic)
-- **Global toggles** in the SKU panel:
-  - Auto-send messages
-  - "Will ship tomorrow" note for all orders
-  - Thank-you message for all orders
-- **Local storage persistence** for user preferences
-
-## Installation
-
-1. **Install Tampermonkey** browser extension:
-   - [Chrome/Edge](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobefkf)
-   - [Firefox](https://addons.mozilla.org/firefox/addon/tampermonkey/)
-   - [Safari](https://apps.apple.com/us/app/tampermonkey/id1482490089)
-
-2. **Install this script** by downloading via the raw GitHub URL:
-   ```
-   https://raw.githubusercontent.com/ellokojavi/ebaypickandpack/main/userscript.js
-   ```
-   (Tampermonkey will prompt you to install)
-
-3. **Go to an eBay bulk shipping page** and the script will activate
-
-## Configuration
-
-### User Config (in-script)
-
-Edit the `USER_CONFIG` object in the userscript (around line 48) to customize:
-
-```javascript
-const USER_CONFIG = {
-    returnAddress: "Altheastix ⚡<br>3033 W Howdel St.<br>Vancouver, WA 99233<br>USA",
-    trackingOrderAmountThreshold: 15,  // Minimum order value to show +tracking link
-    useAlternativeTracking: true,       // Use new v2 tracking system
-    scriptLoadDelay: 15 * 1000,        // Initial startup delay (ms)
-    defaultTrackingNumber: "9114 9023 0722 4988 5575",  // Pre-fill tracking input
-    enableDarkModeByDefault: true,
-    enableQuotesInMessages: true,
-    orderColors: [...],                // Color palette for multi-item orders
-    headerLinks: [...]                 // Custom header navigation
-};
-```
-
-### External Config (Gist)
-
-The script loads templates, quotes, and keywords from an external GitHub Gist. To customize:
-
-1. Create your own Gist with the structure:
-   ```javascript
-   window.AltheastixConfig = {
-       messageTemplates: {
-           thankYouDrafts: ["Your message template here..."]
-       },
-       deliveryNotes: { ... },
-       quotes: { ... },
-       quoteKeywords: { ... }
-   };
-   ```
-
-2. Update the `@require` URL in the script header to point to your Gist
-
-## Usage
-
-### Pick & Pack Workflow
-
-1. **Load the bulk shipping page** → Script initializes with a 15s startup timer
-2. **Filter SKUs** using the search box in the left panel (search by SKU, buyer, item)
-3. **Click a SKU** to jump to the corresponding order
-4. **Edit address** if needed using the Edit/Copy buttons
-5. **Select message template** (or leave empty) from the dropdown
-6. **Check "Will ship tomorrow"** and/or **"Thank you msg"** checkboxes
-7. **Click "Mark as Shipped"** → Opens background tabs to finalize the shipment
-8. **Print envelopes** individually or use "Print All" for batch printing
-
-### Keyboard & UI Tips
-
-- **Click SKU pills** to highlight and scroll to that order
-- **Filter persists** across SKU panel re-renders
-- **Dark mode toggle** (🌙/☀️) in the SKU panel title
-- **Checkbox toggles** apply globally to all orders
-- **Print dialog** appears once with all selected envelopes
-
-## Updates
-
-The script auto-updates via Tampermonkey. To force a check:
-1. Open Tampermonkey dashboard
-2. Find "Altheastix eBay Order Manager"
-3. Click the update icon (↻)
-
-Updates are detected when the `@version` field changes.
-
-## Troubleshooting
-
-### Orders not showing up?
-- Make sure you're on the eBay bulk shipping page (`/ship/bulk` or `gslblui.ebay.com/gslblui/bulk`)
-- Click the "Combine Orders" button if available
-- Wait for the startup timer to complete (or click "Run Now")
-
-### Tracking/Notes not saving?
-- Check that Tampermonkey has granted the script permissions (it should prompt on first use)
-- Ensure you're filling in required fields (tracking number must be exactly 22 digits)
-
-### Print shows blank pages?
-- The printer should be set to "Envelope #10" paper size
-- If still blank, try adjusting margins to "Minimum" in the print dialog
-
-### Messages not auto-sending?
-- Check the "auto-send messages" toggle in the SKU panel configuration
-- If unchecked, messages will draft and wait for manual send
-
-## Development
-
-### Project Structure
-- `userscript.js` — Main script (1000+ lines)
-- `ebay_bulk_labels_original_input.html` — Sample eBay page (for reference)
-- External Gist — Configuration, templates, quotes
-
-### Modifying the Script
-
-1. Clone this repo locally
-2. Edit `userscript.js`
-3. Commit and push to GitHub
-4. Tampermonkey will detect the version change and auto-update
-
-### Version Format
-
-Versions follow: `YYYYMMDD-vX.XX-description`
-- Example: `20260331-v3.26-filter-print-ui-fixes`
-
-## Changelog
-
-See `userscript.js` header for full changelog. Latest:
-
-**v3.26** (2026-03-31)
-- Added live filter for SKUs, buyers, and items
-- Consolidated print all into single window
-- Fixed image sizing and price extraction
-- Fixed Envelope #10 print layout
-
-## License
-
-MIT License — Feel free to fork, modify, and redistribute.
-
-## Credits
-
-- **El Loko Javi** — Author
-- **Grok, Gemini, GitHub Copilot, Claude (Anthropic)** — Code refinement
-- **Claude (Anthropic)** — Recent improvements (v3.26+)
-- **eBay** — Platform (obviously!)
+A Tampermonkey userscript that transforms eBay's bulk shipping interface into a streamlined, fast-paced pick-and-pack workflow tool.
 
 ---
 
-**Questions or Issues?** Open an issue on GitHub or check the script's console logs (F12) for debug messages.
+## Installation
 
-Happy shipping! 📦⚡
+1. Install the [Tampermonkey](https://www.tampermonkey.net/) browser extension.
+2. Click the link below to install the script directly — Tampermonkey will prompt you:
+   ```
+   https://raw.githubusercontent.com/ellokojavi/ebaypickandpack/main/userscript.js
+   ```
+3. Navigate to your [eBay Bulk Shipping page](https://www.ebay.com/ship/bulk) and the script activates automatically.
+
+The script also self-updates via `@updateURL` / `@downloadURL` pointing to this repo, so Tampermonkey will notify you when a new version is available.
+
+---
+
+## Features
+
+### UI & Layout
+- Full redesign of eBay's bulk shipping page with a clean, modern layout
+- **Dark / light mode** toggle with preference saved across sessions
+- **Custom header navigation** with quick links to Seller Hub, All Orders, Listings, Feedback, and Help
+- **Larger product images** (130px) for faster visual identification
+- **Startup countdown overlay** with a "Run Now" shortcut to skip the delay
+
+### Color-Coded Order Cards
+Orders are visually flagged by type at a glance:
+- **Orange border** — Manila envelope orders
+- **Yellow border** — Large (LG) items
+- **Green background + unique per-order color** — Multi-item orders
+- **Amber/orange pills** — Multi-quantity single-SKU orders (e.g. "B01 x2")
+
+### SKU Panel
+- Floating **"SKUs to Pack"** side panel listing all SKUs in the current batch
+- **Live filter** by SKU, buyer name, or item title — updates both the panel and order cards in real-time
+- **Click-to-scroll** from any SKU entry directly to its order card
+- Alphabetical grouping with visual horizontal separators between letter groups
+- Special styling for Manila SKUs, LG SKUs, and multi-quantity SKUs
+- Shipped SKUs are visually marked as completed
+
+### Address Validation
+Every order's shipping address is automatically linted against structural rules:
+- Minimum line count, buyer name presence, street number format
+- Valid `City ST ZIPCODE` line matching eBay's format
+- Recognized US state and territory abbreviations
+- **Canadian addresses** validated separately: postal code format (`A1A 1A1`) and all 13 province/territory codes
+- **PO Box addresses** accepted as valid (skips the street-number rule)
+- Addresses with issues show an inline **⚠ badge** next to the recipient name; hovering reveals a tooltip listing every issue found
+- Addresses that pass all rules show an inline **✔ badge**
+
+### Envelope Printing
+- **Print All Envelopes** — consolidates all envelopes into a single print window with one envelope per page (no more N separate dialogs)
+- **Envelope #10 format** (9.5in × 4.125in) with auto-scaled content
+- **Custom Envelope modal** — paste any address block, auto-parse it into editable fields, and print a one-off envelope for orders not in the active queue
+- **Canadian envelopes** include a faint 🇨🇦 + "Int'l Stamp" reminder sized to be covered by an international stamp
+- Return address configurable in `USER_CONFIG`
+
+### Order Automation
+- **Mark as Shipped** with optional auto-notes and thank-you messages
+- **Add Tracking** — supports both legacy and new eBay tracking systems (v1 + v2)
+- Tracking is automatically suggested for orders above the configurable dollar threshold (default: $20)
+- **Add Note** to orders with custom date formatting
+- **Send Messages** to buyers using templated thank-you drafts loaded from an external Gist
+- Random quotes optionally appended to outgoing messages (configurable)
+- **Auto-send toggle** with a safety confirmation step
+
+### Canned Messages & Templates
+- Fully templated messages with variable substitution: `{BUYER_FIRST}`, `{STICKER_NAME}`, `{ARRIVAL_DATE}`, `{SURPRISE_STICKER}`, `{SHIPPING_DATE}`, etc.
+- Multiple canned message drafts for backorder, pre-order, and delay scenarios
+- Templates and quotes loaded from an **external GitHub Gist** so you can update them without editing the script
+
+### Smart Extras
+- **Order totals** calculated automatically from item prices and quantities
+- **Canadian order detection** with automatic flagging and delivery note insertion
+- **"Revise" item links** to jump directly to the eBay listing editor
+- **Mica image** easter egg (off by default, toggle via `showMicaImage` in `USER_CONFIG`)
+
+---
+
+## Configuration
+
+### In-Script (`USER_CONFIG`)
+
+Edit the `USER_CONFIG` object near the top of the script to customize local preferences:
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `returnAddress` | Altheastix Seattle address | Return address printed on envelopes |
+| `trackingOrderAmountThreshold` | `20` | Orders at or above this dollar amount get a tracking suggestion |
+| `useAlternativeTracking` | `true` | Use the newer eBay v2 tracking system |
+| `scriptLoadDelay` | `15000` | Startup delay in milliseconds before the script runs |
+| `defaultTrackingNumber` | pre-filled value | Default tracking number pre-filled in the tracking input |
+| `enableDarkModeByDefault` | `true` | Start in dark mode |
+| `enableQuotesInMessages` | `true` | Append a random quote to outgoing thank-you messages |
+| `showMicaImage` | `false` | Show the Mica easter egg image in the corner |
+| `orderColors` | 40-color palette | Colors used for multi-item order card backgrounds |
+| `headerLinks` | Seller Hub, Orders, etc. | Quick-nav links rendered in the page header |
+
+### External Config (GitHub Gist)
+
+Templates, delivery notes, quotes, and quote keywords are loaded from a GitHub Gist at runtime. This lets you update messaging without touching the script itself.
+
+To use your own Gist, update the `@require` line at the top of the script to point to your raw Gist URL, structured as:
+
+```javascript
+window.AltheastixConfig = {
+    messageTemplates: {
+        thankYouDrafts: ["Hi {BUYER_FIRST}, thanks for your order! ..."]
+    },
+    deliveryNotes: {
+        canada: "Orders to Canada may take several weeks...",
+        usualPlural: "They usually arrive within 5–7 business days",
+        usualSingular: "It usually arrives within 5–7 business days",
+        patienceVariants: ["thanks for your patience."]
+    },
+    quotes: { keyword: ["quote1", "quote2"] },
+    quoteKeywords: { itemTitle: "keyword" }
+};
+```
+
+If the Gist fails to load, the script falls back to built-in defaults and logs a warning in the browser console.
+
+---
+
+## Pages Supported
+
+| URL Pattern | Purpose |
+|-------------|---------|
+| `ebay.com/ship/bulk*` | Main bulk shipping / pick-and-pack page |
+| `gslblui.ebay.com/gslblui/bulk` | Alternate bulk shipping URL |
+| `ebay.com/mesh/ord/details*` | Order detail page (tracking automation) |
+| `ebay.com/om/shipment/update*` | Shipment update page |
+| `ebay.com/ship/trk/*` | Tracking page |
+| `ebay.com/ship/tr/update*` | Tracking update page |
+
+---
+
+## Auto-Sync
+
+This repo is connected to a local folder via a launchd watcher (`autopush.sh` + `com.altheastix.autopush.plist`). Any save to `userscript.js` triggers an automatic `git commit` and `git push` — no manual uploads needed.
+
+---
+
+## Credits
+
+Built by Javier, with modifications from Grok, Gemini, and GitHub Copilot ❤️
