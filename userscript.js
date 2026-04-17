@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         2025 eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260417-v3.44-tracking-threshold-20
+// @version      20260417-v3.45-github-sync-test
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -26,6 +26,9 @@
 // ===================================================================
 // CHANGELOG
 // ===================================================================
+// v3.45:
+// - Test commit to verify GitHub auto-sync is working. Let's see how it works.
+//
 // v3.44:
 // - Raised trackingOrderAmountThreshold from $15 to $20. The buyer message
 //   "orders at or under $X ship without tracking" and all related UI/logic
