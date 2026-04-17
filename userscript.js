@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         2025 eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260417-v3.45-github-sync-test
+// @version      20260417-v3.48-config-to-github
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -18,7 +18,7 @@
 // @grant        GM_addValueChangeListener
 // @grant        GM_openInTab
 // @grant        window.close
-// @require      https://gist.githubusercontent.com/ellokojavi/fd370add192a441d770717a41f7d2049/raw/altheastix-ebay-config.js
+// @require      https://raw.githubusercontent.com/ellokojavi/ebaypickandpack/main/altheastix-ebay-config.js
 // @updateURL    https://raw.githubusercontent.com/ellokojavi/ebaypickandpack/main/userscript.js
 // @downloadURL  https://raw.githubusercontent.com/ellokojavi/ebaypickandpack/main/userscript.js
 // ==/UserScript==
@@ -26,8 +26,20 @@
 // ===================================================================
 // CHANGELOG
 // ===================================================================
+// v3.48:
+// - Moved external config from GitHub Gist to the repo as altheastix-ebay-config.js.
+//   Updated @require URL to point to GitHub raw URL instead of Gist.
+// - Fixed hardcoded $15 fallback in tracking note logic — now correctly uses $20
+//   (consistent with trackingOrderAmountThreshold in USER_CONFIG).
+//
+// v3.47:
+// - showMicaImage flag is now false by default in USER_CONFIG.
+//
+// v3.46:
+// - Second test commit to verify launchd autopush is working end-to-end.
+//
 // v3.45:
-// - Test commit to verify GitHub auto-sync is working. Let's see how it works.
+// - Test commit to verify GitHub auto-sync is working.
 //
 // v3.44:
 // - Raised trackingOrderAmountThreshold from $15 to $20. The buyer message
@@ -176,7 +188,7 @@
         defaultTrackingNumber: "9114 9023 0722 4988 5575 ",
         enableDarkModeByDefault: true,
         enableQuotesInMessages: true,
-        showMicaImage: true,
+        showMicaImage: false,
         orderColors: [
             // Expanded 40-color palette — hues spread across the spectrum and interleaved
             // so that consecutive assignments are always visually distinct
@@ -1257,7 +1269,7 @@
                                 ? dn.canada
                                 : `${plural ? dn.usualPlural : dn.usualSingular}, ${dn.patienceVariants[Math.floor(Math.random() * dn.patienceVariants.length)]}`;
                             // Dynamic tracking note based on order total value vs threshold
-                            const threshold = USER_CONFIG.trackingOrderAmountThreshold || 15;
+                            const threshold = USER_CONFIG.trackingOrderAmountThreshold || 20;
                             const trackingNote = totalItemsPrice > threshold
                                 ? ''
                                 : `To keep prices fair, orders at or under $${threshold} ship without tracking.`;
