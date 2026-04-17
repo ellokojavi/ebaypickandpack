@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         2025 eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260331-v3.26-filter-print-ui-fixes
+// @version      20260417-v3.44-tracking-threshold-20
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -19,11 +19,125 @@
 // @grant        GM_openInTab
 // @grant        window.close
 // @require      https://gist.githubusercontent.com/ellokojavi/fd370add192a441d770717a41f7d2049/raw/altheastix-ebay-config.js
+// @updateURL    https://raw.githubusercontent.com/ellokojavi/ebaypickandpack/main/userscript.js
+// @downloadURL  https://raw.githubusercontent.com/ellokojavi/ebaypickandpack/main/userscript.js
 // ==/UserScript==
 
 // ===================================================================
 // CHANGELOG
 // ===================================================================
+// v3.44:
+// - Raised trackingOrderAmountThreshold from $15 to $20. The buyer message
+//   "orders at or under $X ship without tracking" and all related UI/logic
+//   now use the new value.
+//
+// v3.43:
+// - PO Box addresses are now accepted as valid in address validation. Rule 3
+//   (street line must start with a digit) is skipped when the line matches
+//   a PO Box pattern (e.g. "PO Box 1931", "P.O. Box 42").
+//
+// v3.42:
+// - Fixed envelope line breaks broken by v3.41. Cloning a detached node breaks
+//   innerText (no CSS = no <br> → newline conversion). Now temporarily hides the
+//   badges on the live element, reads innerText normally, then restores them.
+//
+// v3.40:
+// - Extended address validation to Canadian orders. validateAddress() now detects
+//   "Canada" in the address lines and applies CA-specific rules: postal code format
+//   (A1A 1A1), and province/territory code validation against all 13 CA codes
+//   (AB, BC, MB, NB, NL, NS, NT, NU, ON, PE, QC, SK, YT).
+// - Removed the isCanadian exclusion guard in processOrderCard — Canadian orders
+//   now go through the same badge injection path as US orders.
+//
+// v3.39:
+// - Added address validation rule: any line after the buyer name that consists
+//   entirely of digits is flagged as a likely duplicate street number (e.g. eBay
+//   splitting "416577" onto its own line before "416577 flying bridge").
+//
+// v3.38:
+// - Fixed address badge placement for real: eBay injects a <br> inside the
+//   .print__address__fullname span, so appendChild was landing after the line
+//   break. Badge is now inserted before that <br> so it sits inline with the name.
+//
+// v3.37:
+// - Fixed address badge placement: .print__address__fullname is a sibling of .en-US,
+//   not a descendant, so addrEl.querySelector() always returned null. Scoped the
+//   lookup to orderItem.querySelector() — consistent with every other use in the
+//   script — so the badge now correctly appends inside the name element.
+//
+// v3.36:
+// - Moved address validation badges inline, immediately to the right of the recipient
+//   name, instead of appearing as a separate line below the address block.
+// - Badges are now just the symbol (✔ or ⚠) with no label text; the tooltip carries
+//   the message. OK tooltip updated to "Address looks correct".
+//
+// v3.35:
+// - Added ✔ badge for orders that pass all address validation rules.
+//   Hovering shows "Address looks correct". Styled in green, consistent with the
+//   ⚠ warning badge layout.
+//
+// v3.34:
+// - Added address integrity validation for domestic (US) orders. After each order
+//   card is processed, the shipping address is linted against a set of structural
+//   rules: minimum line count, buyer name presence, street starting with a house
+//   number, presence of a valid "City ST XXXXX" line (comma-less, matching eBay's
+//   format), and recognized US state/territory abbreviation.
+//   International addresses (Canada, UK, etc.) are skipped.
+// - When one or more issues are found, a ⚠ "Address issue" badge is injected
+//   between the address text and the Edit/Copy buttons. Hovering the badge shows
+//   a tooltip listing every issue found, styled to match dark/light mode.
+// - Validation lives in a standalone validateAddress(lines) pure function placed
+//   near parseAddressBlock for discoverability.
+//
+// v3.33:
+// - Toned down multi-qty pill color: replaced bright orange with a muted warm amber.
+//   Removed bold font-weight, reduced border from 2px to 1px, softened background
+//   and text/border colors. Still warm enough to signal "pack multiple units" without
+//   competing visually with Manila/LG pills.
+// v3.32:
+// - Multi-quantity pills (e.g. "B01 x2") now render with an amber/orange color
+//   scheme: warm dark background + orange border + orange text in dark mode;
+//   warm cream background + amber border + dark amber text in light mode.
+//   This uses the same orange accent already applied to "Qty: 2" badges on order
+//   cards, so the visual language is consistent. The style stacks cleanly with
+//   multi-item-order colored pills (which use inline backgroundColor).
+// - Manila pills take priority over multi-qty styling: a SKU that is both Manila
+//   and qty>1 shows Manila styling only (different envelope = more important).
+//
+// v3.31:
+// - Fixed disappearing pills for single-SKU multi-quantity orders (e.g. B01 x2).
+//   isMultiItemOrder was incorrectly set to true when totalQty > 1, causing
+//   colored-pill styling in dark mode (black text on dark bg = invisible).
+//   isMultiItemOrder now only triggers when an order has multiple DISTINCT SKUs,
+//   which is its original intent.
+//
+// v3.30:
+// - Fixed quantity parsing: eBay uses "Qty: 2" (not "Quantity: 2") in the item
+//   details list. All three places that parse quantity now accept both "Quantity:"
+//   and "Qty:" (case-insensitive), so "B01 x 2" pills now render correctly.
+//   The v3.29 SKU+Design consolidation within an order is also retained.
+//
+// v3.29:
+// - Fixed SKU pills for multi-quantity items: when the same SKU appears multiple
+//   times within one order (e.g. eBay renders qty 2 as two separate line items),
+//   the pills now consolidate by SKU+Design per order and show "B01 x 2" instead
+//   of two separate "B01" pills. Cross-order duplicates remain as separate pills.
+//
+// v3.28:
+// - Fixed light-mode quantity badge contrast: #FFA500 (ratio 1.97) → #B45309 (ratio 5.02).
+//   Dark mode keeps #FFA500 (ratio 7.27, unchanged).
+//
+// v3.27:
+// - Added "Custom Envelope" feature: a modal (accessible via link in the SKU panel)
+//   that auto-parses a pasted address block into editable fields and prints a single
+//   ad-hoc #10 envelope. Useful for re-sending orders not in the active ship queue.
+// - Added subtle horizontal dividers between letter groups in the SKU pills list.
+// - Expanded multi-item order pill color palette from 11 to 40 distinct colors,
+//   interleaved across hues to minimize repetition at high order volumes.
+// - Canadian envelopes now include a faint 🇨🇦 + "Int'l Stamp" reminder in the
+//   top-right corner, sized to be fully covered by an international stamp.
+// - Added showMicaImage flag to USER_CONFIG to toggle the Mica image on/off.
+//
 // v3.26:
 // - Added live SKU/buyer/item filter input to the SKU panel that filters both
 //   the SKU list and order cards in real-time. Filter text persists across re-renders.
@@ -34,10 +148,6 @@
 // - Fixed print envelope layout for Envelope #10 format (9.5in × 4.125in) with
 //   6% content scaling to prevent blank pages.
 //
-// v3.25:
-// - Decoupled Logic from Configuration. Quotes, Templates, and Keywords
-//   are now loaded dynamically from a GitHub Gist.
-// - Fixed URL logic to always pull the latest version of the config.
 
 (function() {
     'use strict';
@@ -57,13 +167,25 @@
     // ===================================================================
     const USER_CONFIG = {
         returnAddress: "Altheastix ⚡<br>3015 E Howell St.<br>Seattle, WA 98122<br>USA",
-        trackingOrderAmountThreshold: 15,
+        trackingOrderAmountThreshold: 20,
         useAlternativeTracking: true,
         scriptLoadDelay: 15 * 1000,
         defaultTrackingNumber: "9114 9023 0722 4988 5575 ",
         enableDarkModeByDefault: true,
         enableQuotesInMessages: true,
-        orderColors: ['#FFADAD', '#FFD6A5', '#FDFFB6', '#CAFFBF', '#9BF6FF', '#A0C4FF', '#BDB2FF', '#FFC6FF', '#FFC6FF', '#DDFFD0', '#BDE0FE', '#F0D4FF'],
+        showMicaImage: true,
+        orderColors: [
+            // Expanded 40-color palette — hues spread across the spectrum and interleaved
+            // so that consecutive assignments are always visually distinct
+            '#FFADAD', '#A0C4FF', '#CAFFBF', '#FFC6FF', '#FDFFB6',  // red · blue · green · pink · yellow
+            '#9BF6FF', '#FFD6A5', '#BDB2FF', '#DDFFD0', '#F0D4FF',  // cyan · orange · purple · mint · lavender
+            '#FF9AA2', '#B5EAD7', '#FFDAC1', '#C7CEEA', '#E2F0CB',  // rose · teal · peach · periwinkle · sage
+            '#FFE4B5', '#D4F1F4', '#F8C8D4', '#D5F5E3', '#FAD7A0',  // moccasin · ice blue · blush · seafoam · amber
+            '#D7BDE2', '#A9DFBF', '#F9E79F', '#AED6F1', '#F5CBA7',  // soft violet · jade · straw · sky · apricot
+            '#A3E4D7', '#F1948A', '#85C1E9', '#82E0AA', '#F0B27A',  // aquamarine · coral · cornflower · emerald · pumpkin
+            '#C39BD3', '#76D7C4', '#F7DC6F', '#7FB3D3', '#F0A7A0',  // plum · turquoise · gold · steel blue · salmon
+            '#B7D7A8', '#D2B4DE', '#A9CCE3', '#F9C74F', '#90DBB0',  // leaf · mauve · powder blue · sunflower · spearmint
+        ],
         headerLinks: [
             { text: 'Seller Hub', href: 'https://www.ebay.com/sh/ovw' },
             { text: 'All Orders', href: 'https://www.ebay.com/sh/ord/?filter=status%3AALL_ORDERS' },
@@ -98,9 +220,11 @@
                 copyAddressButton: 'copyAddressButton', editAddressButton: 'editAddressButton', createTemplateButton: 'createTemplateButton', printEnvelopeHTML: 'HTMLEnvelopeToPrint', printAllEnvelopesButton: 'printAllEnvelopesButton', skuPanelContainer: 'SKUListContainer', skuList: 'SKUsToPackContainer', skuContentWrapper: 'sku-content-wrapper'
             },
             classNames: {
-                addressContainer: 'en-US', editAddressBtn: 'edit-address-btn', cancelAddressBtn: 'cancel-address-btn', copyAddressBtn: 'copy-address-btn', addressEditInput: 'address-edit-input', cancelWrapper: 'cancel-wrapper', addressFullname: 'print__address__fullname', itemContainer: 'item', shippingInfoBlock: 'shipping-info-block', quantityMulti: 'quantity-multi', markAsShippedBtn: 'mark-as-shipped-btn', isEditingAddress: 'is-editing-address', highlightManila: 'order-highlight-manila', highlightLg: 'order-highlight-lg', highlightMultiItem: 'order-highlight-multi-item', borderLg: 'order-border-lg', borderManila: 'order-border-manila', highlightYellow: 'highlight-yellow', skuItem: 'sku-item', skuGroupSeparator: 'sku-group-separator', skuLg: 'sku-lg', skuManila: 'sku-manila', multiItemSkuOrder: 'order-multi-item', darkModeSwitch: 'dark-mode-switch', darkModeSlider: 'slider', zoomOverlay: 'zoomed-image-overlay', zoomContainer: 'zoomed-image-container', zoomImage: 'zoomed-image', zoomCloseButton: 'close-zoom-button',
+                addressContainer: 'en-US', editAddressBtn: 'edit-address-btn', cancelAddressBtn: 'cancel-address-btn', copyAddressBtn: 'copy-address-btn', addressEditInput: 'address-edit-input', cancelWrapper: 'cancel-wrapper', addressFullname: 'print__address__fullname', itemContainer: 'item', shippingInfoBlock: 'shipping-info-block', quantityMulti: 'quantity-multi', markAsShippedBtn: 'mark-as-shipped-btn', isEditingAddress: 'is-editing-address', highlightManila: 'order-highlight-manila', highlightLg: 'order-highlight-lg', highlightMultiItem: 'order-highlight-multi-item', borderLg: 'order-border-lg', borderManila: 'order-border-manila', highlightYellow: 'highlight-yellow', skuItem: 'sku-item', skuGroupSeparator: 'sku-group-separator', skuLg: 'sku-lg', skuManila: 'sku-manila', skuMultiQty: 'sku-multi-qty', multiItemSkuOrder: 'order-multi-item', darkModeSwitch: 'dark-mode-switch', darkModeSlider: 'slider', zoomOverlay: 'zoomed-image-overlay', zoomContainer: 'zoomed-image-container', zoomImage: 'zoomed-image', zoomCloseButton: 'close-zoom-button',
                 printEnvelopeBtn: 'print-envelope-btn', markAsShippedWaiting: 'waiting-confirmation', orderShipped: 'shipped-state', shippedLabel: 'shipped-label', orderPendingShipment: 'order-pending-shipment', pendingOverlay: 'pending-overlay', pendingOverlayContent: 'pending-overlay-content', processingIcon: 'processing-icon', skuShipped: 'sku-shipped', addTrackingLink: 'add-tracking-link', trackingLinkSubmitted: 'tracking-link-submitted', reviseLink: 'revise-link', addNoteLink: 'add-note-link', noteLinkSubmitted: 'note-link-submitted',
-                messageContainer: 'message-container', cannedMessageSelect: 'canned-message-select', sendCannedMessageBtn: 'send-canned-message-btn'
+                messageContainer: 'message-container', cannedMessageSelect: 'canned-message-select', sendCannedMessageBtn: 'send-canned-message-btn',
+                addrWarningBadge: 'addr-warning-badge', addrWarningTooltip: 'addr-warning-tooltip',
+                addrOkBadge: 'addr-ok-badge', addrOkTooltip: 'addr-ok-tooltip'
             },
             localStorageKeys: {
                 darkMode: 'darkModeEnabled'
@@ -193,7 +317,7 @@
                 .${CONFIG.classNames.skuItem} { padding: 4px 8px; border-radius: 4px; font-size: 14px; background-color: ${isDarkMode ? '#3a3a3a' : '#f0f0f0'}; border: 1px solid ${isDarkMode ? '#555' : '#ddd'}; line-height: 1.4; white-space: nowrap; text-decoration: none; color: ${isDarkMode ? '#e0e0e0' : 'inherit'}; cursor: pointer; transition: all 0.2s ease-in-out; }
                 .sku-highlight-hover { transform: scale(1.05); border-color: ${isDarkMode ? '#9BF6FF' : '#0070d2'}; box-shadow: 0 0 8px ${isDarkMode ? '#9BF6FF' : '#0070d2'}; }
                 .${CONFIG.classNames.skuShipped}, .sku-shipped { opacity: 0.5 !important; }
-                .${CONFIG.classNames.skuGroupSeparator} { flex-basis: 100%; height: 0; margin-top: 8px; }
+                .${CONFIG.classNames.skuGroupSeparator} { flex-basis: 100%; height: 0; margin-top: 8px; border-top: 1px solid ${isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}; margin-bottom: 2px; }
                 ${CONFIG.selectors.serviceActions} { margin-left: 400px; }
                 ${CONFIG.selectors.bulkLabelsAppCard} { margin-left: 400px; border: 0px solid #777; }
                 ${CONFIG.selectors.ordersFilters} { margin-left: 0; margin-bottom: 12px; width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 10px 0; background: ${isDarkMode ? '#2a2a2a' : '#fff'}; border: 1px solid #555; border-radius: 12px; }
@@ -271,7 +395,7 @@
                 ${CONFIG.selectors.itemDetailsContainer} li { line-height: 1.3; }
                 ${CONFIG.selectors.itemDetailsContainer} li:first-child { font-size: 1.5em !important; font-weight: bold; color: ${isDarkMode ? '#ffffff' : '#111'}; }
                 ${CONFIG.selectors.itemDetailsContainer} li:nth-child(2) { font-size: 1em !important; font-weight: normal; color: ${isDarkMode ? '#e0e0e0' : 'black'}; }
-                .${CONFIG.classNames.quantityMulti} { font-size: 1.5em !important; font-weight: bold; color: orange !important; }
+                .${CONFIG.classNames.quantityMulti} { font-size: 1.5em !important; font-weight: bold; color: ${isDarkMode ? '#FFA500' : '#B45309'} !important; }
                 .${CONFIG.classNames.reviseLink} {
                     display: inline-block;
                     margin-left: 3px;
@@ -305,6 +429,12 @@
                     text-align: left;
                 }
                 .${CONFIG.classNames.addressEditInput} { display: block; width: 95%; padding: 4px 6px; margin-bottom: 4px; border-radius: 4px; border: 1px solid ${isDarkMode ? '#777' : '#ccc'}; background-color: ${isDarkMode ? '#2a2a2a' : '#fff'}; color: ${isDarkMode ? '#e0e0e0' : '#000'}; }
+                .${CONFIG.classNames.addrWarningBadge} { position: relative; display: inline; margin-left: 5px; font-size: 12px; color: ${isDarkMode ? '#FFB347' : '#B45309'}; cursor: help; user-select: none; }
+                .${CONFIG.classNames.addrWarningTooltip} { display: none; position: absolute; left: 0; top: 1.5em; min-width: 220px; max-width: 320px; background: ${isDarkMode ? '#2a2a2a' : '#fff'}; color: ${isDarkMode ? '#e0e0e0' : '#333'}; border: 1px solid ${isDarkMode ? '#FFB347' : '#B45309'}; border-radius: 5px; padding: 6px 10px; font-size: 11px; line-height: 1.5; white-space: normal; z-index: 999; box-shadow: 0 2px 8px rgba(0,0,0,0.25); pointer-events: none; }
+                .${CONFIG.classNames.addrWarningBadge}:hover .${CONFIG.classNames.addrWarningTooltip} { display: block; }
+                .${CONFIG.classNames.addrOkBadge} { position: relative; display: inline; margin-left: 5px; font-size: 12px; color: ${isDarkMode ? '#6fcf6f' : '#2a7a2a'}; cursor: help; user-select: none; }
+                .${CONFIG.classNames.addrOkTooltip} { display: none; position: absolute; left: 0; top: 1.5em; min-width: 160px; background: ${isDarkMode ? '#2a2a2a' : '#fff'}; color: ${isDarkMode ? '#e0e0e0' : '#333'}; border: 1px solid ${isDarkMode ? '#6fcf6f' : '#2a7a2a'}; border-radius: 5px; padding: 6px 10px; font-size: 11px; line-height: 1.5; white-space: normal; z-index: 999; box-shadow: 0 2px 8px rgba(0,0,0,0.25); pointer-events: none; }
+                .${CONFIG.classNames.addrOkBadge}:hover .${CONFIG.classNames.addrOkTooltip} { display: block; }
                 ${CONFIG.selectors.pageFooter} { background-color: ${isDarkMode ? '#2a2a2a' : '#f5f5f5'}; color: ${isDarkMode ? '#e0e0e0' : '#555'}; margin-top: 0 !important; }
                 ${CONFIG.selectors.pageFooter} a { color: ${isDarkMode ? '#66b3ff' : '#3665f3'} !important; text-decoration: none; }
                 ${CONFIG.selectors.pageFooter} a:hover { text-decoration: underline; }
@@ -320,6 +450,7 @@
                 .${CONFIG.classNames.skuItem}.${CONFIG.classNames.multiItemSkuOrder} { background-color: ${isDarkMode ? '#2a4a3f' : '#E8F5E9'}; font-weight: bold; }
                 .${CONFIG.classNames.skuItem}.${CONFIG.classNames.skuLg} { background-color: ${isDarkMode ? '#2a3f4a' : '#B3E5FC'}; font-weight: bold; border: 2px solid #ffffb1 !important; }
                 .${CONFIG.classNames.skuItem}.${CONFIG.classNames.skuManila} { background-color: ${isDarkMode ? '#4a3f2a' : '#FFD54F'}; font-weight: bold; border: 3px solid orange !important; }
+                .${CONFIG.classNames.skuItem}.${CONFIG.classNames.skuMultiQty} { background-color: ${isDarkMode ? '#2e2a1e' : '#FAF3E0'}; color: ${isDarkMode ? '#c8902a' : '#8a5c00'} !important; border: 1px solid ${isDarkMode ? '#7a5c28' : '#c8a060'} !important; }
                 .${CONFIG.classNames.highlightYellow} { color: #111; background-color: #ffffb1; padding: 1px 2px; border-radius: 2px; }
                 .${CONFIG.classNames.zoomOverlay} { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); z-index: 10000; display: flex; justify-content: center; align-items: center; }
                 .${CONFIG.classNames.zoomContainer} { max-width: 80%; max-height: 80%; position: relative; }
@@ -635,6 +766,46 @@
             document.querySelector('#auto-send-messages-toggle')?.closest('span')?.remove();
             // Attempt to combine orders before proceeding
             ensureOrdersCombined();
+            if (USER_CONFIG.showMicaImage) {
+                const micaImg = document.createElement('img');
+                micaImg.src = 'https://raw.githubusercontent.com/ellokojavi/ebaypickandpack/main/mica.png';
+                micaImg.style.cssText = 'position:fixed;top:0;left:0;max-height:100px;width:auto;z-index:1001;cursor:pointer;transition:opacity 0.15s;';
+                micaImg.addEventListener('mouseenter', () => { micaImg.style.opacity = '0.85'; });
+                micaImg.addEventListener('mouseleave', () => { micaImg.style.opacity = '1'; });
+                micaImg.addEventListener('click', () => {
+                    const overlay = document.createElement('div');
+                    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:10002;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.25s ease;';
+                    const enlarged = document.createElement('img');
+                    enlarged.src = micaImg.src;
+                    enlarged.style.cssText = `width:${micaImg.naturalWidth * 4}px;height:${micaImg.naturalHeight * 4}px;max-width:90vw;max-height:90vh;object-fit:contain;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.6);transform:scale(0.88);transition:transform 0.25s ease,opacity 0.25s ease;opacity:0;`;
+                    const closeBtn = document.createElement('button');
+                    closeBtn.textContent = '✕';
+                    closeBtn.style.cssText = 'position:fixed;top:20px;right:24px;background:none;border:none;color:rgba(255,255,255,0.7);font-size:28px;cursor:pointer;line-height:1;padding:4px 8px;transition:color 0.15s;';
+                    closeBtn.addEventListener('mouseenter', () => { closeBtn.style.color = '#fff'; });
+                    closeBtn.addEventListener('mouseleave', () => { closeBtn.style.color = 'rgba(255,255,255,0.7)'; });
+                    const close = () => {
+                        overlay.style.opacity = '0';
+                        enlarged.style.opacity = '0';
+                        enlarged.style.transform = 'scale(0.88)';
+                        setTimeout(() => overlay.remove(), 250);
+                    };
+                    closeBtn.addEventListener('click', close);
+                    overlay.addEventListener('click', close);
+                    enlarged.addEventListener('click', (e) => e.stopPropagation());
+                    document.addEventListener('keydown', function escHandler(e) {
+                        if (e.key === 'Escape') { close(); document.removeEventListener('keydown', escHandler); }
+                    });
+                    overlay.append(enlarged, closeBtn);
+                    document.body.appendChild(overlay);
+                    // Trigger fade+scale in on next frame so the transition fires
+                    requestAnimationFrame(() => {
+                        overlay.style.opacity = '1';
+                        enlarged.style.opacity = '1';
+                        enlarged.style.transform = 'scale(1)';
+                    });
+                });
+                document.body.appendChild(micaImg);
+            }
             console.debug('[Tampermonkey][INIT] Header & base layout adjustments complete');
         }
 
@@ -659,6 +830,36 @@
                 orderItem.dataset.isCanadian = 'true';
                 orderItem.querySelector(`.${CONFIG.classNames.addressContainer}`).innerHTML = orderItem.querySelector(`.${CONFIG.classNames.addressContainer}`).innerHTML.replace(/Canada/g, '<b><span style="color: red;">Canada</span></b>');
             }
+
+            // --- Address integrity check ---
+            // Validates the structural soundness of domestic shipping addresses and
+            // injects a ⚠ icon with a hover tooltip listing any issues found.
+            {
+                const addrEl = orderItem.querySelector(`.${CONFIG.classNames.addressContainer}`);
+                if (addrEl) {
+                    const addrLines = addrEl.innerText.split('\n').map(l => l.trim()).filter(l => l);
+                    const addrWarnings = validateAddress(addrLines);
+                    const fullnameEl = orderItem.querySelector(`.${CONFIG.classNames.addressFullname}`);
+                    const badgeInsert = el => {
+                        if (!fullnameEl) { addrEl.prepend(el); return; }
+                        const br = fullnameEl.querySelector('br');
+                        br ? fullnameEl.insertBefore(el, br) : fullnameEl.appendChild(el);
+                    };
+                    if (addrWarnings.length > 0) {
+                        const tooltipItems = addrWarnings.map(w => `• ${w}`).join('<br>');
+                        const badge = document.createElement('span');
+                        badge.className = CONFIG.classNames.addrWarningBadge;
+                        badge.innerHTML = `⚠<span class="${CONFIG.classNames.addrWarningTooltip}">${tooltipItems}</span>`;
+                        badgeInsert(badge);
+                    } else {
+                        const badge = document.createElement('span');
+                        badge.className = CONFIG.classNames.addrOkBadge;
+                        badge.innerHTML = `✔<span class="${CONFIG.classNames.addrOkTooltip}">Address looks correct</span>`;
+                        badgeInsert(badge);
+                    }
+                }
+            }
+
             orderItem.querySelectorAll(`${CONFIG.selectors.itemDescription} a[href*="&item="]`).forEach(itemLink => {
                 const itemIDMatch = itemLink.href.match(/&item=(\d+)/);
                 if (itemIDMatch?.[1]) {
@@ -675,9 +876,9 @@
                     const detailsList = itemElement.querySelector(CONFIG.selectors.itemDetailsContainer);
                     if (detailsList) {
                         let qty = 1;
-                        const qtyLi = Array.from(detailsList.querySelectorAll('li')).find(li => li.innerText.trim().startsWith('Quantity:'));
+                        const qtyLi = Array.from(detailsList.querySelectorAll('li')).find(li => /^(Quantity|Qty):/i.test(li.innerText.trim()));
                         if (qtyLi) {
-                            const m = qtyLi.innerText.match(/Quantity:\s*(\d+)/);
+                            const m = qtyLi.innerText.match(/^(?:Quantity|Qty):\s*(\d+)/i);
                             if (m) qty = parseInt(m[1], 10) || 1;
                         }
 
@@ -733,7 +934,7 @@
             let hasManila = false, hasLg = false, skuCount = 0;
             orderItem.querySelectorAll(`${CONFIG.selectors.itemDetailsContainer} li`).forEach(li => {
                 const text = li.innerText;
-                if (text.startsWith("Quantity: ") && parseInt(text.split("Quantity: ")[1]) > 1) li.classList.add(CONFIG.classNames.quantityMulti);
+                if (/^(Quantity|Qty):\s*/i.test(text) && parseInt(text.replace(/^(?:Quantity|Qty):\s*/i, '')) > 1) li.classList.add(CONFIG.classNames.quantityMulti);
                 if (text.startsWith("SKU: ")) {
                     skuCount++;
                     if (text.toLowerCase().includes('manila')) hasManila = true;
@@ -807,8 +1008,17 @@
             orderCards.forEach(orderItem => {
                 const addressEl = orderItem.querySelector(`.${CONFIG.classNames.addressContainer}`);
                 if (!addressEl) return;
+                const addrBadges = addressEl.querySelectorAll(`.${CONFIG.classNames.addrWarningBadge}, .${CONFIG.classNames.addrOkBadge}`);
+                addrBadges.forEach(b => b.style.display = 'none');
                 const addressHTML = addressEl.innerText.replaceAll("\n", "<br>");
-                envelopeHTMLs.push(`<div class="envelope"><table style="font-family: Arial; width: 100%; height: 100%; border-collapse: collapse;"><tr style="vertical-align: top;"><td style="width: 100%; padding: 0; font-size: 14px;">${USER_CONFIG.returnAddress}</td></tr><tr style="height: 10%;"><td></td></tr><tr style="vertical-align: top;"><td style="text-align: left; padding-left: 20%; font-size: 24px;">${addressHTML}</td></tr><tr style="height: 30%;"><td></td></tr></table></div>`);
+                addrBadges.forEach(b => b.style.display = '');
+                const isCanadian = orderItem.dataset.isCanadian === 'true'
+                    || /canada/i.test(addressEl.innerText);
+                // Stamp reminder: sized to fit under a standard USPS international stamp (~1.25in × 1.5in)
+                const stampReminder = isCanadian
+                    ? `<div style="position:absolute;top:40px;right:0;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:5px 6px;border:1px dashed rgba(0,0,0,0.18);border-radius:2px;text-align:center;font-family:Arial;box-sizing:border-box;opacity:0.35;"><span style="font-size:22px;line-height:1;">🇨🇦</span><span style="font-size:10px;font-weight:bold;color:#444;line-height:1.2;white-space:nowrap;">Int'l Stamp</span></div>`
+                    : '';
+                envelopeHTMLs.push(`<div class="envelope" style="position:relative;">${stampReminder}<table style="font-family: Arial; width: 100%; height: 100%; border-collapse: collapse;"><tr style="vertical-align: top;"><td style="width: 100%; padding: 0; font-size: 14px;">${USER_CONFIG.returnAddress}</td></tr><tr style="height: 10%;"><td></td></tr><tr style="vertical-align: top;"><td style="text-align: left; padding-left: 20%; font-size: 24px;">${addressHTML}</td></tr><tr style="height: 30%;"><td></td></tr></table></div>`);
             });
             if (envelopeHTMLs.length === 0) return;
             const printwin = window.open("", "_blank");
@@ -1396,6 +1606,7 @@
                             if (skuObject.text.toLowerCase().includes("lg")) skuItemLink.classList.add(CONFIG.classNames.skuLg);
                             if (skuObject.text.toLowerCase().includes("manila")) skuItemLink.classList.add(CONFIG.classNames.skuManila);
                         }
+                        if (skuObject.quantity > 1 && !skuItemLink.classList.contains(CONFIG.classNames.skuManila)) skuItemLink.classList.add(CONFIG.classNames.skuMultiQty);
                         flexContainer.appendChild(skuItemLink);
                     }
                     contentWrapper.appendChild(flexContainer);
@@ -1419,6 +1630,17 @@
                     }
                     contentWrapper.appendChild(printButton);
                 }
+
+                // --- CUSTOM ENVELOPE FEATURE (link in SKU panel) ---
+                const customEnvLink = document.createElement('a');
+                customEnvLink.href = '#';
+                customEnvLink.textContent = '✉ Custom Envelope';
+                customEnvLink.style.cssText = `display:block;text-align:center;margin-top:6px;font-size:12px;color:${isDarkMode ? '#78BFFF' : '#3665f3'};text-decoration:none;cursor:pointer;opacity:0.75;transition:opacity 0.2s;`;
+                customEnvLink.onmouseenter = () => { customEnvLink.style.opacity = '1'; };
+                customEnvLink.onmouseleave = () => { customEnvLink.style.opacity = '0.75'; };
+                customEnvLink.addEventListener('click', (e) => { e.preventDefault(); showCustomEnvelopeModal(); });
+                contentWrapper.appendChild(customEnvLink);
+                // --- END CUSTOM ENVELOPE FEATURE (link) ---
 
                 // --- Configuration Section (below Print button) ---
                 const configSection = document.createElement('div');
@@ -1572,13 +1794,14 @@
                         let skuValue = '', designValue = '', quantity = 1;
                         const detailsList = itemEl.querySelector('[class*="item__details"]');
                         if (!detailsList) return;
-                        const skuLi = Array.from(detailsList.querySelectorAll('li')).find(li => li.innerText.trim().startsWith("SKU:"));
+                        const allLis = Array.from(detailsList.querySelectorAll('li'));
+                        const skuLi = allLis.find(li => li.innerText.trim().startsWith("SKU:"));
                         if (skuLi) skuValue = skuLi.innerText.trim().replace("SKU:", "").trim();
-                        const designLi = Array.from(detailsList.querySelectorAll('li')).find(li => li.innerText.trim().startsWith("Design:"));
+                        const designLi = allLis.find(li => li.innerText.trim().startsWith("Design:"));
                         if (designLi) designValue = designLi.innerText.trim().replace("Design:", "").trim();
-                        const qtyLi = Array.from(detailsList.querySelectorAll('li')).find(li => li.innerText.trim().startsWith("Quantity:"));
+                        const qtyLi = allLis.find(li => /^(Quantity|Qty):/i.test(li.innerText.trim()));
                         if (qtyLi) {
-                            const quantityMatch = qtyLi.innerText.trim().match(/Quantity:\s*(\d+)/);
+                            const quantityMatch = qtyLi.innerText.trim().match(/^(?:Quantity|Qty):\s*(\d+)/i);
                             if (quantityMatch?.[1]) quantity = parseInt(quantityMatch[1], 10);
                         }
                         if (skuValue) itemsInThisOrder.push({ sku: skuValue, design: designValue, quantity: quantity });
@@ -1593,14 +1816,25 @@
                     }
                 });
                 parsedOrders.forEach(order => {
-                    const totalQuantityInOrder = order.items.reduce((sum, item) => sum + item.quantity, 0);
-                    const isMultiItemOrder = totalQuantityInOrder > 1 || order.items.length > 1;
+                    // Consolidate items with the same SKU+Design within one order
+                    const consolidated = new Map();
                     order.items.forEach(item => {
+                        const key = `${item.sku}|||${item.design}`;
+                        if (consolidated.has(key)) {
+                            consolidated.get(key).quantity += item.quantity;
+                        } else {
+                            consolidated.set(key, { sku: item.sku, design: item.design, quantity: item.quantity });
+                        }
+                    });
+                    const mergedItems = Array.from(consolidated.values());
+                    const isMultiItemOrder = mergedItems.length > 1;
+                    mergedItems.forEach(item => {
                         let displayText = item.sku;
                         if (item.design) displayText += ` (${item.design})`;
                         if (item.quantity > 1) displayText += ` x${item.quantity}`;
                         SKU.push({
                             text: displayText,
+                            quantity: item.quantity,
                             isMultiItemOrder,
                             orderId: order.orderId,
                             isCanadian: order.isCanadian,
@@ -1614,6 +1848,153 @@
 
             return { createSKUPackingList };
         }
+
+        // --- CUSTOM ENVELOPE FEATURE (modal) ---
+        // Opens a modal that lets the user paste a raw address block, auto-parses it into
+        // structured fields for review/edit, and prints a single ad-hoc envelope.
+        function showCustomEnvelopeModal() {
+            const isDarkMode = localStorage.getItem(CONFIG.localStorageKeys.darkMode) !== 'false';
+            const bg = isDarkMode ? '#1e1e1e' : '#fff';
+            const fg = isDarkMode ? '#e0e0e0' : '#000';
+            const inputBg = isDarkMode ? '#2c2c2c' : '#fff';
+            const inputBorder = isDarkMode ? '#555' : '#ccc';
+            const accent = isDarkMode ? '#3665f3' : '#0070d2';
+            const mutedFg = isDarkMode ? '#999' : '#888';
+
+            // Overlay
+            const overlay = document.createElement('div');
+            overlay.className = 'custom-envelope-overlay';
+            overlay.style.cssText = `position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);z-index:10001;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);`;
+
+            // Modal
+            const modal = document.createElement('div');
+            modal.className = 'custom-envelope-modal';
+            modal.style.cssText = `background:${bg};color:${fg};border-radius:12px;padding:24px;width:460px;max-width:92vw;max-height:88vh;overflow-y:auto;box-shadow:0 8px 30px rgba(0,0,0,0.3);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;`;
+
+            // Header
+            const header = document.createElement('div');
+            header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;';
+            const title = document.createElement('h3');
+            title.textContent = '✉ Custom Envelope';
+            title.style.cssText = `margin:0;font-size:18px;color:${fg};`;
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = '✕';
+            closeBtn.style.cssText = `background:none;border:none;font-size:18px;cursor:pointer;color:${mutedFg};padding:4px 8px;border-radius:4px;`;
+            closeBtn.onclick = () => overlay.remove();
+            header.append(title, closeBtn);
+            modal.appendChild(header);
+
+            // Instruction
+            const hint = document.createElement('p');
+            hint.textContent = 'Paste a full address block below — fields update automatically.';
+            hint.style.cssText = `font-size:12px;color:${mutedFg};margin:0 0 10px;`;
+            modal.appendChild(hint);
+
+            // Textarea
+            const textarea = document.createElement('textarea');
+            textarea.placeholder = 'Pablo Cazenave\n26615 Godfrey Cove Ct\nApt 206\nKaty, TX 77494-0415\nUnited States';
+            textarea.style.cssText = `width:100%;box-sizing:border-box;min-height:110px;padding:10px;border-radius:8px;border:1px solid ${inputBorder};background:${inputBg};color:${fg};font-size:14px;font-family:inherit;resize:vertical;outline:none;transition:border-color 0.2s;`;
+            textarea.addEventListener('focus', () => { textarea.style.borderColor = accent; });
+            textarea.addEventListener('blur', () => { textarea.style.borderColor = inputBorder; });
+            modal.appendChild(textarea);
+
+            // Parsed fields container
+            const fieldsContainer = document.createElement('div');
+            fieldsContainer.style.cssText = 'margin-top:14px;display:flex;flex-direction:column;gap:8px;';
+
+            const fieldDefs = [
+                { key: 'name', label: 'Name' },
+                { key: 'street', label: 'Street' },
+                { key: 'line2', label: 'Apt / Unit / Extra' },
+                { key: 'cityStateZip', label: 'City, State ZIP' },
+                { key: 'country', label: 'Country' }
+            ];
+
+            const fieldInputs = {};
+            fieldDefs.forEach(def => {
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex;align-items:center;gap:8px;';
+                const label = document.createElement('label');
+                label.textContent = def.label;
+                label.style.cssText = `font-size:12px;font-weight:600;color:${mutedFg};width:110px;flex-shrink:0;text-align:right;`;
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.dataset.field = def.key;
+                input.style.cssText = `flex:1;padding:6px 10px;border-radius:6px;border:1px solid ${inputBorder};background:${inputBg};color:${fg};font-size:13px;font-family:inherit;outline:none;transition:border-color 0.2s;`;
+                input.addEventListener('focus', () => { input.style.borderColor = accent; });
+                input.addEventListener('blur', () => { input.style.borderColor = inputBorder; });
+                fieldInputs[def.key] = input;
+                row.append(label, input);
+                fieldsContainer.appendChild(row);
+            });
+            modal.appendChild(fieldsContainer);
+
+            // Live parsing: debounced, fires on every textarea change
+            let parseTimer = null;
+            const runParse = () => {
+                const parsed = parseAddressBlock(textarea.value);
+                fieldDefs.forEach(def => {
+                    fieldInputs[def.key].value = parsed[def.key] || '';
+                });
+            };
+            textarea.addEventListener('input', () => {
+                clearTimeout(parseTimer);
+                parseTimer = setTimeout(runParse, 250);
+            });
+            // Also fire on paste immediately (paste event fires before input)
+            textarea.addEventListener('paste', () => {
+                clearTimeout(parseTimer);
+                setTimeout(runParse, 50);
+            });
+
+            // Buttons row
+            const btnRow = document.createElement('div');
+            btnRow.style.cssText = 'display:flex;justify-content:flex-end;gap:10px;margin-top:18px;';
+
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = 'Cancel';
+            cancelBtn.style.cssText = `padding:8px 18px;border-radius:6px;border:1px solid ${inputBorder};background:${isDarkMode ? '#333' : '#f5f5f5'};color:${fg};font-size:14px;cursor:pointer;font-weight:600;`;
+            cancelBtn.onclick = () => overlay.remove();
+
+            const printBtn = document.createElement('button');
+            printBtn.textContent = 'Print Envelope';
+            printBtn.style.cssText = `padding:8px 18px;border-radius:6px;border:none;background:${accent};color:#fff;font-size:14px;cursor:pointer;font-weight:700;transition:background 0.2s;`;
+            printBtn.onmouseenter = () => { printBtn.style.background = isDarkMode ? '#5a82f5' : '#005fb8'; };
+            printBtn.onmouseleave = () => { printBtn.style.background = accent; };
+
+            printBtn.onclick = () => {
+                // Build address HTML from the editable fields (not the raw textarea)
+                const parts = fieldDefs
+                    .map(def => fieldInputs[def.key].value.trim())
+                    .filter(v => v.length > 0);
+                if (parts.length === 0) { alert('Please paste an address first.'); return; }
+                const addressHTML = parts.join('<br>');
+                const envelopeHTML = `<div class="envelope"><table style="font-family: Arial; width: 100%; height: 100%; border-collapse: collapse;"><tr style="vertical-align: top;"><td style="width: 100%; padding: 0; font-size: 14px;">${USER_CONFIG.returnAddress}</td></tr><tr style="height: 10%;"><td></td></tr><tr style="vertical-align: top;"><td style="text-align: left; padding-left: 20%; font-size: 24px;">${addressHTML}</td></tr><tr style="height: 30%;"><td></td></tr></table></div>`;
+                const printwin = window.open("", "_blank");
+                printwin.document.write(`<html><head><style>@page { size: 8.93in x 3.878in; margin: 0; } html, body { margin: 0; padding: 0; } .envelope { width: 8.93in; height: 3.878in; padding: 10px; font-family: Arial; box-sizing: border-box; overflow: hidden; }</style></head><body>${envelopeHTML}</body></html>`);
+                printwin.document.close();
+                printwin.focus();
+                printwin.print();
+                printwin.close();
+                overlay.remove();
+            };
+
+            btnRow.append(cancelBtn, printBtn);
+            modal.appendChild(btnRow);
+
+            // Close on overlay click (outside modal)
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+            // Close on Escape
+            const escHandler = (e) => { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', escHandler); } };
+            document.addEventListener('keydown', escHandler);
+
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+
+            // Auto-focus textarea
+            setTimeout(() => textarea.focus(), 50);
+        }
+        // --- END CUSTOM ENVELOPE FEATURE (modal) ---
 
         // --- Main Execution Function ---
         // This is the core function that orchestrates the script's execution on the main page.
@@ -2271,5 +2652,195 @@
     function applyTemplate(template, data) {
         return template.replace(/\{([A-Z0-9_]+)\}/g, (m, key) => (key in data ? data[key] : m));
     }
+
+    // --- ADDRESS INTEGRITY VALIDATION ---
+    // Checks structural soundness of US and Canadian shipping addresses.
+    // Returns an array of human-readable warning strings; empty array = no issues found.
+    // All other international addresses are skipped — too many valid formats to lint reliably.
+    function validateAddress(lines) {
+        const warnings = [];
+        if (!lines || lines.length === 0) {
+            warnings.push('Address is empty');
+            return warnings;
+        }
+
+        // Detect country
+        const isCanadian = lines.some(l => /^canada$/i.test(l.trim()));
+
+        // Skip non-US, non-Canadian destinations
+        const otherInternationalPattern = /^(united kingdom|uk|australia|germany|france|japan|mexico|italy|spain|netherlands|sweden|norway|denmark|finland|new zealand|ireland|portugal|belgium|austria|switzerland|south korea|poland|israel|philippines|singapore|hong kong|taiwan|china|colombia|argentina|chile|peru|costa rica|brazil|india)$/i;
+        if (!isCanadian && lines.some(l => otherInternationalPattern.test(l.trim()))) return warnings;
+
+        // Rule 1: minimum line count (name + street + city/province/postal = 3 minimum)
+        if (lines.length < 3) {
+            warnings.push('Address looks incomplete — fewer than 3 lines');
+            return warnings; // further checks would be noise
+        }
+
+        // Rule 2: name line should have at least two characters and not be purely numeric
+        const nameLine = lines[0].trim();
+        if (nameLine.length < 2) {
+            warnings.push('Buyer name is missing or too short');
+        } else if (/^\d+$/.test(nameLine)) {
+            warnings.push('Buyer name line appears to be a number');
+        }
+
+        // Rule 3: street line (line index 1) should start with a digit OR be a PO Box
+        const streetLine = lines[1].trim();
+        const isPOBox = /^p\.?o\.?\s*box\b/i.test(streetLine);
+        if (!isPOBox && !/^\d/.test(streetLine)) {
+            warnings.push('Street line doesn\'t start with a house/building number');
+        }
+
+        // Rule 3b: any line after the name that is purely digits is a standalone street
+        // number — almost always means eBay split the number from the street name,
+        // producing a duplicate (e.g. "416577" on one line, "416577 flying bridge" on the next).
+        const bareNumberLine = lines.slice(1).find(l => /^\d+$/.test(l.trim()));
+        if (bareNumberLine) {
+            warnings.push(`"${bareNumberLine.trim()}" is a number on its own line — street number may be duplicated`);
+        }
+
+        if (isCanadian) {
+            // Rule 4 (CA): look for a "City Province A1A 1A1" line.
+            // Canadian postal codes follow the pattern: letter-digit-letter space digit-letter-digit.
+            const cszPattern = /^(.+?)\s+([A-Z]{2})\s+([A-Z]\d[A-Z]\s?\d[A-Z]\d)$/i;
+            const cszLine = lines.find(l => cszPattern.test(l.trim()));
+
+            if (!cszLine) {
+                warnings.push('No city/province/postal code line found (expected: "City ON A1A 1A1")');
+            } else {
+                const match = cszLine.trim().match(cszPattern);
+                if (match) {
+                    // Rule 5 (CA): validate province/territory abbreviation
+                    const VALID_CA_PROVINCES = new Set([
+                        'AB','BC','MB','NB','NL','NS','NT','NU','ON','PE','QC','SK','YT'
+                    ]);
+                    const province = match[2].toUpperCase();
+                    if (!VALID_CA_PROVINCES.has(province)) {
+                        warnings.push(`Unrecognized Canadian province/territory code: "${province}"`);
+                    }
+                }
+            }
+        } else {
+            // Rule 4 (US): look for a "City ST 12345" line.
+            // eBay omits the comma between city and state, so the comma is optional here.
+            const cszPattern = /^(.+?)(?:,)?\s+([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/i;
+            const cszLine = lines.find(l => cszPattern.test(l.trim()));
+
+            if (!cszLine) {
+                warnings.push('No city/state/ZIP line found (expected: "City ST 12345")');
+            } else {
+                const match = cszLine.trim().match(cszPattern);
+                if (match) {
+                    // Rule 5 (US): validate state/territory abbreviation
+                    const VALID_US_STATES = new Set([
+                        'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA',
+                        'HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
+                        'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
+                        'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
+                        'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY',
+                        'DC','PR','GU','VI','AS','MP','AA','AE','AP'
+                    ]);
+                    const stateCode = match[2].toUpperCase();
+                    if (!VALID_US_STATES.has(stateCode)) {
+                        warnings.push(`Unrecognized state/territory code: "${stateCode}"`);
+                    }
+                }
+            }
+        }
+
+        return warnings;
+    }
+    // --- END ADDRESS INTEGRITY VALIDATION ---
+
+    // --- CUSTOM ENVELOPE FEATURE ---
+    // Parses a free-form address block into structured fields.
+    // Handles name, street, apt/unit/suite/extra line, city+state+zip, and country.
+    function parseAddressBlock(text) {
+        const result = { name: '', street: '', line2: '', cityStateZip: '', country: '' };
+        if (!text || !text.trim()) return result;
+
+        // Split into non-empty lines, trimming each
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        if (lines.length === 0) return result;
+
+        // Known country names / codes (common destinations)
+        const countryPatterns = /^(united states|usa|us|canada|ca|mexico|mx|united kingdom|uk|australia|au|germany|de|france|fr|japan|jp|brazil|br|india|in|italy|it|spain|es|netherlands|nl|sweden|se|norway|no|denmark|dk|finland|fi|new zealand|nz|ireland|ie|portugal|pt|belgium|be|austria|at|switzerland|ch|south korea|kr|poland|pl|czech republic|cz|israel|il|puerto rico|pr|philippines|ph|singapore|sg|hong kong|hk|taiwan|tw|china|cn|colombia|co|argentina|ar|chile|cl|peru|pe|costa rica|cr)$/i;
+
+        // City + State + ZIP pattern (US-style: "City, ST 12345" or "City, ST 12345-6789")
+        const cityStateZipPattern = /^(.+),\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/i;
+
+        // Secondary address line indicators
+        const line2Pattern = /^(apt\.?|apartment|unit|suite|ste\.?|bldg\.?|building|floor|fl\.?|room|rm\.?|lot|front\s*door|back\s*door|side\s*door|gate|door|c\/?o\b|attn:?)/i;
+
+        // Detect which line is the city/state/zip
+        let cszIndex = -1;
+        for (let i = 0; i < lines.length; i++) {
+            if (cityStateZipPattern.test(lines[i])) { cszIndex = i; break; }
+        }
+
+        // Detect country line (usually last)
+        let countryIndex = -1;
+        for (let i = lines.length - 1; i >= 0; i--) {
+            if (countryPatterns.test(lines[i])) { countryIndex = i; break; }
+        }
+
+        // If no city/state/zip pattern found, try a looser heuristic:
+        // a line with a comma followed by 2-letter code (state/province) near the end
+        if (cszIndex === -1) {
+            const looseCSZ = /^(.+),\s*([A-Z]{2})\b/i;
+            for (let i = lines.length - 1; i >= 1; i--) {
+                if (i === countryIndex) continue;
+                if (looseCSZ.test(lines[i])) { cszIndex = i; break; }
+            }
+        }
+
+        // Assign fields based on detected landmarks
+        // Line 0 is always the name
+        result.name = lines[0] || '';
+
+        if (cszIndex > 0) {
+            // Everything between name and csz is address lines
+            const addressLines = lines.slice(1, cszIndex);
+            if (addressLines.length >= 2) {
+                result.street = addressLines[0];
+                result.line2 = addressLines.slice(1).join(', ');
+            } else if (addressLines.length === 1) {
+                result.street = addressLines[0];
+            }
+            result.cityStateZip = lines[cszIndex];
+        } else {
+            // No csz detected — assign by position heuristics
+            if (lines.length >= 2) result.street = lines[1];
+            if (lines.length >= 3) {
+                // Check if line 2 looks like a secondary line
+                const remaining = lines.slice(2, countryIndex > 0 ? countryIndex : undefined);
+                if (remaining.length >= 2) {
+                    // Check if first remaining is apt-like
+                    if (line2Pattern.test(remaining[0])) {
+                        result.line2 = remaining[0];
+                        result.cityStateZip = remaining.slice(1).join(', ');
+                    } else {
+                        result.street = lines[1];
+                        result.line2 = remaining[0];
+                        result.cityStateZip = remaining.slice(1).join(', ');
+                    }
+                } else if (remaining.length === 1) {
+                    if (line2Pattern.test(remaining[0])) {
+                        result.line2 = remaining[0];
+                    } else {
+                        result.cityStateZip = remaining[0];
+                    }
+                }
+            }
+        }
+
+        if (countryIndex > 0) {
+            result.country = lines[countryIndex];
+        }
+
+        return result;
+    }
+    // --- END CUSTOM ENVELOPE FEATURE (utility) ---
 
 })();
