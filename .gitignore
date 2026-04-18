@@ -1,0 +1,5 @@
+# Local tooling — not part of the userscript repo
+autopush/
+reference/
+CLAUDE.md
+.DS_Store
