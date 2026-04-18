@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.altheastix.autopush</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/javieririgoyen/bin/autopush.sh</string>
+    </array>
+
+    <key>WatchPaths</key>
+    <array>
+        <string>/Users/javieririgoyen/Documents/Claude/Projects/Altheastix eBay Order Manager/src/userscript.js</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/javieririgoyen/Documents/Claude/Projects/Altheastix eBay Order Manager/autopush/autopush.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/javieririgoyen/Documents/Claude/Projects/Altheastix eBay Order Manager/autopush/autopush.log</string>
+</dict>
+</plist>
