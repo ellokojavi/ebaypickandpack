@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         2025 eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260417-v3.48-config-to-github
+// @version      20260417-v3.49-cowork-push-test
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -26,6 +26,9 @@
 // ===================================================================
 // CHANGELOG
 // ===================================================================
+// v3.49:
+// - Test commit to verify Cowork auto-push is working end-to-end.
+//
 // v3.48:
 // - Moved external config from GitHub Gist to the repo as altheastix-ebay-config.js.
 //   Updated @require URL to point to GitHub raw URL instead of Gist.
