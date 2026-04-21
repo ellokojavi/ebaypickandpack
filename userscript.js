@@ -1328,8 +1328,20 @@
                     const copyBtn = addressActions?.querySelector(`.${CONFIG.classNames.copyAddressBtn}`);
                     if (!addressElement || !editBtn || !copyBtn) return;
                     if (orderItemElement.classList.contains(CONFIG.classNames.isEditingAddress)) {
+                        // Save: read the edited lines and rebuild the address HTML.
+                        // Preserve the validation badge (⚠ / ✔) that was detached when entering edit mode
+                        // by re-injecting it into the rebuilt first line, so editing the address never
+                        // mutates or strips the status icon.
                         const inputs = Array.from(addressElement.querySelectorAll(`.${CONFIG.classNames.addressEditInput}`));
-                        addressElement.innerHTML = inputs.map(input => input.value.trim()).filter(line => line).join('<br>');
+                        const savedBadge = addressElement.dataset.savedBadgeHtml || '';
+                        const lines = inputs.map(input => input.value.trim()).filter(line => line);
+                        if (lines.length > 0 && savedBadge) {
+                            // Re-attach badge to the end of the first line (name line), matching the
+                            // original layout where the badge sat next to the fullname.
+                            lines[0] = `${lines[0]} ${savedBadge}`;
+                        }
+                        addressElement.innerHTML = lines.join('<br>');
+                        delete addressElement.dataset.savedBadgeHtml;
                         orderItemElement.classList.remove(CONFIG.classNames.isEditingAddress);
                         editBtn.textContent = 'Edit';
                         copyBtn.style.display = 'inline';
@@ -1337,7 +1349,15 @@
                     } else {
                         orderItemElement.classList.add(CONFIG.classNames.isEditingAddress);
                         addressElement.dataset.originalHtml = addressElement.innerHTML;
-                        const addressLines = addressElement.innerText.split('\n').filter(line => line.trim() !== '');
+                        // Detach the validation badge(s) BEFORE reading innerText so the ⚠ / ✔
+                        // character doesn't get captured into the name line. We stash the badge
+                        // HTML and re-attach it on save (or restore the original HTML on cancel).
+                        const badgeEls = Array.from(addressElement.querySelectorAll(
+                            `.${CONFIG.classNames.addrWarningBadge}, .${CONFIG.classNames.addrOkBadge}`
+                        ));
+                        addressElement.dataset.savedBadgeHtml = badgeEls.map(b => b.outerHTML).join('');
+                        badgeEls.forEach(b => b.remove());
+                        const addressLines = addressElement.innerText.split('\n').map(l => l.trim()).filter(line => line !== '');
                         addressElement.innerHTML = '';
                         addressLines.forEach(line => {
                             const input = document.createElement('input'); input.type = 'text'; input.className = CONFIG.classNames.addressEditInput; input.value = line; addressElement.appendChild(input);
@@ -1349,7 +1369,9 @@
                 }
                 if (target.classList.contains(CONFIG.classNames.cancelAddressBtn)) {
                     event.preventDefault();
+                    // Restoring originalHtml also restores the badge, since it was captured before detach.
                     if (addressElement) addressElement.innerHTML = addressElement.dataset.originalHtml;
+                    if (addressElement) delete addressElement.dataset.savedBadgeHtml;
                     orderItemElement.classList.remove(CONFIG.classNames.isEditingAddress);
                     const editBtn = addressActions?.querySelector(`.${CONFIG.classNames.editAddressBtn}`);
                     if (editBtn) editBtn.textContent = 'Edit';
