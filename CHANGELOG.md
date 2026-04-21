@@ -1,5 +1,12 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.53
+- Fixed address Edit button pulling the validation badge character (⚠ / ✔) into
+  the recipient name. The badge is now detached before reading the address
+  lines into the edit inputs, then re-attached to the name line on Save.
+  Cancel restores the original HTML (badge included). Editing the address no
+  longer mutates or strips the status icon.
+
 ## v3.51
 - Moved changelog out of `userscript.js` into this file (`src/CHANGELOG.md`).
   No functional changes.
