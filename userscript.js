@@ -461,10 +461,15 @@
                 .canned-modal-content h3 { margin: 0 0 10px; font-size: 18px; color: ${isDarkMode ? '#e0e0e0' : '#000'}; }
                 .canned-modal-input {
                     width: 100%; padding: 8px; border-radius: 4px;
-                    border: 1px solid ${isDarkMode ? '#777' : '#ccc'};
+                    border: 1px solid ${isDarkMode ? '#3f7a55' : '#9bcdb0'};
                     background-color: ${isDarkMode ? '#3a3a3a' : '#fff'};
-                    color: ${isDarkMode ? '#e0e0e0' : '#000'};
+                    color: ${isDarkMode ? '#5fd98a' : '#0c7a3e'};
+                    font-weight: 600;
                     box-sizing: border-box;
+                }
+                .canned-modal-input::placeholder {
+                    color: ${isDarkMode ? '#8a8a8a' : '#999'};
+                    font-weight: 400;
                 }
                 .canned-modal-buttons {
                     display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;
