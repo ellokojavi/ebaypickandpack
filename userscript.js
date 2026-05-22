@@ -23,7 +23,7 @@
 // @downloadURL  https://raw.githubusercontent.com/ellokojavi/ebaypickandpack/main/userscript.js
 // ==/UserScript==
 
-// Changelog:  see src/CHANGELOG.md in the repository.
+// Changelog: see src/CHANGELOG.md in the repository.
 
 (function() {
     'use strict';
