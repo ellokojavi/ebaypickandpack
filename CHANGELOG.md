@@ -1,5 +1,13 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.62
+- Canned message live preview now colors the buyer's custom field
+  values with an accent so they stand out from the fixed template
+  text, making edits easy to spot at a glance.
+- Fields not yet filled now render as a small pill placeholder
+  (e.g. "sticker name") in the preview instead of leaving a blank gap.
+- Modal input boxes are color-matched to the same preview accent.
+
 ## v3.61
 - Canned message modal ("Late + Gift", "Late, no gift", "Preorder
   Sticker") now shows a live preview pane that re-renders the fully
