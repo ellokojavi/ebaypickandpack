@@ -1454,7 +1454,7 @@
                                 const orderItemElement = target.closest(CONFIG.selectors.orderItem);
                                 const fullNameEl = orderItemElement.querySelector('.print__address__fullname');
                                 const buyerName = (fullNameEl?.textContent || '').trim();
-                                const buyerFirst = buyerName.split(/\s+/)[0] || 'there';
+                                const buyerFirst = humanizeName(buyerName.split(/\s+/)[0] || 'there');
                                 messageText = applyTemplate(template, { BUYER_FIRST: buyerFirst });
                             }
                         }
