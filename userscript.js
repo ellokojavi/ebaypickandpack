@@ -500,6 +500,19 @@
                     min-height: 40px; max-height: 240px; overflow-y: auto;
                     color: ${isDarkMode ? '#d0d0d0' : '#222'};
                 }
+                .canned-modal-token {
+                    color: ${isDarkMode ? '#5fd98a' : '#0c7a3e'};
+                    font-weight: 600;
+                }
+                .canned-modal-pill {
+                    display: inline-block;
+                    padding: 1px 8px; margin: 0 1px;
+                    border-radius: 9px;
+                    font-size: 11px; font-weight: 600; line-height: 1.5;
+                    color: ${isDarkMode ? '#5fd98a' : '#0c7a3e'};
+                    background-color: ${isDarkMode ? 'rgba(95,217,138,0.14)' : 'rgba(12,122,62,0.10)'};
+                    border: 1px dashed ${isDarkMode ? '#3f7a55' : '#9bcdb0'};
+                }
             `;
         }
 
@@ -1429,10 +1442,43 @@
                             });
                         };
 
-                        // Live preview: re-render the interpolated message on every keystroke
-                        // so the blurb can be reviewed before jumping to the messages page.
+                        // Live preview: re-render the interpolated message on every keystroke.
+                        // The buyer's custom field values are shown in an accent color so changes
+                        // stand out from the fixed template text; fields not yet filled render as
+                        // a pill placeholder instead of leaving a blank gap.
+                        const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => (
+                            { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+                        const previewFields = {
+                            STICKER_NAME: { id: 'sticker-name', label: 'sticker name' },
+                            ARRIVAL_DATE: { id: 'arrival-date', label: 'arrival date' },
+                            SHIPPING_DATE: { id: 'shipping-date', label: 'shipping date' },
+                            SURPRISE_STICKER: { id: 'surprise-sticker', label: 'surprise sticker' }
+                        };
                         const previewEl = modalContent.querySelector('#canned-preview');
-                        const renderPreview = () => { previewEl.textContent = buildMessageText(); };
+                        const renderPreview = () => {
+                            let html = '';
+                            let lastIndex = 0;
+                            let match;
+                            const tokenRe = /\{([A-Z0-9_]+)\}/g;
+                            while ((match = tokenRe.exec(template)) !== null) {
+                                html += escapeHtml(template.slice(lastIndex, match.index));
+                                const key = match[1];
+                                const field = previewFields[key];
+                                if (key === 'BUYER_FIRST') {
+                                    html += escapeHtml(buyerFirst);
+                                } else if (field) {
+                                    const value = (document.getElementById(field.id)?.value || '').trim();
+                                    html += value
+                                        ? `<span class="canned-modal-token">${escapeHtml(value)}</span>`
+                                        : `<span class="canned-modal-pill">${escapeHtml(field.label)}</span>`;
+                                } else {
+                                    html += escapeHtml(match[0]);
+                                }
+                                lastIndex = match.index + match[0].length;
+                            }
+                            html += escapeHtml(template.slice(lastIndex));
+                            previewEl.innerHTML = html;
+                        };
                         modalContent.querySelectorAll('.canned-modal-input').forEach((input) => {
                             input.addEventListener('input', renderPreview);
                         });
