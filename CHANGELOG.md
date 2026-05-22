@@ -1,5 +1,65 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.61
+- Canned message modal ("Late + Gift", "Late, no gift", "Preorder
+  Sticker") now shows a live preview pane that re-renders the fully
+  interpolated message on every keystroke, so the blurb can be checked
+  before jumping to the messages page.
+- Buyer first names that arrive ALL CAPS (e.g. "GEORGE") are now
+  title-cased ("George") in canned messages via a new humanizeName()
+  helper, so the greeting reads as if hand-written. Names that already
+  contain a lowercase letter are left untouched.
+- Updated USER_CONFIG.defaultTrackingNumber to the current USPS
+  tracking number.
+
+## v3.60
+- Tightened address banner label: "⚠ Address issue on 1 order:" /
+  "⚠ Address issues on N orders:" — drops the hedging "potentially wrong"
+  and replaces the trailing dash with a colon.
+
+## v3.59
+- Configuration panel is now collapsible. The header row is clickable and
+  shows a ▸/▾ chevron. Collapsed state is persisted in localStorage
+  (key `configPanelCollapsed`) and defaults to collapsed on first load.
+  Toggling calls `updateSkuPanelPosition()` so panel geometry stays correct.
+
+## v3.58
+- Moved the scroll-to-top button from the top-right corner to the
+  bottom-right of the orders column. Its `left` is now computed in
+  `updateSkuPanelPosition` from the orders container's right edge
+  (same geometry as the SKU panel), so it tracks the column on resize.
+
+## v3.57
+- Address warning banner: added an × dismiss button (right-aligned, same
+  amber palette) that hides the banner for the session. Dismissal is
+  tracked with a closure flag so `refreshAddressBanner()` does not
+  re-show it on subsequent calls.
+- Added a floating scroll-to-top button (↑) anchored to the top-right
+  corner of the viewport. It fades in after scrolling 200 px down and
+  fades out when back at the top, using an opacity transition wired into
+  the existing `updateSkuPanelOnScroll` handler.
+
+## v3.56
+- Added a thin address-warning banner that appears directly below the
+  `.orders-filters` header whenever one or more orders have a flagged
+  address (i.e. already carry the ⚠ badge from the existing
+  `validateAddress()` check). The banner shows a count summary and one
+  jump-link per affected order (buyer name as label) that smooth-scrolls
+  directly to that card. Banner is hidden entirely when no issues exist.
+
+## v3.55
+- Separated the Configuration panel from the SKUs to Pack panel. It is now
+  a fully independent floating box (`#altheastix-config-container`) appended
+  to `document.body`, positioned below the SKU panel with a 12px gap. Its
+  left edge and scroll-driven vertical position are kept in sync via
+  `updateSkuPanelPosition` and `updateSkuPanelOnScroll`, and it carries the
+  same `transition: top 0.3s ease-in-out` so it glides with the SKU panel
+  when the page header scrolls out of view.
+
+## v3.54
+- Removed six stray `// autopush test ...` comments at the end of
+  `userscript.js` left over from earlier launchd debugging. No behavior change.
+
 ## v3.53
 - Fixed address Edit button pulling the validation badge character (⚠ / ✔) into
   the recipient name. The badge is now detached before reading the address
