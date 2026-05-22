@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         2025 eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
+// @name         eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260421-v3.53-address-edit-badge-fix
+// @version      20260422-v3.60-address-banner-label
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
-// @author       Javier, with modifications from Grok, Gemini, and GitHub Copilot <3
+// @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
 // @match        https://www.ebay.com/ship/bulk*
 // @match        https://www.ebay.com/mesh/ord/details*
@@ -46,7 +46,7 @@
         trackingOrderAmountThreshold: 20,
         useAlternativeTracking: true,
         scriptLoadDelay: 15 * 1000,
-        defaultTrackingNumber: "9114 9023 0722 4988 5575 ",
+        defaultTrackingNumber: "9114 9023 0722 4938 6961 ",
         enableDarkModeByDefault: true,
         enableQuotesInMessages: true,
         showMicaImage: false,
@@ -180,6 +180,7 @@
                 ${CONFIG.selectors.groupingSummary}, .tag--combined { display: none !important; }
                 .service-actions__wrapper.sticky.sticky-full-width { display: none !important; }
                 #${CONFIG.ids.skuPanelContainer} { position: fixed; top: 110px; width: 360px; max-height: calc(100vh - 130px); overflow-y: auto; z-index: 1000; background: ${isDarkMode ? '#2a2a2a' : '#fdfdfd'}; padding: 0; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: 1px solid ${isDarkMode ? '#444' : '#ddd'}; transition: top 0.3s ease-in-out; }
+                #altheastix-config-container { position: fixed; width: 360px; z-index: 1000; background: ${isDarkMode ? '#2a2a2a' : '#fdfdfd'}; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: 1px solid ${isDarkMode ? '#444' : '#ddd'}; transition: top 0.3s ease-in-out; }
                 ${CONFIG.selectors.skuPanelTitle} { position: sticky; top: 0; background: ${isDarkMode ? '#333' : '#f5f5f5'}; z-index: 1; margin: 0; padding: 12px 15px; font-size: 16px; border-bottom: 1px solid ${isDarkMode ? '#444' : '#ddd'}; display: flex; justify-content: space-between; align-items: center; color: ${isDarkMode ? '#e0e0e0' : '#000'}; }
                 ${CONFIG.selectors.skuPanelToggles} { display: flex; gap: 10px; align-items: center; }
                 .${CONFIG.classNames.darkModeSwitch} { position: relative; display: inline-block; width: 40px; height: 20px; }
@@ -197,6 +198,10 @@
                 ${CONFIG.selectors.serviceActions} { margin-left: 400px; }
                 ${CONFIG.selectors.bulkLabelsAppCard} { margin-left: 400px; border: 0px solid #777; }
                 ${CONFIG.selectors.ordersFilters} { margin-left: 0; margin-bottom: 12px; width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 10px 0; background: ${isDarkMode ? '#2a2a2a' : '#fff'}; border: 1px solid #555; border-radius: 12px; }
+                #altheastix-address-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin-bottom: 10px; padding: 6px 14px; border-radius: 8px; font-size: 12px; line-height: 1.5; background: ${isDarkMode ? 'rgba(255,179,71,0.1)' : '#fef3c7'}; border: 1px solid ${isDarkMode ? '#c97d20' : '#f59e0b'}; color: ${isDarkMode ? '#FFD580' : '#78350f'}; }
+                #altheastix-scroll-top-btn { position: fixed; bottom: 20px; width: 34px; height: 34px; border-radius: 50%; border: 1px solid ${isDarkMode ? '#555' : '#ccc'}; background: ${isDarkMode ? '#333' : '#fff'}; color: ${isDarkMode ? '#e0e0e0' : '#444'}; font-size: 16px; line-height: 1; cursor: pointer; z-index: 1001; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.2); opacity: 0; pointer-events: none; transition: opacity 0.2s ease, background 0.15s ease; }
+                #altheastix-scroll-top-btn.visible { opacity: 1; pointer-events: auto; }
+                #altheastix-scroll-top-btn:hover { background: ${isDarkMode ? '#444' : '#f0f0f0'}; }
                 ${CONFIG.selectors.batchSelect} { padding-left: 12px !important; flex-shrink: 0; }
                 ${CONFIG.selectors.buttonList} ul { display: flex; gap: 10px; list-style: none; padding: 0; margin: 0; align-items: center; }
                 ${CONFIG.selectors.buttonList} li { margin: 0; }
@@ -480,13 +485,24 @@
 
         function updateSkuPanelPosition() {
             const skuPanel = document.getElementById(CONFIG.ids.skuPanelContainer);
+            const configPanel = document.getElementById('altheastix-config-container');
             const ordersContainer = document.querySelector(CONFIG.selectors.bulkLabelsAppCard);
             if (!skuPanel || !ordersContainer) return;
             const skuPanelWidth = skuPanel.offsetWidth;
             const ordersContainerLeft = ordersContainer.getBoundingClientRect().left;
             const gap = 20;
             const newLeft = ordersContainerLeft - skuPanelWidth - gap;
-            skuPanel.style.left = `${Math.max(20, newLeft)}px`;
+            const leftPos = Math.max(20, newLeft);
+            skuPanel.style.left = `${leftPos}px`;
+            if (configPanel) {
+                configPanel.style.left = `${leftPos}px`;
+                const skuPanelTopNum = parseInt(skuPanel.style.top) || 110;
+                configPanel.style.top = `${skuPanelTopNum + skuPanel.offsetHeight + 12}px`;
+            }
+            const scrollTopBtn = document.getElementById('altheastix-scroll-top-btn');
+            if (scrollTopBtn) {
+                scrollTopBtn.style.left = `${ordersContainer.getBoundingClientRect().right + 8}px`;
+            }
         }
 
         function injectRadicalStyles() {
@@ -497,16 +513,20 @@
 
         function updateSkuPanelOnScroll() {
             const skuPanel = document.getElementById(CONFIG.ids.skuPanelContainer);
+            const configPanel = document.getElementById('altheastix-config-container');
             const header = document.querySelector(CONFIG.selectors.header);
             if (!skuPanel || !header) return;
 
             const headerRect = header.getBoundingClientRect();
-            if (headerRect.bottom < 0) {
-                // Header is scrolled out of view
-                skuPanel.style.top = '20px';
-            } else {
-                // Header is in view
-                skuPanel.style.top = '110px';
+            const skuPanelTop = headerRect.bottom < 0 ? 20 : 110;
+            skuPanel.style.top = `${skuPanelTop}px`;
+            if (configPanel) {
+                configPanel.style.top = `${skuPanelTop + skuPanel.offsetHeight + 12}px`;
+            }
+
+            const scrollTopBtn = document.getElementById('altheastix-scroll-top-btn');
+            if (scrollTopBtn) {
+                scrollTopBtn.classList.toggle('visible', window.scrollY > 200);
             }
         }
 
@@ -556,6 +576,15 @@
             const skuPanelContainer = document.createElement('div');
             skuPanelContainer.id = CONFIG.ids.skuPanelContainer;
             document.body.appendChild(skuPanelContainer);
+            const configPanelContainer = document.createElement('div');
+            configPanelContainer.id = 'altheastix-config-container';
+            document.body.appendChild(configPanelContainer);
+            const scrollTopBtn = document.createElement('button');
+            scrollTopBtn.id = 'altheastix-scroll-top-btn';
+            scrollTopBtn.title = 'Back to top';
+            scrollTopBtn.textContent = '↑';
+            scrollTopBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+            document.body.appendChild(scrollTopBtn);
             injectRadicalStyles();
             const ebayLogo = document.querySelector(CONFIG.selectors.headerLogo);
             const topHeader = document.querySelector(CONFIG.selectors.headerTop);
@@ -683,6 +712,95 @@
                 document.body.appendChild(micaImg);
             }
             console.debug('[Tampermonkey][INIT] Header & base layout adjustments complete');
+        }
+
+        // --- Address Warning Banner ---
+        // Scans all order cards for existing ⚠ address badges (already placed by
+        // processOrderCard via validateAddress) and renders a thin summary banner
+        // directly below the .orders-filters bar. One jump-link per flagged order.
+        let addressBannerDismissed = false;
+        function refreshAddressBanner() {
+            const isDarkMode = localStorage.getItem(CONFIG.localStorageKeys.darkMode) !== 'false';
+            if (addressBannerDismissed) {
+                const banner = document.getElementById('altheastix-address-banner');
+                if (banner) banner.style.display = 'none';
+                return;
+            }
+
+            // Collect orders that carry a warning badge
+            const flagged = [];
+            document.querySelectorAll(CONFIG.selectors.orderItem).forEach(orderItem => {
+                if (!orderItem.querySelector(`.${CONFIG.classNames.addrWarningBadge}`)) return;
+                // Get buyer name — strip any badge text nodes by reading only the first text node
+                const nameEl = orderItem.querySelector('.print__address__fullname');
+                let name = '';
+                if (nameEl) {
+                    name = Array.from(nameEl.childNodes)
+                        .filter(n => n.nodeType === Node.TEXT_NODE)
+                        .map(n => n.textContent)
+                        .join('')
+                        .trim();
+                }
+                if (!name) name = orderItem.id || 'Order';
+                flagged.push({ id: orderItem.id, name });
+            });
+
+            // Find or create the banner element
+            let banner = document.getElementById('altheastix-address-banner');
+            if (!banner) {
+                banner = document.createElement('div');
+                banner.id = 'altheastix-address-banner';
+                const filtersEl = document.querySelector(CONFIG.selectors.ordersFilters);
+                if (filtersEl) {
+                    filtersEl.insertAdjacentElement('afterend', banner);
+                } else {
+                    const ordersContainer = document.querySelector(CONFIG.selectors.ordersContainer);
+                    if (ordersContainer) ordersContainer.prepend(banner);
+                }
+            }
+
+            if (flagged.length === 0) {
+                banner.style.display = 'none';
+                return;
+            }
+
+            banner.style.display = '';
+            banner.innerHTML = '';
+
+            const summary = document.createElement('span');
+            summary.style.cssText = 'font-weight: 700; white-space: nowrap;';
+            summary.textContent = flagged.length === 1
+                ? '⚠ Address issue on 1 order:'
+                : `⚠ Address issues on ${flagged.length} orders:`;
+            banner.appendChild(summary);
+
+            flagged.forEach((o, i) => {
+                const a = document.createElement('a');
+                a.href = '#';
+                a.textContent = o.name;
+                a.style.cssText = `color: ${isDarkMode ? '#FFB347' : '#92400e'}; font-weight: 600; text-decoration: underline; cursor: pointer; white-space: nowrap;`;
+                a.addEventListener('click', e => {
+                    e.preventDefault();
+                    document.getElementById(o.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                });
+                banner.appendChild(a);
+                if (i < flagged.length - 1) {
+                    const sep = document.createTextNode(' · ');
+                    banner.appendChild(sep);
+                }
+            });
+
+            const dismissBtn = document.createElement('button');
+            dismissBtn.textContent = '×';
+            dismissBtn.title = 'Dismiss';
+            dismissBtn.style.cssText = `margin-left: auto; padding: 0 4px; background: none; border: none; cursor: pointer; font-size: 15px; line-height: 1; color: ${isDarkMode ? '#FFB347' : '#92400e'}; opacity: 0.7; flex-shrink: 0;`;
+            dismissBtn.addEventListener('mouseenter', () => { dismissBtn.style.opacity = '1'; });
+            dismissBtn.addEventListener('mouseleave', () => { dismissBtn.style.opacity = '0.7'; });
+            dismissBtn.addEventListener('click', () => {
+                addressBannerDismissed = true;
+                banner.style.display = 'none';
+            });
+            banner.appendChild(dismissBtn);
         }
 
         // --- Order Card Processing ---
@@ -1540,24 +1658,26 @@
                 contentWrapper.appendChild(customEnvLink);
                 // --- END CUSTOM ENVELOPE FEATURE (link) ---
 
-                // --- Configuration Section (below Print button) ---
+                // --- Configuration Section (separate floating panel) ---
                 const configSection = document.createElement('div');
                 configSection.id = 'altheastix-config-panel';
-                configSection.style.cssText = [
-                    'margin-top: 12px',
-                    `background: ${isDarkMode ? '#2a2a2a' : '#fafafa'}`,
-                    `border: 1px solid ${isDarkMode ? '#444' : '#ddd'}`,
-                    'border-radius: 8px',
-                    'padding: 10px',
-                ].join('; ');
+                configSection.style.cssText = 'padding: 10px 15px;';
+
+                const CFG_COLLAPSED_KEY = 'configPanelCollapsed';
+                const cfgIsCollapsed = localStorage.getItem(CFG_COLLAPSED_KEY) !== 'false';
 
                 const cfgHeader = document.createElement('div');
-                cfgHeader.textContent = 'Configuration';
-                cfgHeader.style.cssText = `
-                    font-weight: 700; font-size: 13px; margin-bottom: 8px;
-                    color: ${isDarkMode ? '#e0e0e0' : '#333'};
-                `;
+                cfgHeader.style.cssText = `display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 13px; color: ${isDarkMode ? '#e0e0e0' : '#333'}; cursor: pointer; user-select: none;`;
+                const cfgTitle = document.createElement('span');
+                cfgTitle.textContent = 'Configuration';
+                const cfgChevron = document.createElement('span');
+                cfgChevron.textContent = cfgIsCollapsed ? '▸' : '▾';
+                cfgChevron.style.cssText = 'font-size: 11px; opacity: 0.6;';
+                cfgHeader.append(cfgTitle, cfgChevron);
                 configSection.appendChild(cfgHeader);
+
+                const cfgBody = document.createElement('div');
+                cfgBody.style.cssText = `margin-top: 8px; display: ${cfgIsCollapsed ? 'none' : 'block'};`;
 
                 // Row: Auto-send messages slider (50/50 layout)
                 const row = document.createElement('div');
@@ -1584,7 +1704,7 @@
                 rightHalf.textContent = 'When ON, messages send automatically after drafting.';
 
                 row.append(leftHalf, rightHalf);
-                configSection.appendChild(row);
+                cfgBody.appendChild(row);
 
                 cb.addEventListener('change', (e) => {
                     GM_setValue(AUTO_SEND_MESSAGES_KEY, !!e.target.checked);
@@ -1615,7 +1735,7 @@
                 rightHalfShip.textContent = 'Toggles "+ Will ship tomorrow note" on every order.';
 
                 rowShip.append(leftHalfShip, rightHalfShip);
-                configSection.appendChild(rowShip);
+                cfgBody.appendChild(rowShip);
 
                 // Apply to all order cards when toggled
                 cbShip.addEventListener('change', (e) => {
@@ -1650,7 +1770,7 @@
                 rightHalfThanks.textContent = 'Toggles "+ thank you msg" on every order.';
 
                 rowThanks.append(leftHalfThanks, rightHalfThanks);
-                configSection.appendChild(rowThanks);
+                cfgBody.appendChild(rowThanks);
 
                 // Apply to all order cards when toggled
                 cbThanks.addEventListener('change', (e) => {
@@ -1660,7 +1780,21 @@
                     });
                 });
 
-                contentWrapper.appendChild(configSection);
+                configSection.appendChild(cfgBody);
+                cfgHeader.addEventListener('click', () => {
+                    const nowCollapsed = cfgBody.style.display !== 'none';
+                    cfgBody.style.display = nowCollapsed ? 'none' : 'block';
+                    cfgChevron.textContent = nowCollapsed ? '▸' : '▾';
+                    localStorage.setItem(CFG_COLLAPSED_KEY, String(nowCollapsed));
+                    updateSkuPanelPosition();
+                });
+
+                const cfgContainer = document.getElementById('altheastix-config-container');
+                if (cfgContainer) {
+                    cfgContainer.innerHTML = '';
+                    cfgContainer.appendChild(configSection);
+                }
+                updateSkuPanelPosition();
 
                 // --- Auto-enable and propagate changes on load ---
                 setTimeout(() => {
@@ -1909,6 +2043,7 @@
             document.querySelectorAll(CONFIG.selectors.orderItem).forEach((orderItem, index) => processOrderCard(orderItem, index));
             setupGlobalEventListeners(skuManager);
             skuManager.createSKUPackingList();
+            refreshAddressBanner();
             console.debug('[Tampermonkey][MAIN] Order cards processed & SKU panel built');
 
             // Listen for note confirmation
@@ -2742,10 +2877,4 @@
     // --- END CUSTOM ENVELOPE FEATURE (utility) ---
 
 })();
-// autopush test Sat Apr 18 01:24:47 UTC 2026
-// autopush test Sat Apr 18 01:27:56 UTC 2026
-// autopush test Sat Apr 18 01:28:52 UTC 2026
-// autopush test Sat Apr 18 01:30:21 UTC 2026
-// autopush test 1776475840
-// autopush test 1776475887
 
