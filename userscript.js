@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260521-v3.61-canned-message-preview
+// @version      20260521-v3.62-preview-token-pills
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -23,7 +23,7 @@
 // @downloadURL  https://raw.githubusercontent.com/ellokojavi/ebaypickandpack/main/userscript.js
 // ==/UserScript==
 
-// Changelog: see src/CHANGELOG.md in the repository.
+// Changelog:  see src/CHANGELOG.md in the repository.
 
 (function() {
     'use strict';
