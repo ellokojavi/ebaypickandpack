@@ -480,6 +480,21 @@
                     background-color: ${isDarkMode ? '#555' : '#ccc'};
                     color: ${isDarkMode ? '#e0e0e0' : '#000'};
                 }
+                .canned-modal-preview-label {
+                    font-size: 11px; font-weight: bold; text-transform: uppercase;
+                    letter-spacing: 0.6px; margin-bottom: -8px;
+                    color: ${isDarkMode ? '#9aa0a6' : '#666'};
+                }
+                .canned-modal-preview {
+                    white-space: pre-wrap; word-break: break-word;
+                    background-color: ${isDarkMode ? '#1f1f1f' : '#f6f7f8'};
+                    border: 1px dashed ${isDarkMode ? '#666' : '#bbb'};
+                    border-radius: 6px;
+                    padding: 10px 12px;
+                    font-size: 13px; line-height: 1.45;
+                    min-height: 40px; max-height: 240px; overflow-y: auto;
+                    color: ${isDarkMode ? '#d0d0d0' : '#222'};
+                }
             `;
         }
 
@@ -2679,6 +2694,19 @@
                 clearInterval(interval);
                 resolve([]);
             }, timeout);
+        });
+    }
+
+    // Normalizes a name token written in ALL CAPS (common in eBay buyer data) to a
+    // natural title-cased form so messages read as if hand-written ("GEORGE" -> "George").
+    // Tokens that already contain a lowercase letter are left untouched, preserving
+    // intentional casing such as "McDonald".
+    function humanizeName(name) {
+        if (!name) return name;
+        return String(name).replace(/\S+/g, (word) => {
+            if (/[a-z]/.test(word)) return word;   // already has lowercase — leave as-is
+            if (!/[A-Z]/.test(word)) return word;  // nothing to re-case
+            return word.toLowerCase().replace(/(^|[\s'’\-])([a-z])/g, (m, sep, ch) => sep + ch.toUpperCase());
         });
     }
 
