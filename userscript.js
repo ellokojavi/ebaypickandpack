@@ -1354,6 +1354,16 @@
                     if (selectedMessageKey === 'canned1' || selectedMessageKey === 'canned3' || selectedMessageKey === 'canned4') {
                         const isGift = selectedMessageKey === 'canned1';
                         const isPreorder = selectedMessageKey === 'canned4';
+                        const template = CONFIG.manualMessageDrafts[selectedMessageKey] || '';
+
+                        // Resolve the buyer's first name up front so the live preview can use it.
+                        // eBay buyer names sometimes arrive ALL CAPS — humanizeName() title-cases
+                        // them so the greeting reads as if hand-written ("GEORGE" -> "George").
+                        const orderItemEl = target.closest(CONFIG.selectors.orderItem);
+                        const fullNameEl = orderItemEl?.querySelector('.print__address__fullname');
+                        const buyerName = (fullNameEl?.textContent || '').trim();
+                        const buyerFirst = humanizeName(buyerName.split(/\s+/)[0] || 'there');
+
                         const modalOverlay = document.createElement('div');
                         modalOverlay.className = 'canned-modal-overlay';
 
@@ -1365,11 +1375,16 @@
                             surpriseStickerInput = '<input type="text" id="surprise-sticker" class="canned-modal-input" placeholder="Surprise Sticker Name">';
                         }
 
+                        const previewBlock = `
+                                <div class="canned-modal-preview-label">Live preview</div>
+                                <div class="canned-modal-preview" id="canned-preview"></div>`;
+
                         if (isPreorder) {
                             modalContent.innerHTML = `
                                 <h3>Customize "Preorder Sticker" Message</h3>
                                 <input type="text" id="sticker-name" class="canned-modal-input" placeholder="Sticker Name">
                                 <input type="text" id="shipping-date" class="canned-modal-input" placeholder="Shipping Date">
+                                ${previewBlock}
                                 <div class="canned-modal-buttons">
                                     <button class="canned-modal-button secondary" id="cancel-canned">Cancel</button>
                                     <button class="canned-modal-button primary" id="generate-canned">Generate Message</button>
@@ -1381,6 +1396,7 @@
                                 <input type="text" id="sticker-name" class="canned-modal-input" placeholder="Sticker Name">
                                 <input type="text" id="arrival-date" class="canned-modal-input" placeholder="Expected Arrival Date">
                                 ${surpriseStickerInput}
+                                ${previewBlock}
                                 <div class="canned-modal-buttons">
                                     <button class="canned-modal-button secondary" id="cancel-canned">Cancel</button>
                                     <button class="canned-modal-button primary" id="generate-canned">Generate Message</button>
@@ -1391,30 +1407,38 @@
                         modalOverlay.appendChild(modalContent);
                         document.body.appendChild(modalOverlay);
 
-                        document.getElementById('cancel-canned').addEventListener('click', () => {
-                            modalOverlay.remove();
-                        });
-
-                        document.getElementById('generate-canned').addEventListener('click', async () => {
-                            const stickerName = document.getElementById('sticker-name').value;
-                            const arrivalDate = !isPreorder ? document.getElementById('arrival-date').value : '';
-                            const shippingDate = isPreorder ? document.getElementById('shipping-date').value : '';
-                            const surpriseSticker = isGift ? document.getElementById('surprise-sticker').value : '';
-
-                            let template = CONFIG.manualMessageDrafts[selectedMessageKey] || '';
-
-                            const orderItemElement = target.closest(CONFIG.selectors.orderItem);
-                            const fullNameEl = orderItemElement.querySelector('.print__address__fullname');
-                            const buyerName = (fullNameEl?.textContent || '').trim();
-                            const buyerFirst = buyerName.split(/\s+/)[0] || 'there';
-
-                            let messageText = applyTemplate(template, {
+                        // Builds the fully interpolated message from the current modal inputs.
+                        // Shared by the live preview and the final "Generate Message" action so
+                        // that what the user previews is exactly what gets sent.
+                        const buildMessageText = () => {
+                            const stickerName = (document.getElementById('sticker-name')?.value || '').trim();
+                            const arrivalDate = !isPreorder ? (document.getElementById('arrival-date')?.value || '').trim() : '';
+                            const shippingDate = isPreorder ? (document.getElementById('shipping-date')?.value || '').trim() : '';
+                            const surpriseSticker = isGift ? (document.getElementById('surprise-sticker')?.value || '').trim() : '';
+                            return applyTemplate(template, {
                                 BUYER_FIRST: buyerFirst,
                                 STICKER_NAME: stickerName,
                                 ARRIVAL_DATE: arrivalDate,
                                 SHIPPING_DATE: shippingDate,
                                 SURPRISE_STICKER: surpriseSticker
                             });
+                        };
+
+                        // Live preview: re-render the interpolated message on every keystroke
+                        // so the blurb can be reviewed before jumping to the messages page.
+                        const previewEl = modalContent.querySelector('#canned-preview');
+                        const renderPreview = () => { previewEl.textContent = buildMessageText(); };
+                        modalContent.querySelectorAll('.canned-modal-input').forEach((input) => {
+                            input.addEventListener('input', renderPreview);
+                        });
+                        renderPreview();
+
+                        document.getElementById('cancel-canned').addEventListener('click', () => {
+                            modalOverlay.remove();
+                        });
+
+                        document.getElementById('generate-canned').addEventListener('click', async () => {
+                            const messageText = buildMessageText();
 
                             await GM_setValue('ebay_manual_message_to_send', { orderId: orderId, message: messageText });
                             GM_openInTab(`https://www.ebay.com/mesh/ord/details?orderid=${orderId}&tm_action=manual_message`, { active: true });
