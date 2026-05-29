@@ -2,6 +2,8 @@
 
 A Tampermonkey userscript that transforms eBay's bulk shipping interface into a streamlined, fast-paced pick-and-pack workflow tool. No more clunky default UI — just speed.
 
+![Pick-and-Pack page in dark mode showing the SKUs to Pack panel and color-coded order cards](docs/screenshot.png)
+
 ---
 
 ## 🚀 Installation
