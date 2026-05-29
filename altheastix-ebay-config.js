@@ -270,6 +270,104 @@ window.AltheastixConfig = {
             `All the people that criticized me should eat their words.\n— Diego Maradona`,
             `When I wear the national team shirt, its sole contact with my skin makes it stand on an end.\n— Diego Maradona`,
             `If I die, I want to be reborn and I want to be a footballer. And I want to be Diego Armando Maradona again. I am a player who has given people joy and that is enough for me.\n— Diego Maradona`
+        ],
+        "Janis Joplin": [
+            `Don't compromise yourself — you're all you've got.\n— Janis Joplin`,
+            `You are what you settle for.\n— Janis Joplin`,
+            `Being an intellectual creates a lot of questions and no answers.\n— Janis Joplin`,
+            `I never seem to do things the easy way.\n— Janis Joplin`,
+            `On stage I make love to twenty-five thousand people; then I go home alone.\n— Janis Joplin`
+        ],
+        "Phish": [
+            `The music feels like it's coming through me rather than from me.\n— Trey Anastasio`,
+            `Every show is different. That's the whole point.\n— Trey Anastasio`,
+            `Play it straight. Tell the truth. Be yourself.\n— Trey Anastasio`,
+            `The more you listen, the more you hear.\n— Trey Anastasio`,
+            `What we're doing is about the music. It's always been about the music.\n— Trey Anastasio`
+        ],
+        "Pearl Jam": [
+            `Music was my way of keeping people from knowing what I was really feeling.\n— Eddie Vedder`,
+            `I'm a huge fan of the human condition.\n— Eddie Vedder`,
+            `Better to burn out than fade away? I don't know about that.\n— Eddie Vedder`,
+            `No matter what, we always have the choice to do good.\n— Eddie Vedder`,
+            `I think everything has to do with listening — listening and responding.\n— Eddie Vedder`
+        ],
+        "Pink Floyd": [
+            `All you touch and all you see is all your life will ever be.\n— Roger Waters`,
+            `We're just two lost souls swimming in a fish bowl, year after year.\n— Roger Waters`,
+            `I have become comfortably numb.\n— Roger Waters / David Gilmour`,
+            `Breathe, breathe in the air. Don't be afraid to care.\n— Roger Waters`,
+            `There is no dark side of the moon really. Matter of fact, it's all dark.\n— Pink Floyd`
+        ],
+        "Red Hot Chili Peppers": [
+            `The only way to get what you really want is to let go of what you don't want.\n— Anthony Kiedis`,
+            `I'd rather be at the bottom of the mountain than standing at the top of a fake one.\n— Flea`,
+            `Music is everything to me. Without it, I don't know who I am.\n— Flea`,
+            `Every show I play, I want to create something beautiful that has never been created before.\n— Flea`,
+            `Transformation is not five minutes from now; it's a present activity.\n— Anthony Kiedis`
+        ],
+        "AC/DC": [
+            `Rock and roll ain't noise pollution.\n— Angus Young`,
+            `It's a long way to the top if you wanna rock and roll.\n— Bon Scott`,
+            `For those about to rock, we salute you.\n— Angus Young`,
+            `I play from my heart every single night.\n— Angus Young`,
+            `We just played rock and roll and hoped people would listen.\n— Malcolm Young`
+        ],
+        "Mr. Rogers": [
+            `You've made this day a special day by just your being yourself.\n— Fred Rogers`,
+            `The greatest thing we can do is to help somebody know that they're loved and capable of loving.\n— Fred Rogers`,
+            `I like you just the way you are.\n— Fred Rogers`,
+            `Frankly, there isn't anyone you couldn't learn to love once you've heard their story.\n— Fred Rogers`,
+            `The real issue in life is not how many blessings we have, but what we do with our blessings.\n— Fred Rogers`
+        ],
+        "Peanuts": [
+            `I think I've discovered the secret of life — you just hang around until you get used to it.\n— Charlie Brown`,
+            `Happiness is a warm puppy.\n— Charles M. Schulz`,
+            `Good grief.\n— Charlie Brown`,
+            `I never made a mistake in my life. I thought I did once, but I was wrong.\n— Lucy Van Pelt`,
+            `Big sisters are the crabgrass in the lawn of life.\n— Charlie Brown`
+        ],
+        "Lynyrd Skynyrd": [
+            `If I leave here tomorrow, would you still remember me?\n— Ronnie Van Zant`,
+            `Be a simple kind of man.\n— Ronnie Van Zant`,
+            `Take your time, don't live too fast.\n— Ronnie Van Zant`,
+            `Forget your lust for the rich man's gold.\n— Ronnie Van Zant`,
+            `Gimme three steps towards the door.\n— Ronnie Van Zant`
+        ],
+        "Guns N' Roses": [
+            `Nothing lasts forever, even cold November rain.\n— Axl Rose`,
+            `All we need is just a little patience.\n— Axl Rose`,
+            `I'm not going to change the way I look or the way I feel to conform to anything.\n— Axl Rose`,
+            `I never knew anything until I started playing guitar.\n— Slash`,
+            `Music is the one area where I've always felt most free to express myself.\n— Slash`
+        ],
+        "Punk Rock": [
+            `Anger is an energy.\n— John Lydon`,
+            `Punk is not dead. Punk will only die when corporations can exploit and mass produce it.\n— Jello Biafra`,
+            `Know your enemy.\n— Rage Against the Machine`,
+            `If your whole goal is to make popular music, you might as well be a piece of furniture.\n— Glenn Danzig`,
+            `Punk rock is a word used by dilettantes and heartless manipulators about music that takes up the challenge of social change and the challenge of artistic integrity.\n— Joe Strummer`
+        ],
+        "Messi": [
+            `You have to fight to reach your dream. You have to sacrifice and work hard for it.\n— Lionel Messi`,
+            `My ambition is always to be better.\n— Lionel Messi`,
+            `Football is the most important of the least important things in life.\n— Arrigo Sacchi`,
+            `Some people think football is a matter of life and death. I assure you, it's much more serious than that.\n— Bill Shankly`,
+            `The secret is to believe in your dreams; in your potential that you can be like your role model, your team, in positive team spirit.\n— Lionel Messi`
+        ],
+        "Star Wars": [
+            `Do. Or do not. There is no try.\n— Yoda`,
+            `This is the way.\n— The Mandalorian`,
+            `Fear is the path to the dark side.\n— Yoda`,
+            `In my experience, there is no such thing as luck.\n— Obi-Wan Kenobi`,
+            `The Force will be with you. Always.\n— Obi-Wan Kenobi`
+        ],
+        "Bitcoin": [
+            `The root problem with conventional currency is all the trust that's required to make it work.\n— Satoshi Nakamoto`,
+            `Bitcoin is a remarkable cryptographic achievement, and the ability to create something that is not duplicable in the digital world has enormous value.\n— Eric Schmidt`,
+            `Not your keys, not your coins.\n— Bitcoin community`,
+            `Stay humble. Stack sats.\n— Bitcoin community`,
+            `The Times 03/Jan/2009 — Chancellor on brink of second bailout for banks.\n— Satoshi Nakamoto (Genesis Block)`
         ]
     },
 
@@ -292,6 +390,20 @@ window.AltheastixConfig = {
         "Ozzy Osbourne": ["Ozzy Osbourne"],
         "Rat Fink": ["Rat Fink"],
         "The Simpsons": ["The Simpsons"],
-        "Maradona": ["Maradona", "Diego Maradona"]
+        "Maradona": ["Maradona", "Diego Maradona"],
+        "Janis Joplin": ["Janis Joplin"],
+        "Phish": ["Phish", "Trey Anastasio", "Fishman"],
+        "Pearl Jam": ["Pearl Jam", "Eddie Vedder"],
+        "Pink Floyd": ["Pink Floyd", "Roger Waters", "David Gilmour"],
+        "Red Hot Chili Peppers": ["Red Hot Chili Peppers", "RHCP", "Flea", "Kiedis"],
+        "AC/DC": ["ACDC", "Angus Young", "Bon Scott"],
+        "Mr. Rogers": ["Fred Rogers", "Mister Fred Rogers", "Rogers Neighborhood"],
+        "Peanuts": ["Snoopy", "Peanuts", "Charlie Brown"],
+        "Lynyrd Skynyrd": ["Lynyrd Skynyrd", "Freebird"],
+        "Guns N' Roses": ["Guns N Roses", "Axl Rose", "Slash"],
+        "Punk Rock": ["Misfits", "Rancid", "Dead Kennedys", "Sex Pistols", "Rage Against", "Korn", "Slipknot", "Punk"],
+        "Messi": ["Messi", "Inter Milan", "Seleccion", "Colo-Colo", "Boca Juniors", "CDUC", "Futbol", "Soccer"],
+        "Star Wars": ["Star Wars", "Mandalorian", "Grogu", "Baby Yoda", "C3PO", "Jedi"],
+        "Bitcoin": ["Bitcoin", "BTC", "Crypto", "Satoshi"]
     }
 };
