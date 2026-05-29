@@ -3,3 +3,8 @@ autopush/
 reference/
 CLAUDE.md
 .DS_Store
+
+# Never commit SSH keys
+id_*
+*.pub
+ssh-copy-id*
