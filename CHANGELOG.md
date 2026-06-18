@@ -1,5 +1,9 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.68
+- Renamed the SKU panel title from "SKUs to Pack (X)" to "SKUs to Pick
+  and Pack (X)".
+
 ## v3.67
 - Reverted the v3.66 elevation reskin. The SKU panel and order cards are
   back to their v3.65 styling, and the `enableElevationSkin` flag plus its

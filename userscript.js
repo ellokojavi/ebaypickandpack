@@ -1572,7 +1572,7 @@
                 const title = document.createElement('h2');
                 title.className = 'sku-title';
                 const titleText = document.createElement('span');
-                titleText.textContent = `SKUs to Pack (${SKU.length})`;
+                titleText.textContent = `SKUs to Pick and Pack (${SKU.length})`;
                 const togglesWrapper = document.createElement('div');
                 togglesWrapper.className = 'sku-toggles';
                 const darkModeToggle = document.createElement('label');
