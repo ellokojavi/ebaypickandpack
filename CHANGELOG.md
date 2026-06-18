@@ -1,5 +1,10 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.65
+- Removed the "Filter by SKU, buyer, or item…" search bar from the SKU
+  panel. It was no longer needed, so the input and its filtering logic
+  are gone.
+
 ## v3.64
 - Sticker-delay canned messages ("Late + Gift" and "Late, no gift") now
   end with a P.S. telling the buyer they can ignore eBay's automated
