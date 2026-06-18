@@ -1,5 +1,14 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.64
+- Sticker-delay canned messages ("Late + Gift" and "Late, no gift") now
+  end with a P.S. telling the buyer they can ignore eBay's automated
+  shipment notices while they wait — we'll reach out personally once the
+  order is on its way.
+- Removed the mica.png decorative image and its `showMicaImage` option.
+  The image was a private asset and has been deleted from the repo, so
+  the dead code that pointed at its raw GitHub URL is gone too.
+
 ## v3.63
 - Envelope printing: the Altheastix return-address block (upper-left) now
   has top/left padding so its first line is no longer clipped by the

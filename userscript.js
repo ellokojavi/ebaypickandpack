@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260618-v3.63-envelope-return-address-padding
+// @version      20260618-v3.64-delay-msg-ps-remove-mica
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -49,7 +49,6 @@
         defaultTrackingNumber: "9114 9023 0722 4938 6961 ",
         enableDarkModeByDefault: true,
         enableQuotesInMessages: true,
-        showMicaImage: false,
         orderColors: [
             // Expanded 40-color palette — hues spread across the spectrum and interleaved
             // so that consecutive assignments are always visually distinct
@@ -117,8 +116,8 @@
             // Fallback provided in case of load failure
             messageTemplates: EXT_CONFIG.messageTemplates || { thankYouDrafts: ["Error loading templates from Gist."] },
             manualMessageDrafts: {
-                'canned1': "Hi {BUYER_FIRST}. Thanks a lot for your order. Wanted to let you know that due to high demand we ran out of these {STICKER_NAME} stickers and, as such, will need to wait until roughly {ARRIVAL_DATE} for your order to ship. If you are cool with that we'll add a surprise {SURPRISE_STICKER} sticker for the hassle. If not, we'll issue a refund, no questions asked.\n\nThanks a lot for your patience! These stickers have been a whole hit.\n\nA.",
-                'canned3': "Hi {BUYER_FIRST}. Thanks a lot for your order. Wanted to let you know that due to sudden high demand we ran out of these {STICKER_NAME} stickers and, as such, will need to wait until roughly {ARRIVAL_DATE} for your order to ship. If not cool with waiting, we can issue a refund, no questions asked. Please let us know if you are OK with it.\n\nThanks a lot for your patience and apologies! These stickers have been a whole hit.\n\nA.",
+                'canned1': "Hi {BUYER_FIRST}. Thanks a lot for your order. Wanted to let you know that due to high demand we ran out of these {STICKER_NAME} stickers and, as such, will need to wait until roughly {ARRIVAL_DATE} for your order to ship. If you are cool with that we'll add a surprise {SURPRISE_STICKER} sticker for the hassle. If not, we'll issue a refund, no questions asked.\n\nThanks a lot for your patience! These stickers have been a whole hit.\n\nA.\n\nP.S. If you're happy to wait, feel free to ignore any automated eBay messages about your shipment — we'll personally let you know as soon as it's on its way.",
+                'canned3': "Hi {BUYER_FIRST}. Thanks a lot for your order. Wanted to let you know that due to sudden high demand we ran out of these {STICKER_NAME} stickers and, as such, will need to wait until roughly {ARRIVAL_DATE} for your order to ship. If not cool with waiting, we can issue a refund, no questions asked. Please let us know if you are OK with it.\n\nThanks a lot for your patience and apologies! These stickers have been a whole hit.\n\nA.\n\nP.S. If you're happy to wait, feel free to ignore any automated eBay messages about your shipment — we'll personally let you know as soon as it's on its way.",
                 'canned4': "Hi {BUYER_FIRST}. Thanks for your pre-order of the {STICKER_NAME} sticker. As stated in the product details, this item is a pre-order and will ship by {SHIPPING_DATE}. Please disregard any automated eBay message stating that your item has shipped. We will personally contact you as soon as it's on its way.\n\nThanks a lot for your patience!\n\nA."
             },
             deliveryNotes: EXT_CONFIG.deliveryNotes || {
@@ -704,46 +703,7 @@
             document.querySelector('#auto-send-messages-toggle')?.closest('span')?.remove();
             // Attempt to combine orders before proceeding
             ensureOrdersCombined();
-            if (USER_CONFIG.showMicaImage) {
-                const micaImg = document.createElement('img');
-                micaImg.src = 'https://raw.githubusercontent.com/ellokojavi/ebaypickandpack/main/mica.png';
-                micaImg.style.cssText = 'position:fixed;top:0;left:0;max-height:100px;width:auto;z-index:1001;cursor:pointer;transition:opacity 0.15s;';
-                micaImg.addEventListener('mouseenter', () => { micaImg.style.opacity = '0.85'; });
-                micaImg.addEventListener('mouseleave', () => { micaImg.style.opacity = '1'; });
-                micaImg.addEventListener('click', () => {
-                    const overlay = document.createElement('div');
-                    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:10002;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.25s ease;';
-                    const enlarged = document.createElement('img');
-                    enlarged.src = micaImg.src;
-                    enlarged.style.cssText = `width:${micaImg.naturalWidth * 4}px;height:${micaImg.naturalHeight * 4}px;max-width:90vw;max-height:90vh;object-fit:contain;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.6);transform:scale(0.88);transition:transform 0.25s ease,opacity 0.25s ease;opacity:0;`;
-                    const closeBtn = document.createElement('button');
-                    closeBtn.textContent = '✕';
-                    closeBtn.style.cssText = 'position:fixed;top:20px;right:24px;background:none;border:none;color:rgba(255,255,255,0.7);font-size:28px;cursor:pointer;line-height:1;padding:4px 8px;transition:color 0.15s;';
-                    closeBtn.addEventListener('mouseenter', () => { closeBtn.style.color = '#fff'; });
-                    closeBtn.addEventListener('mouseleave', () => { closeBtn.style.color = 'rgba(255,255,255,0.7)'; });
-                    const close = () => {
-                        overlay.style.opacity = '0';
-                        enlarged.style.opacity = '0';
-                        enlarged.style.transform = 'scale(0.88)';
-                        setTimeout(() => overlay.remove(), 250);
-                    };
-                    closeBtn.addEventListener('click', close);
-                    overlay.addEventListener('click', close);
-                    enlarged.addEventListener('click', (e) => e.stopPropagation());
-                    document.addEventListener('keydown', function escHandler(e) {
-                        if (e.key === 'Escape') { close(); document.removeEventListener('keydown', escHandler); }
-                    });
-                    overlay.append(enlarged, closeBtn);
-                    document.body.appendChild(overlay);
-                    // Trigger fade+scale in on next frame so the transition fires
-                    requestAnimationFrame(() => {
-                        overlay.style.opacity = '1';
-                        enlarged.style.opacity = '1';
-                        enlarged.style.transform = 'scale(1)';
-                    });
-                });
-                document.body.appendChild(micaImg);
-            }
+
             console.debug('[Tampermonkey][INIT] Header & base layout adjustments complete');
         }
 
