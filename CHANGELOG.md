@@ -1,5 +1,15 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.66
+- Optional UI reskin to visually separate the two workflows: the SKU
+  panel now reads as a recessed "pick" tray (darker surface + inset
+  shadow) and order cards read as raised "ship" cards (drop shadow +
+  top-edge highlight). Same colors, same layout — purely surface
+  styling. No features, buttons, or behavior changed.
+- Gated behind `enableElevationSkin` in `USER_CONFIG` (on by default).
+  Set it to `false` to instantly restore the exact v3.65 appearance —
+  no other changes are needed to roll back the look.
+
 ## v3.65
 - Removed the "Filter by SKU, buyer, or item…" search bar from the SKU
   panel. It was no longer needed, so the input and its filtering logic
