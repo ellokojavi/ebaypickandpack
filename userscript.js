@@ -174,7 +174,7 @@
 
         // --- Radical Styles ---
         function getRadicalStyles(isDarkMode) {
-            return `
+            const base = `
                 :root {
                     --color-neutral-800: #8c8c8c !important;
                 }
