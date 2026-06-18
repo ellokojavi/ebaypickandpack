@@ -2091,7 +2091,7 @@
                     .filter(v => v.length > 0);
                 if (parts.length === 0) { alert('Please paste an address first.'); return; }
                 const addressHTML = parts.join('<br>');
-                const envelopeHTML = `<div class="envelope"><table style="font-family: Arial; width: 100%; height: 100%; border-collapse: collapse;"><tr style="vertical-align: top;"><td style="width: 100%; padding: 0; font-size: 14px;">${USER_CONFIG.returnAddress}</td></tr><tr style="height: 10%;"><td></td></tr><tr style="vertical-align: top;"><td style="text-align: left; padding-left: 20%; font-size: 24px;">${addressHTML}</td></tr><tr style="height: 30%;"><td></td></tr></table></div>`;
+                const envelopeHTML = `<div class="envelope"><table style="font-family: Arial; width: 100%; height: 100%; border-collapse: collapse;"><tr style="vertical-align: top;"><td style="width: 100%; padding: 14px 0 0 18px; font-size: 14px;">${USER_CONFIG.returnAddress}</td></tr><tr style="height: 10%;"><td></td></tr><tr style="vertical-align: top;"><td style="text-align: left; padding-left: 20%; font-size: 24px;">${addressHTML}</td></tr><tr style="height: 30%;"><td></td></tr></table></div>`;
                 const printwin = window.open("", "_blank");
                 printwin.document.write(`<html><head><style>@page { size: 8.93in x 3.878in; margin: 0; } html, body { margin: 0; padding: 0; } .envelope { width: 8.93in; height: 3.878in; padding: 10px; font-family: Arial; box-sizing: border-box; overflow: hidden; }</style></head><body>${envelopeHTML}</body></html>`);
                 printwin.document.close();
