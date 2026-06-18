@@ -1639,9 +1639,6 @@
                     contentWrapper.appendChild(flexContainer);
                 }
 
-                // Re-apply filter if there was one active
-                if (prevFilter) applyFilter();
-
                 const allOrderItems = document.querySelectorAll(CONFIG.selectors.orderItem);
                 const checkedCheckboxes = document.querySelectorAll(`${CONFIG.selectors.orderItem} ${CONFIG.selectors.checkbox}:checked`);
                 if (allOrderItems.length > 0) {
