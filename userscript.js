@@ -1590,45 +1590,6 @@
                 container.appendChild(contentWrapper);
                 darkModeToggle.querySelector('input').addEventListener('change', (e) => { localStorage.setItem(CONFIG.localStorageKeys.darkMode, String(e.target.checked)); injectRadicalStyles(); PrintSKUTable(); });
 
-                // --- Filter / Search Input ---
-                const filterInput = document.createElement('input');
-                filterInput.type = 'text';
-                filterInput.id = 'sku-filter-input';
-                filterInput.placeholder = 'Filter by SKU, buyer, or item...';
-                filterInput.style.cssText = `width: 100%; box-sizing: border-box; padding: 6px 10px; margin-bottom: 8px; border-radius: 6px; border: 1px solid ${isDarkMode ? '#555' : '#ccc'}; background-color: ${isDarkMode ? '#333' : '#fff'}; color: ${isDarkMode ? '#e0e0e0' : '#000'}; font-size: 13px; outline: none;`;
-                // Preserve filter text across re-renders
-                const prevFilter = container.dataset.filterText || '';
-                filterInput.value = prevFilter;
-                contentWrapper.appendChild(filterInput);
-
-                const applyFilter = () => {
-                    const query = filterInput.value.trim().toLowerCase();
-                    container.dataset.filterText = query;
-                    // Filter SKU items in the panel
-                    const skuItems = contentWrapper.querySelectorAll(`.${CONFIG.classNames.skuItem}`);
-                    skuItems.forEach(item => {
-                        const skuText = item.textContent.toLowerCase();
-                        const orderItemId = item.dataset.orderItemId;
-                        const orderCard = orderItemId ? document.getElementById(orderItemId) : null;
-                        const buyerName = orderCard?.querySelector('.print__address__fullname')?.textContent.toLowerCase() || '';
-                        const itemTitles = Array.from(orderCard?.querySelectorAll('.item__description h2 a') || []).map(a => a.textContent.toLowerCase()).join(' ');
-                        const match = !query || skuText.includes(query) || buyerName.includes(query) || itemTitles.includes(query);
-                        item.style.display = match ? '' : 'none';
-                    });
-                    // Also show/hide separators if all items around them are hidden
-                    const separators = contentWrapper.querySelectorAll(`.${CONFIG.classNames.skuGroupSeparator}`);
-                    separators.forEach(sep => { sep.style.display = query ? 'none' : ''; });
-                    // Filter order cards on the main page
-                    document.querySelectorAll(CONFIG.selectors.orderItem).forEach(orderCard => {
-                        const buyerName = orderCard.querySelector('.print__address__fullname')?.textContent.toLowerCase() || '';
-                        const skus = Array.from(orderCard.querySelectorAll('[class*="item__details"] li')).filter(li => li.innerText.startsWith('SKU:')).map(li => li.innerText.toLowerCase()).join(' ');
-                        const itemTitles = Array.from(orderCard.querySelectorAll('.item__description h2 a') || []).map(a => a.textContent.toLowerCase()).join(' ');
-                        const match = !query || buyerName.includes(query) || skus.includes(query) || itemTitles.includes(query);
-                        orderCard.style.display = match ? '' : 'none';
-                    });
-                };
-                filterInput.addEventListener('input', applyFilter);
-
                 if (SKU.length > 0) {
                     const flexContainer = document.createElement('div');
                     flexContainer.id = CONFIG.ids.skuList;
