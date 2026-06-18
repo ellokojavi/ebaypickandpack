@@ -1,5 +1,11 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.67
+- Reverted the v3.66 elevation reskin. The SKU panel and order cards are
+  back to their v3.65 styling, and the `enableElevationSkin` flag plus its
+  CSS have been removed. The skin didn't render in practice, so it's
+  backed out for now; can revisit with a different approach later.
+
 ## v3.66
 - Optional UI reskin to visually separate the two workflows: the SKU
   panel now reads as a recessed "pick" tray (darker surface + inset
