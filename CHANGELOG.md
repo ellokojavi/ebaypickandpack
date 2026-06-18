@@ -1,5 +1,11 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.63
+- Envelope printing: the Altheastix return-address block (upper-left) now
+  has top/left padding so its first line is no longer clipped by the
+  envelope's tight margins. Applies to both the bulk Print Envelope flow
+  and the Custom Envelope modal.
+
 ## v3.62
 - Canned message live preview now colors the buyer's custom field
   values with an accent so they stand out from the fixed template
