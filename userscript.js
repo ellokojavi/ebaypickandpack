@@ -516,6 +516,25 @@
                     border: 1px dashed ${isDarkMode ? '#3f7a55' : '#9bcdb0'};
                 }
             `;
+
+            // --- Elevation reskin (USER_CONFIG.enableElevationSkin) ---
+            // Purely additive surface styling: recessed "pick" tray vs. raised
+            // "ship" cards. Same selectors as the base rules, appended last so
+            // they win without !important. Touches only background / border /
+            // box-shadow — no layout, no feature, no color-coding affected.
+            // Flag off => returns base unchanged (exact pre-skin appearance).
+            if (!USER_CONFIG.enableElevationSkin) return base;
+            const elevationSkin = `
+                #${CONFIG.ids.skuPanelContainer}, #altheastix-config-container {
+                    background: ${isDarkMode ? '#141414' : '#eceef1'};
+                    border-color: ${isDarkMode ? '#000' : '#d2d6da'};
+                    box-shadow: inset 0 2px 7px ${isDarkMode ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0.13)'};
+                }
+                ${CONFIG.selectors.orderItem} {
+                    box-shadow: 0 2px 7px ${isDarkMode ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.14)'}, inset 0 1px 0 ${isDarkMode ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.75)'};
+                }
+            `;
+            return base + elevationSkin;
         }
 
         function updateSkuPanelPosition() {
