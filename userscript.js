@@ -49,6 +49,9 @@
         defaultTrackingNumber: "9114 9023 0722 4938 6961 ",
         enableDarkModeByDefault: true,
         enableQuotesInMessages: true,
+        // UI reskin: recessed SKU "pick" tray vs. raised order "ship" cards.
+        // Set to false to restore the exact pre-skin (v3.65) appearance.
+        enableElevationSkin: true,
         orderColors: [
             // Expanded 40-color palette — hues spread across the spectrum and interleaved
             // so that consecutive assignments are always visually distinct
