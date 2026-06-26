@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260626-v3.70-ship-date-control-layout-fix
+// @version      20260626-v3.71-config-thank-you-master-gating
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -444,11 +444,12 @@
                 }
                 .ship-when-caption { font-size: 11px; color: ${isDarkMode ? '#aaa' : '#666'}; margin-bottom: 4px; }
                 .ship-when-seg { display: inline-flex; flex: 0 0 auto; max-width: 100%; border: 1px solid ${isDarkMode ? '#555' : '#ccc'}; border-radius: 999px; overflow: hidden; }
-                .ship-when-btn { padding: 4px 12px; font-size: 12px; font-weight: 600; line-height: 1.2; white-space: nowrap; flex: 0 0 auto; background-color: ${isDarkMode ? '#2a2a2a' : '#fff'}; color: ${isDarkMode ? '#bbb' : '#555'}; border: none; cursor: pointer; transition: background-color 0.15s ease, color 0.15s ease; }
+                .ship-when-btn { padding: 3px 11px; font-size: 11px; font-weight: 500; line-height: 1.2; white-space: nowrap; flex: 0 0 auto; background-color: ${isDarkMode ? '#2a2a2a' : '#fff'}; color: ${isDarkMode ? '#bbb' : '#555'}; border: none; cursor: pointer; transition: background-color 0.15s ease, color 0.15s ease; }
                 .ship-when-btn + .ship-when-btn { border-left: 1px solid ${isDarkMode ? '#555' : '#ccc'}; }
                 .ship-when-btn.ship-when-active { background-color: ${isDarkMode ? '#3665f3' : '#0070d2'}; color: #fff; }
                 .ship-when-btn:hover:not(.ship-when-active) { background-color: ${isDarkMode ? '#3a3a3a' : '#f0f0f0'}; }
                 .ship-when-preview { font-size: 11px; color: ${isDarkMode ? '#aaa' : '#666'}; margin-top: 4px; }
+                .is-msg-disabled { opacity: 0.45; pointer-events: none; }
                 .imageupload__option { margin-top: 10px !important; }
                 .canned-modal-overlay {
                     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -951,6 +952,7 @@
                 const firstOrderId = allOrderIds.split(',')[0];
 
                 const shipTomorrowContainer = document.createElement('div');
+                shipTomorrowContainer.className = 'ship-when-wrap';
                 shipTomorrowContainer.style.cssText = 'margin-top: 8px; text-align: left;';
                 const shipTomorrowCheckboxId = `ship-tomorrow-checkbox-${index}`;
                 const shipWhenFmt = { weekday: 'short', month: 'short', day: 'numeric' };
@@ -970,8 +972,8 @@
                 thankYouMsgContainer.style.cssText = 'margin-top: 4px; text-align: left;';
                 const thankYouCheckboxId = `thank-you-checkbox-${index}`;
                 thankYouMsgContainer.innerHTML = `
-                    <input type="checkbox" id="${thankYouCheckboxId}" class="thank-you-checkbox" style="vertical-align: middle;">
-                    <label for="${thankYouCheckboxId}" class="thank-you-label" style="vertical-align: middle; font-size: 12px;">+ thank you msg</label>
+                    <input type="checkbox" id="${thankYouCheckboxId}" class="thank-you-checkbox" style="vertical-align: middle;" checked>
+                    <label for="${thankYouCheckboxId}" class="thank-you-label" style="vertical-align: middle; font-size: 12px;">Send thank you msg</label>
                 `;
 
                 const messageContainer = document.createElement('div');
@@ -993,7 +995,7 @@
                 sendMessageButton.textContent = 'Message';
 
                 messageContainer.append(messageSelect, sendMessageButton);
-                addressActions.after(messageContainer, shipButton, shipTomorrowContainer, thankYouMsgContainer);
+                addressActions.after(messageContainer, shipButton, thankYouMsgContainer, shipTomorrowContainer);
             }
             const printButton = document.createElement('button');
             printButton.id = `${CONFIG.ids.createTemplateButton}${index}`;
@@ -1049,8 +1051,16 @@
                 const tomorrowLabel = preview.dataset.tomorrowLabel || '';
                 preview.textContent = isTomorrow
                     ? `Ships ${tomorrowLabel} · adds reminder note`
-                    : `Ships ${todayLabel} · no note`;
+                    : `Ships ${todayLabel}`;
             }
+        }
+
+        // Greys out the message-dependent control on a card (the ship-date
+        // segmented control) when its thank-you message is turned off.
+        function setCardMsgGating(cardEl, thankYouOn) {
+            if (!cardEl) return;
+            const wrap = cardEl.querySelector('.ship-when-wrap');
+            if (wrap) wrap.classList.toggle('is-msg-disabled', !thankYouOn);
         }
 
         // --- Global Event Listeners ---
@@ -1076,6 +1086,10 @@
                 if (target.classList.contains('ship-when-btn')) {
                     event.preventDefault();
                     setShipWhenState(orderItemElement, target.dataset.when === 'tomorrow');
+                    return;
+                }
+                if (target.classList.contains('thank-you-checkbox')) {
+                    setCardMsgGating(orderItemElement, target.checked);
                     return;
                 }
                 if (target.classList.contains(CONFIG.classNames.addNoteLink)) {
@@ -1815,7 +1829,7 @@
                 sliderThanks.className = CONFIG.classNames.darkModeSlider;
                 switchLabelThanks.append(cbThanks, sliderThanks);
                 const labelSpanThanks = document.createElement('span');
-                labelSpanThanks.textContent = 'thank you msg (all orders)';
+                labelSpanThanks.textContent = 'Send thank you msg (all orders)';
                 labelSpanThanks.style.cssText = `flex:1 3 auto; font-size: 12px; color: ${isDarkMode ? '#ccc' : '#333'}; white-space: normal; overflow-wrap: anywhere; line-height: 1.25;`;
                 leftHalfThanks.append(switchLabelThanks, labelSpanThanks);
 
@@ -1825,6 +1839,16 @@
 
                 rowThanks.append(leftHalfThanks, rightHalfThanks);
                 cfgBody.appendChild(rowThanks);
+                // Thank-you is the master switch, so show it first.
+                cfgBody.insertBefore(rowThanks, cfgBody.firstChild);
+
+                // Grey out the message-dependent controls (auto-send + ship date)
+                // here and on every card when no thank-you message will be sent.
+                function applyMsgGating(on) {
+                    row.classList.toggle('is-msg-disabled', !on);
+                    rowShip.classList.toggle('is-msg-disabled', !on);
+                    document.querySelectorAll(CONFIG.selectors.orderItem).forEach((card) => setCardMsgGating(card, on));
+                }
 
                 // Apply to all order cards when toggled
                 cbThanks.addEventListener('change', (e) => {
@@ -1832,6 +1856,7 @@
                     document.querySelectorAll('.thank-you-checkbox').forEach((box) => {
                         if (box instanceof HTMLInputElement) box.checked = check;
                     });
+                    applyMsgGating(check);
                 });
 
                 configSection.appendChild(cfgBody);
@@ -1858,6 +1883,7 @@
                             if (box instanceof HTMLInputElement) box.checked = true;
                         });
                     }
+                    applyMsgGating(cbThanks.checked);
                 }, 0);
             }
 

@@ -1,5 +1,17 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.71
+- Made "Send thank you msg" the master switch for messaging. Renamed the
+  "thank you msg" toggle to "Send thank you msg" and moved it to the top of
+  the Configuration panel and above the ship-date control on each order card.
+- When "Send thank you msg" is off, the auto-send and ship-date controls are
+  now greyed out (and non-interactive) — in the Configuration box and on each
+  card — since no message will be sent.
+- Shrank the Today/Tomorrow segmented buttons (11px / medium weight) so they
+  sit more harmoniously next to the text labels.
+- Removed the inaccurate "· no note" annotation from the "Ships today"
+  preview; it now just shows the ship date.
+
 ## v3.70
 - Fixed the layout of the global "ship date (all orders)" segmented control,
   which was being clipped ("Tomorrow" cut off) because the pill was squeezed
