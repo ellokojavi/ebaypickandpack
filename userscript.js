@@ -175,7 +175,7 @@
                 :root {
                     --color-neutral-800: #8c8c8c !important;
                 }
-                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: ${isDarkMode ? '#1a1a1a' : '#fff'}; color: ${isDarkMode ? '#e0e0e0' : '#000'}; }
+                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-variant-numeric: tabular-nums; background-color: ${isDarkMode ? '#1a1a1a' : '#fff'}; color: ${isDarkMode ? '#e0e0e0' : '#000'}; }
                 ${CONFIG.selectors.groupingSummary}, .tag--combined { display: none !important; }
                 .service-actions__wrapper.sticky.sticky-full-width { display: none !important; }
                 #${CONFIG.ids.skuPanelContainer} { position: fixed; top: 110px; width: 360px; max-height: calc(100vh - 130px); overflow-y: auto; z-index: 1000; background: ${isDarkMode ? '#2a2a2a' : '#fdfdfd'}; padding: 0; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: 1px solid ${isDarkMode ? '#444' : '#ddd'}; transition: top 0.3s ease-in-out; }
