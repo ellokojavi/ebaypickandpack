@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260626-v3.72-mark-shipped-msg-label-spacing
+// @version      20260626-v3.73-ship-date-preview-inline
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -443,12 +443,13 @@
                     color: ${isDarkMode ? '#ccc' : '#333'};
                 }
                 .ship-when-caption { font-size: 11px; color: ${isDarkMode ? '#aaa' : '#666'}; margin-bottom: 4px; }
+                .ship-when-row { display: flex; align-items: center; gap: 8px; }
                 .ship-when-seg { display: inline-flex; flex: 0 0 auto; max-width: 100%; border: 1px solid ${isDarkMode ? '#555' : '#ccc'}; border-radius: 999px; overflow: hidden; }
                 .ship-when-btn { padding: 3px 11px; font-size: 11px; font-weight: 500; line-height: 1.2; white-space: nowrap; flex: 0 0 auto; background-color: ${isDarkMode ? '#2a2a2a' : '#fff'}; color: ${isDarkMode ? '#bbb' : '#555'}; border: none; cursor: pointer; transition: background-color 0.15s ease, color 0.15s ease; }
                 .ship-when-btn + .ship-when-btn { border-left: 1px solid ${isDarkMode ? '#555' : '#ccc'}; }
                 .ship-when-btn.ship-when-active { background-color: ${isDarkMode ? '#3665f3' : '#0070d2'}; color: #fff; }
                 .ship-when-btn:hover:not(.ship-when-active) { background-color: ${isDarkMode ? '#3a3a3a' : '#f0f0f0'}; }
-                .ship-when-preview { font-size: 11px; color: ${isDarkMode ? '#aaa' : '#666'}; margin-top: 4px; }
+                .ship-when-preview { font-size: 11px; color: ${isDarkMode ? '#aaa' : '#666'}; white-space: nowrap; }
                 .is-msg-disabled { opacity: 0.45; pointer-events: none; }
                 .imageupload__option { margin-top: 10px !important; }
                 .canned-modal-overlay {
@@ -955,17 +956,19 @@
                 shipTomorrowContainer.className = 'ship-when-wrap';
                 shipTomorrowContainer.style.cssText = 'margin-top: 8px; text-align: left;';
                 const shipTomorrowCheckboxId = `ship-tomorrow-checkbox-${index}`;
-                const shipWhenFmt = { weekday: 'short', month: 'short', day: 'numeric' };
+                const shipWhenFmt = { month: 'short', day: 'numeric' };
                 const shipTodayLabel = new Date().toLocaleDateString('en-US', shipWhenFmt);
                 const shipTomorrowLabel = computeNextShipDateSkippingSunday(1).toLocaleDateString('en-US', shipWhenFmt);
                 shipTomorrowContainer.innerHTML = `
                     <input type="checkbox" id="${shipTomorrowCheckboxId}" class="ship-tomorrow-checkbox" checked hidden>
                     <div class="ship-when-caption">Tell customer it ships:</div>
-                    <div class="ship-when-seg" role="group" aria-label="Ship date">
-                        <button type="button" class="ship-when-btn" data-when="today" aria-pressed="false">Today</button>
-                        <button type="button" class="ship-when-btn ship-when-active" data-when="tomorrow" aria-pressed="true">Tomorrow</button>
+                    <div class="ship-when-row">
+                        <div class="ship-when-seg" role="group" aria-label="Ship date">
+                            <button type="button" class="ship-when-btn" data-when="today" aria-pressed="false">Today</button>
+                            <button type="button" class="ship-when-btn ship-when-active" data-when="tomorrow" aria-pressed="true">Tomorrow</button>
+                        </div>
+                        <span class="ship-when-preview" data-today-label="${shipTodayLabel}" data-tomorrow-label="${shipTomorrowLabel}">${shipTomorrowLabel}</span>
                     </div>
-                    <div class="ship-when-preview" data-today-label="${shipTodayLabel}" data-tomorrow-label="${shipTomorrowLabel}">Ships ${shipTomorrowLabel} · adds reminder note</div>
                 `;
 
                 const thankYouMsgContainer = document.createElement('div');
@@ -1049,9 +1052,7 @@
             if (preview) {
                 const todayLabel = preview.dataset.todayLabel || '';
                 const tomorrowLabel = preview.dataset.tomorrowLabel || '';
-                preview.textContent = isTomorrow
-                    ? `Ships ${tomorrowLabel} · adds reminder note`
-                    : `Ships ${todayLabel}`;
+                preview.textContent = isTomorrow ? tomorrowLabel : todayLabel;
             }
         }
 
