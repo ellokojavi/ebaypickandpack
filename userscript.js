@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260626-v3.73-ship-date-preview-inline
+// @version      20260626-v3.74-ship-date-preview-weekday
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -956,7 +956,7 @@
                 shipTomorrowContainer.className = 'ship-when-wrap';
                 shipTomorrowContainer.style.cssText = 'margin-top: 8px; text-align: left;';
                 const shipTomorrowCheckboxId = `ship-tomorrow-checkbox-${index}`;
-                const shipWhenFmt = { month: 'short', day: 'numeric' };
+                const shipWhenFmt = { weekday: 'short', month: 'short', day: 'numeric' };
                 const shipTodayLabel = new Date().toLocaleDateString('en-US', shipWhenFmt);
                 const shipTomorrowLabel = computeNextShipDateSkippingSunday(1).toLocaleDateString('en-US', shipWhenFmt);
                 shipTomorrowContainer.innerHTML = `
