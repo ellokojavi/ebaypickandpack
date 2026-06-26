@@ -262,15 +262,15 @@ window.AltheastixConfig = {
         ],
         "Maradona": [
             `Ver la pelota, correr tras ella, me convierte en el hombre más feliz del mundo. (To see the ball, to run after it, makes me the happiest man in the world.)\n— Diego Maradona`,
-            `When you win, you don't get carried away. But if you go step by step, with confidence, you can go far.\n— Diego Maradona`,
-            `Yo soy blanco o negro, gris no voy a ser en mi vida. (I am black or white, I'll never be grey in my life.)\n— Diego Maradona`,
+            `Yo me equivoqué y pagué, pero la pelota no se mancha. (I made mistakes and I paid for them, but the ball is never stained.)\n— Diego Maradona`,
+            `Yo soy o blanco o negro, gris no voy a ser en mi vida. (I am either black or white, I'll never be grey in my life.)\n— Diego Maradona`,
             `Fue con la mano de Dios. (It was the hand of God.)\n— Diego Maradona`,
-            `My mother thinks I am the best. And I was raised to always believe what my mother tells me.\n— Diego Maradona`,
-            `I am Maradona, who makes goals, who makes mistakes. I can take it all, I have shoulders big enough to fight with everybody.\n— Diego Maradona`,
-            `God makes me play well. That is why I always make the sign of the cross when I walk out on to the field. I feel I would be betraying him if I didn't.\n— Diego Maradona`,
-            `All the people that criticized me should eat their words.\n— Diego Maradona`,
-            `When I wear the national team shirt, its sole contact with my skin makes it stand on an end.\n— Diego Maradona`,
-            `If I die, I want to be reborn and I want to be a footballer. And I want to be Diego Armando Maradona again. I am a player who has given people joy and that is enough for me.\n— Diego Maradona`
+            `Mi mamá me consideraba el mejor del mundo, así que si ella lo dice, será verdad. (My mom thought I was the best in the world, so if she says so, it must be true.)\n— Diego Maradona`,
+            `Corro, me esfuerzo, pero sobre todo el diálogo con el balón. (I run, I give my all, but above all there's the dialogue with the ball.)\n— Diego Maradona`,
+            `Yo crecí en un barrio privado de Buenos Aires. Privado de luz, de agua, de teléfono… (I grew up in a private neighborhood in Buenos Aires. Deprived of light, of water, of a telephone…)\n— Diego Maradona`,
+            `No quiero dramatizar, pero créeme que me cortaron las piernas. (I don't want to be dramatic, but believe me, they cut my legs out from under me.)\n— Diego Maradona`,
+            `Pase lo que pase y dirija quien dirija, la camiseta número 10 será siempre mía. (No matter what happens or who's in charge, the number 10 shirt will always be mine.)\n— Diego Maradona`,
+            `Si me muero, quiero volver a nacer y quiero ser futbolista. Y quiero volver a ser Diego Armando Maradona. Soy un jugador que le ha dado alegría a la gente y con eso me basta y me sobra. (If I die, I want to be reborn and be a footballer. And I want to be Diego Armando Maradona again. I'm a player who has given people joy, and that's more than enough for me.)\n— Diego Maradona`
         ],
         "Gustavo Cerati": [
             `Gracias totales. (Total thanks!)\n— Gustavo Cerati`,
