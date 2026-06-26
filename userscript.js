@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260618-v3.68-sku-title-pick-and-pack
+// @version      20260626-v3.69-ship-today-tomorrow-segmented
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -442,6 +442,13 @@
                 .ship-tomorrow-label, .thank-you-label {
                     color: ${isDarkMode ? '#ccc' : '#333'};
                 }
+                .ship-when-caption { font-size: 11px; color: ${isDarkMode ? '#aaa' : '#666'}; margin-bottom: 4px; }
+                .ship-when-seg { display: inline-flex; border: 1px solid ${isDarkMode ? '#555' : '#ccc'}; border-radius: 999px; overflow: hidden; }
+                .ship-when-btn { padding: 4px 14px; font-size: 12px; font-weight: 600; line-height: 1.2; background-color: ${isDarkMode ? '#2a2a2a' : '#fff'}; color: ${isDarkMode ? '#bbb' : '#555'}; border: none; cursor: pointer; transition: background-color 0.15s ease, color 0.15s ease; }
+                .ship-when-btn + .ship-when-btn { border-left: 1px solid ${isDarkMode ? '#555' : '#ccc'}; }
+                .ship-when-btn.ship-when-active { background-color: ${isDarkMode ? '#3665f3' : '#0070d2'}; color: #fff; }
+                .ship-when-btn:hover:not(.ship-when-active) { background-color: ${isDarkMode ? '#3a3a3a' : '#f0f0f0'}; }
+                .ship-when-preview { font-size: 11px; color: ${isDarkMode ? '#aaa' : '#666'}; margin-top: 4px; }
                 .imageupload__option { margin-top: 10px !important; }
                 .canned-modal-overlay {
                     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -946,9 +953,17 @@
                 const shipTomorrowContainer = document.createElement('div');
                 shipTomorrowContainer.style.cssText = 'margin-top: 8px; text-align: left;';
                 const shipTomorrowCheckboxId = `ship-tomorrow-checkbox-${index}`;
+                const shipWhenFmt = { weekday: 'short', month: 'short', day: 'numeric' };
+                const shipTodayLabel = new Date().toLocaleDateString('en-US', shipWhenFmt);
+                const shipTomorrowLabel = computeNextShipDateSkippingSunday(1).toLocaleDateString('en-US', shipWhenFmt);
                 shipTomorrowContainer.innerHTML = `
-                    <input type="checkbox" id="${shipTomorrowCheckboxId}" class="ship-tomorrow-checkbox" style="vertical-align: middle;">
-                    <label for="${shipTomorrowCheckboxId}" class="ship-tomorrow-label" style="vertical-align: middle; font-size: 12px;">+ "Will ship tomorrow" note</label>
+                    <input type="checkbox" id="${shipTomorrowCheckboxId}" class="ship-tomorrow-checkbox" checked hidden>
+                    <div class="ship-when-caption">Tell customer it ships:</div>
+                    <div class="ship-when-seg" role="group" aria-label="Ship date">
+                        <button type="button" class="ship-when-btn" data-when="today" aria-pressed="false">Today</button>
+                        <button type="button" class="ship-when-btn ship-when-active" data-when="tomorrow" aria-pressed="true">Tomorrow</button>
+                    </div>
+                    <div class="ship-when-preview" data-today-label="${shipTodayLabel}" data-tomorrow-label="${shipTomorrowLabel}">Ships ${shipTomorrowLabel} · adds reminder note</div>
                 `;
 
                 const thankYouMsgContainer = document.createElement('div');
@@ -1016,6 +1031,28 @@
             printwin.close();
         }
 
+        // Sets the "ship today vs tomorrow" state for one order card: the hidden
+        // checkbox the ship/message logic reads, the segmented-button styling,
+        // and the live ship-date preview.
+        function setShipWhenState(cardEl, isTomorrow) {
+            if (!cardEl) return;
+            const cb = cardEl.querySelector('.ship-tomorrow-checkbox');
+            if (cb instanceof HTMLInputElement) cb.checked = isTomorrow;
+            cardEl.querySelectorAll('.ship-when-btn').forEach((b) => {
+                const active = (b.dataset.when === 'tomorrow') === isTomorrow;
+                b.classList.toggle('ship-when-active', active);
+                b.setAttribute('aria-pressed', String(active));
+            });
+            const preview = cardEl.querySelector('.ship-when-preview');
+            if (preview) {
+                const todayLabel = preview.dataset.todayLabel || '';
+                const tomorrowLabel = preview.dataset.tomorrowLabel || '';
+                preview.textContent = isTomorrow
+                    ? `Ships ${tomorrowLabel} · adds reminder note`
+                    : `Ships ${todayLabel} · no note`;
+            }
+        }
+
         // --- Global Event Listeners ---
         // A single, delegated event listener on the main orders container.
         // It handles clicks for all custom actions like 'Copy Address', 'Add Note', 'Mark as Shipped', etc.
@@ -1036,6 +1073,11 @@
             ordersContainerForEvents.addEventListener('click', async function(event) {
                 const target = event.target;
                 const orderItemElement = target.closest(CONFIG.selectors.orderItem);
+                if (target.classList.contains('ship-when-btn')) {
+                    event.preventDefault();
+                    setShipWhenState(orderItemElement, target.dataset.when === 'tomorrow');
+                    return;
+                }
                 if (target.classList.contains(CONFIG.classNames.addNoteLink)) {
                     event.preventDefault(); event.stopPropagation();
                     const orderId = target.dataset.orderId;
@@ -1718,39 +1760,43 @@
                     GM_setValue(AUTO_SEND_MESSAGES_KEY, !!e.target.checked);
                 });
 
-                // Row: Ship tomorrow (global) (50/50 layout)
+                // Row: Ship date (global) - segmented Today/Tomorrow (50/50 layout)
                 const rowShip = document.createElement('div');
                 rowShip.style.cssText = 'display:flex; align-items:center; gap:8px; margin-top: 8px;';
 
                 const leftHalfShip = document.createElement('div');
                 leftHalfShip.style.cssText = 'flex: 0 0 50%; max-width: 50%; display:flex; align-items:center; gap:8px; min-width:0;';
-                const switchLabelShip = document.createElement('label');
-                switchLabelShip.className = CONFIG.classNames.darkModeSwitch;
-                const cbShip = document.createElement('input');
-                cbShip.type = 'checkbox';
-                cbShip.id = 'ship-tomorrow-global-toggle';
-                cbShip.checked = true;
-                const sliderShip = document.createElement('span');
-                sliderShip.className = CONFIG.classNames.darkModeSlider;
-                switchLabelShip.append(cbShip, sliderShip);
+                const segShip = document.createElement('div');
+                segShip.className = 'ship-when-seg';
+                segShip.setAttribute('role', 'group');
+                segShip.setAttribute('aria-label', 'Ship date for all orders');
+                segShip.innerHTML = `
+                    <button type="button" class="ship-when-btn" data-when="today" aria-pressed="false">Today</button>
+                    <button type="button" class="ship-when-btn ship-when-active" data-when="tomorrow" aria-pressed="true">Tomorrow</button>
+                `;
                 const labelSpanShip = document.createElement('span');
-                labelSpanShip.textContent = 'ship tomorrow (all orders)';
+                labelSpanShip.textContent = 'ship date (all orders)';
                 labelSpanShip.style.cssText = `flex:1 3 auto; font-size: 12px; color: ${isDarkMode ? '#ccc' : '#333'}; white-space: normal; overflow-wrap: anywhere; line-height: 1.25;`;
-                leftHalfShip.append(switchLabelShip, labelSpanShip);
+                leftHalfShip.append(segShip, labelSpanShip);
 
                 const rightHalfShip = document.createElement('div');
                 rightHalfShip.style.cssText = `flex: 0 0 50%; max-width: 50%; font-size: 10px; line-height: 1.25; color: ${isDarkMode ? '#aaa' : '#666'};`;
-                rightHalfShip.textContent = 'Toggles "+ Will ship tomorrow note" on every order.';
+                rightHalfShip.textContent = 'Sets every order to tell the buyer it ships today or tomorrow.';
 
                 rowShip.append(leftHalfShip, rightHalfShip);
                 cfgBody.appendChild(rowShip);
 
-                // Apply to all order cards when toggled
-                cbShip.addEventListener('change', (e) => {
-                    const check = !!e.target.checked;
-                    document.querySelectorAll('.ship-tomorrow-checkbox').forEach((box) => {
-                        if (box instanceof HTMLInputElement) box.checked = check;
+                // Apply the chosen ship day to every order card.
+                segShip.addEventListener('click', (e) => {
+                    const btn = e.target.closest('.ship-when-btn');
+                    if (!btn) return;
+                    const isTomorrow = btn.dataset.when === 'tomorrow';
+                    segShip.querySelectorAll('.ship-when-btn').forEach((b) => {
+                        const active = (b.dataset.when === 'tomorrow') === isTomorrow;
+                        b.classList.toggle('ship-when-active', active);
+                        b.setAttribute('aria-pressed', String(active));
                     });
+                    document.querySelectorAll(CONFIG.selectors.orderItem).forEach((card) => setShipWhenState(card, isTomorrow));
                 });
 
                 // Row: Thank you msg (global) (50/50 layout)
@@ -1806,11 +1852,7 @@
 
                 // --- Auto-enable and propagate changes on load ---
                 setTimeout(() => {
-                    if (cbShip.checked) {
-                        document.querySelectorAll('.ship-tomorrow-checkbox').forEach(box => {
-                            if (box instanceof HTMLInputElement) box.checked = true;
-                        });
-                    }
+                    document.querySelectorAll(CONFIG.selectors.orderItem).forEach(card => setShipWhenState(card, true));
                     if (cbThanks.checked) {
                         document.querySelectorAll('.thank-you-checkbox').forEach(box => {
                             if (box instanceof HTMLInputElement) box.checked = true;
