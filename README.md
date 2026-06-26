@@ -36,7 +36,7 @@ Orders are visually flagged by type at a glance:
 - 🟤 **Amber/orange pills** — Multi-quantity single-SKU orders (e.g. "B01 x2")
 
 ### 📦 SKU Panel
-- Floating **"SKUs to Pack"** side panel listing all SKUs in the current batch
+- Floating **"SKUs to Pick and Pack"** side panel listing all SKUs in the current batch
 - **Live filter** 🔎 by SKU, buyer name, or item title — updates both the panel and order cards in real-time
 - **Click-to-scroll** from any SKU entry directly to its order card
 - Alphabetical grouping with visual horizontal separators between letter groups
@@ -61,18 +61,20 @@ Every order's shipping address is automatically linted against structural rules:
 - Return address fully configurable in `USER_CONFIG`
 
 ### 🤖 Order Automation
-- **Mark as Shipped** with optional auto-notes and thank-you messages
+- **Mark as Shipped** with optional auto-notes and thank-you messages — the button reads **"Mark as Shipped & Msg"** when a thank-you message will go out with the shipment, and **"Mark as Shipped"** when it won't
+- **Today / Tomorrow ship control** — an explicit segmented toggle (per order *and* globally) that sets whether the buyer is told the order ships same-day or next-day. "Tomorrow" also adds the internal "Will be shipped on `<date>`" note. Each card shows a live ship-date preview (e.g. "Fri, Jun 27") 📅
+- **"Send thank you msg" master switch** — the top-level toggle for messaging; when off, the auto-send and ship-date controls are greyed out since no message will be sent ✉️
 - **Add Tracking** — supports both legacy and new eBay tracking systems (v1 + v2) 📬
 - Tracking is automatically suggested for orders above the configurable dollar threshold (default: $20) 💰
 - **Add Note** to orders with custom date formatting 📝
-- **Send Messages** to buyers using templated thank-you drafts loaded from an external Gist 💌
+- **Send Messages** to buyers using templated thank-you drafts loaded from the external config file 💌
 - Random quotes optionally appended to outgoing messages (configurable) 💬
 - **Auto-send toggle** with a safety confirmation step 🛡️
 
 ### ✉️ Canned Messages & Templates
 - Fully templated messages with variable substitution: `{BUYER_FIRST}`, `{STICKER_NAME}`, `{ARRIVAL_DATE}`, `{SURPRISE_STICKER}`, `{SHIPPING_DATE}`, etc.
 - Multiple canned message drafts for backorder, pre-order, and delay scenarios
-- Templates and quotes loaded from an **external GitHub Gist** so you can update them without touching the script 🧩
+- Templates and quotes loaded from an **external config file** (`altheastix-ebay-config.js`) so you can update them without touching the script 🧩
 
 ### 🧠 Smart Extras
 - **Order totals** calculated automatically from item prices and quantities 🧮
@@ -99,11 +101,15 @@ Edit the `USER_CONFIG` object near the top of the script to customize local pref
 | `orderColors` | 40-color palette | Colors used for multi-item order card backgrounds 🌈 |
 | `headerLinks` | Seller Hub, Orders, etc. | Quick-nav links rendered in the page header 🔗 |
 
-### 🧩 External Config (GitHub Gist)
+### 🧩 External Config (`altheastix-ebay-config.js`)
 
-Templates, delivery notes, quotes, and quote keywords are loaded from a GitHub Gist at runtime. This lets you update messaging without touching the script itself.
+Templates, delivery notes, quotes, and quote keywords are loaded at runtime from `altheastix-ebay-config.js`, which lives in this repo and is pulled in via the script's `@require` line:
 
-To use your own Gist, update the `@require` line at the top of the script to point to your raw Gist URL, structured as:
+```
+https://raw.githubusercontent.com/ellokojavi/ebaypickandpack/main/altheastix-ebay-config.js
+```
+
+Because the `@require` points at the `main` branch raw URL (no commit hash), the script always fetches the latest version — editing the config file and pushing is enough to update messaging without touching the userscript. The file is structured as:
 
 ```javascript
 window.AltheastixConfig = {
@@ -121,7 +127,7 @@ window.AltheastixConfig = {
 };
 ```
 
-If the Gist fails to load, the script falls back to built-in defaults and logs a warning in the browser console. 🛟
+If the config file fails to load, the script falls back to built-in defaults and logs a warning in the browser console. 🛟
 
 ---
 
@@ -140,7 +146,7 @@ If the Gist fails to load, the script falls back to built-in defaults and logs a
 
 ## 🔄 Auto-Sync
 
-This repo is connected to a local folder via a launchd watcher (`autopush.sh` + `com.altheastix.autopush.plist`). Any save to `userscript.js` triggers an automatic `git commit` and `git push` — no manual uploads needed. 🪄
+This repo is connected to a local folder via a launchd watcher (`autopush.sh` + `com.altheastix.autopush.plist`). Any save to `userscript.js` or `altheastix-ebay-config.js` triggers an automatic `git commit` and `git push` — no manual uploads needed. The watcher also stages `CHANGELOG.md` and `README.md` so the changelog and docs ride along in the same commit. 🪄
 
 ---
 

@@ -961,8 +961,8 @@
                 const shipTomorrowLabel = computeNextShipDateSkippingSunday(1).toLocaleDateString('en-US', shipWhenFmt);
                 shipTomorrowContainer.innerHTML = `
                     <input type="checkbox" id="${shipTomorrowCheckboxId}" class="ship-tomorrow-checkbox" checked hidden>
-                    <div class="ship-when-caption">Tell customer it ships:</div>
                     <div class="ship-when-row">
+                        <span class="ship-when-label">Will ship</span>
                         <div class="ship-when-seg" role="group" aria-label="Ship date">
                             <button type="button" class="ship-when-btn" data-when="today" aria-pressed="false">Today</button>
                             <button type="button" class="ship-when-btn ship-when-active" data-when="tomorrow" aria-pressed="true">Tomorrow</button>
