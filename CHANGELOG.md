@@ -1,5 +1,10 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.73
+- Shortened the per-card ship-date preview to just "Mmm dd" (e.g. "Jun 27")
+  and moved it inline to the right of the Today/Tomorrow toggle, so it no
+  longer wraps onto an extra line.
+
 ## v3.72
 - The "Mark as Shipped" button now reads "Mark as Shipped & Msg" when that
   order's "Send thank you msg" is on, making it clear a message goes out with
