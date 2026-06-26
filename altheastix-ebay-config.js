@@ -415,5 +415,3 @@ window.AltheastixConfig = {
         "Bitcoin": ["Bitcoin", "BTC", "Crypto", "Satoshi"]
     }
 };
-
-// autopush watcher test — safe to remove
