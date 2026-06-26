@@ -1,5 +1,14 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.69
+- Replaced the ambiguous "ship tomorrow" on/off toggle with an explicit
+  "Today | Tomorrow" segmented control, in both the Configuration panel
+  (all orders) and each order card. Both positions are now labeled, so it is
+  clear that "Today" tells the buyer the order ships same-day (and adds no
+  reminder note) while "Tomorrow" promises next-day shipping and adds the
+  internal "Will be shipped on <date>" note. Each card also shows a live
+  ship-date preview so you can see exactly what the buyer will be told.
+
 ## v3.68
 - Renamed the SKU panel title from "SKUs to Pack (X)" to "SKUs to Pick
   and Pack (X)".
