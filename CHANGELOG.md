@@ -1,5 +1,10 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.75
+- Replaced the "Tell customer it ships:" caption above each order's ship-date
+  control with an inline "Will ship" label to the left of the Today/Tomorrow
+  toggle, saving a line of vertical space per card.
+
 ## v3.74
 - Added a weekday prefix back to the per-card ship-date preview, e.g.
   "Fri, Jun 27".
