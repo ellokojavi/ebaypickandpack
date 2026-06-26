@@ -261,10 +261,10 @@ window.AltheastixConfig = {
             `Music is the strongest form of magic.\n— Marilyn Manson`
         ],
         "Maradona": [
-            `To see the ball, to run after it, makes me the happiest man in the world.\n— Diego Maradona`,
+            `Ver la pelota, correr tras ella, me convierte en el hombre más feliz del mundo. (To see the ball, to run after it, makes me the happiest man in the world.)\n— Diego Maradona`,
             `When you win, you don't get carried away. But if you go step by step, with confidence, you can go far.\n— Diego Maradona`,
-            `I am black or white, I'll never be grey in my life.\n— Diego Maradona`,
-            `It was the hand of God.\n— Diego Maradona`,
+            `Yo soy blanco o negro, gris no voy a ser en mi vida. (I am black or white, I'll never be grey in my life.)\n— Diego Maradona`,
+            `Fue con la mano de Dios. (It was the hand of God.)\n— Diego Maradona`,
             `My mother thinks I am the best. And I was raised to always believe what my mother tells me.\n— Diego Maradona`,
             `I am Maradona, who makes goals, who makes mistakes. I can take it all, I have shoulders big enough to fight with everybody.\n— Diego Maradona`,
             `God makes me play well. That is why I always make the sign of the cross when I walk out on to the field. I feel I would be betraying him if I didn't.\n— Diego Maradona`,
@@ -350,7 +350,7 @@ window.AltheastixConfig = {
             `Punk rock is a word used by dilettantes and heartless manipulators about music that takes up the challenge of social change and the challenge of artistic integrity.\n— Joe Strummer`
         ],
         "Messi": [
-            `You have to fight to reach your dream. You have to sacrifice and work hard for it.\n— Lionel Messi`,
+            `Hay que luchar para concretar el sueño, hay que sacrificarse y trabajar duro por ello. (You have to fight to reach your dream. You have to sacrifice and work hard for it.)\n— Lionel Messi`,
             `My ambition is always to be better.\n— Lionel Messi`,
             `Football is the most important of the least important things in life.\n— Arrigo Sacchi`,
             `Some people think football is a matter of life and death. I assure you, it's much more serious than that.\n— Bill Shankly`,
