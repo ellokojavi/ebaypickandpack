@@ -443,6 +443,7 @@
                     color: ${isDarkMode ? '#ccc' : '#333'};
                 }
                 .ship-when-caption { font-size: 11px; color: ${isDarkMode ? '#aaa' : '#666'}; margin-bottom: 4px; }
+                .ship-when-label { font-size: 11px; color: ${isDarkMode ? '#aaa' : '#666'}; white-space: nowrap; flex: 0 0 auto; }
                 .ship-when-row { display: flex; align-items: center; gap: 8px; }
                 .ship-when-seg { display: inline-flex; flex: 0 0 auto; max-width: 100%; border: 1px solid ${isDarkMode ? '#555' : '#ccc'}; border-radius: 999px; overflow: hidden; }
                 .ship-when-btn { padding: 3px 11px; font-size: 11px; font-weight: 500; line-height: 1.2; white-space: nowrap; flex: 0 0 auto; background-color: ${isDarkMode ? '#2a2a2a' : '#fff'}; color: ${isDarkMode ? '#bbb' : '#555'}; border: none; cursor: pointer; transition: background-color 0.15s ease, color 0.15s ease; }
