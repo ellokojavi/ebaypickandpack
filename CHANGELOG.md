@@ -1,5 +1,9 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.74
+- Added a weekday prefix back to the per-card ship-date preview, e.g.
+  "Fri, Jun 27".
+
 ## v3.73
 - Shortened the per-card ship-date preview to just "Mmm dd" (e.g. "Jun 27")
   and moved it inline to the right of the Today/Tomorrow toggle, so it no
