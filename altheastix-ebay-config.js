@@ -272,6 +272,12 @@ window.AltheastixConfig = {
             `When I wear the national team shirt, its sole contact with my skin makes it stand on an end.\n— Diego Maradona`,
             `If I die, I want to be reborn and I want to be a footballer. And I want to be Diego Armando Maradona again. I am a player who has given people joy and that is enough for me.\n— Diego Maradona`
         ],
+        "Gustavo Cerati": [
+            `Gracias totales. (Total thanks!)\n— Gustavo Cerati`,
+            `Poder decir adiós es crecer. (Being able to say goodbye is to grow.)\n— Gustavo Cerati, "Adiós"`,
+            `El silencio no es tiempo perdido. (Silence is not wasted time.)\n— Gustavo Cerati`,
+            `Nuestro futuro depende de cómo entendamos al pasado. (Our future depends on how we understand the past.)\n— Gustavo Cerati`
+        ],
         "Janis Joplin": [
             `Don't compromise yourself — you're all you've got.\n— Janis Joplin`,
             `You are what you settle for.\n— Janis Joplin`,
@@ -392,6 +398,7 @@ window.AltheastixConfig = {
         "Rat Fink": ["Rat Fink"],
         "The Simpsons": ["The Simpsons"],
         "Maradona": ["Maradona", "Diego Maradona"],
+        "Gustavo Cerati": ["Gustavo Cerati", "Cerati", "Soda Stereo"],
         "Janis Joplin": ["Janis Joplin"],
         "Phish": ["Phish", "Trey Anastasio", "Fishman"],
         "Pearl Jam": ["Pearl Jam", "Eddie Vedder"],
