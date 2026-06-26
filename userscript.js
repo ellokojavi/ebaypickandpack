@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260626-v3.71-config-thank-you-master-gating
+// @version      20260626-v3.72-mark-shipped-msg-label-spacing
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -947,7 +947,7 @@
                 shipButton.type = 'button';
                 shipButton.className = CONFIG.classNames.markAsShippedBtn;
                 shipButton.dataset.orderId = allOrderIds;
-                shipButton.textContent = 'Mark as Shipped';
+                shipButton.textContent = 'Mark as Shipped & Msg';
                 shipButton.setAttribute('data-order-item-id', orderItem.id);
                 const firstOrderId = allOrderIds.split(',')[0];
 
@@ -1056,11 +1056,16 @@
         }
 
         // Greys out the message-dependent control on a card (the ship-date
-        // segmented control) when its thank-you message is turned off.
+        // segmented control) when its thank-you message is turned off, and
+        // keeps the Mark-as-Shipped button label in sync ("& Msg" when on).
         function setCardMsgGating(cardEl, thankYouOn) {
             if (!cardEl) return;
             const wrap = cardEl.querySelector('.ship-when-wrap');
             if (wrap) wrap.classList.toggle('is-msg-disabled', !thankYouOn);
+            const shipBtn = cardEl.querySelector('.' + CONFIG.classNames.markAsShippedBtn);
+            if (shipBtn && !shipBtn.classList.contains(CONFIG.classNames.markAsShippedWaiting)) {
+                shipBtn.textContent = thankYouOn ? 'Mark as Shipped & Msg' : 'Mark as Shipped';
+            }
         }
 
         // --- Global Event Listeners ---
@@ -1360,7 +1365,7 @@
                         undoBtn.onclick = (e) => {
                             e.stopPropagation();
                             overlay.remove();
-                            target.textContent = 'Mark as Shipped';
+                            target.textContent = orderItemElement.querySelector('.thank-you-checkbox')?.checked ? 'Mark as Shipped & Msg' : 'Mark as Shipped';
                             target.disabled = false;
                             target.classList.remove(CONFIG.classNames.markAsShippedWaiting);
                         };
@@ -1745,7 +1750,7 @@
 
                 // Row: Auto-send messages slider (50/50 layout)
                 const row = document.createElement('div');
-                row.style.cssText = 'display:flex; align-items:center; gap:8px;';
+                row.style.cssText = 'display:flex; align-items:center; gap:8px; margin-top: 16px;';
 
                 const leftHalf = document.createElement('div');
                 leftHalf.style.cssText = 'flex: 0 0 50%; max-width: 50%; display:flex; align-items:center; gap:8px; min-width:0;';
@@ -1776,7 +1781,7 @@
 
                 // Row: Ship date (global) - segmented Today/Tomorrow (50/50 layout)
                 const rowShip = document.createElement('div');
-                rowShip.style.cssText = 'display:flex; align-items:center; gap:8px; margin-top: 8px;';
+                rowShip.style.cssText = 'display:flex; align-items:center; gap:8px; margin-top: 16px;';
 
                 const leftHalfShip = document.createElement('div');
                 leftHalfShip.style.cssText = 'flex: 0 0 50%; max-width: 50%; display:flex; flex-direction:column; align-items:flex-start; gap:5px; min-width:0;';
@@ -1815,7 +1820,7 @@
 
                 // Row: Thank you msg (global) (50/50 layout)
                 const rowThanks = document.createElement('div');
-                rowThanks.style.cssText = 'display:flex; align-items:center; gap:8px; margin-top: 8px;';
+                rowThanks.style.cssText = 'display:flex; align-items:center; gap:8px; margin-top: 16px;';
 
                 const leftHalfThanks = document.createElement('div');
                 leftHalfThanks.style.cssText = 'flex: 0 0 50%; max-width: 50%; display:flex; align-items:center; gap:8px; min-width:0;';

@@ -1,5 +1,13 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.72
+- The "Mark as Shipped" button now reads "Mark as Shipped & Msg" when that
+  order's "Send thank you msg" is on, making it clear a message goes out with
+  the shipment. It falls back to "Mark as Shipped" when the message is off,
+  and stays in sync when the toggle is flipped (per card or globally).
+- Increased the vertical spacing between the Configuration toggles, which
+  were too crammed.
+
 ## v3.71
 - Made "Send thank you msg" the master switch for messaging. Renamed the
   "thank you msg" toggle to "Send thank you msg" and moved it to the top of
