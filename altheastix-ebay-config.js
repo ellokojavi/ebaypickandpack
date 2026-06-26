@@ -53,7 +53,8 @@ window.AltheastixConfig = {
             `Bicycles are almost as good as guitars for meeting girls.\n— Bob Weir`,
             `If you had started doing anything two weeks ago, by today you would have been two weeks better at it.\n— John Mayer`,
             `Someday, everything will make perfect sense. So for now, laugh at the confusion, smile through the tears, be strong and keep reminding yourself that everything happens for a reason.\n— John Mayer`,
-            `It's very liberating when you finally realize it's impossible to make everyone like you.\n— John Mayer`
+            `It's very liberating when you finally realize it's impossible to make everyone like you.\n— John Mayer`,
+            `And nothing comes for free, there's nothing you can hold for very long. And when you hear that song come crying like the wind, it seems like all this life was just a dream.\n— Robert Hunter & Jerry Garcia, "Stella Blue"`
         ],
         "Jimi Hendrix": [
             `Knowledge speaks, but wisdom listens.\n— Jimi Hendrix`,
