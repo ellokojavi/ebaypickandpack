@@ -1,5 +1,12 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.76
+- Enabled tabular (monospaced) numerals across the UI via
+  `font-variant-numeric: tabular-nums` on the body, so digits in prices,
+  order IDs, SKUs, the SKU count, and dates line up vertically in lists for
+  a cleaner, more workflow-oriented look. Typeface is unchanged (still the
+  native system stack).
+
 ## v3.75
 - Replaced the "Tell customer it ships:" caption above each order's ship-date
   control with an inline "Will ship" label to the left of the Today/Tomorrow
