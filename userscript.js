@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260626-v3.69-ship-today-tomorrow-segmented
+// @version      20260626-v3.70-ship-date-control-layout-fix
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -443,8 +443,8 @@
                     color: ${isDarkMode ? '#ccc' : '#333'};
                 }
                 .ship-when-caption { font-size: 11px; color: ${isDarkMode ? '#aaa' : '#666'}; margin-bottom: 4px; }
-                .ship-when-seg { display: inline-flex; border: 1px solid ${isDarkMode ? '#555' : '#ccc'}; border-radius: 999px; overflow: hidden; }
-                .ship-when-btn { padding: 4px 14px; font-size: 12px; font-weight: 600; line-height: 1.2; background-color: ${isDarkMode ? '#2a2a2a' : '#fff'}; color: ${isDarkMode ? '#bbb' : '#555'}; border: none; cursor: pointer; transition: background-color 0.15s ease, color 0.15s ease; }
+                .ship-when-seg { display: inline-flex; flex: 0 0 auto; max-width: 100%; border: 1px solid ${isDarkMode ? '#555' : '#ccc'}; border-radius: 999px; overflow: hidden; }
+                .ship-when-btn { padding: 4px 12px; font-size: 12px; font-weight: 600; line-height: 1.2; white-space: nowrap; flex: 0 0 auto; background-color: ${isDarkMode ? '#2a2a2a' : '#fff'}; color: ${isDarkMode ? '#bbb' : '#555'}; border: none; cursor: pointer; transition: background-color 0.15s ease, color 0.15s ease; }
                 .ship-when-btn + .ship-when-btn { border-left: 1px solid ${isDarkMode ? '#555' : '#ccc'}; }
                 .ship-when-btn.ship-when-active { background-color: ${isDarkMode ? '#3665f3' : '#0070d2'}; color: #fff; }
                 .ship-when-btn:hover:not(.ship-when-active) { background-color: ${isDarkMode ? '#3a3a3a' : '#f0f0f0'}; }
@@ -1765,7 +1765,7 @@
                 rowShip.style.cssText = 'display:flex; align-items:center; gap:8px; margin-top: 8px;';
 
                 const leftHalfShip = document.createElement('div');
-                leftHalfShip.style.cssText = 'flex: 0 0 50%; max-width: 50%; display:flex; align-items:center; gap:8px; min-width:0;';
+                leftHalfShip.style.cssText = 'flex: 0 0 50%; max-width: 50%; display:flex; flex-direction:column; align-items:flex-start; gap:5px; min-width:0;';
                 const segShip = document.createElement('div');
                 segShip.className = 'ship-when-seg';
                 segShip.setAttribute('role', 'group');
@@ -1776,8 +1776,8 @@
                 `;
                 const labelSpanShip = document.createElement('span');
                 labelSpanShip.textContent = 'ship date (all orders)';
-                labelSpanShip.style.cssText = `flex:1 3 auto; font-size: 12px; color: ${isDarkMode ? '#ccc' : '#333'}; white-space: normal; overflow-wrap: anywhere; line-height: 1.25;`;
-                leftHalfShip.append(segShip, labelSpanShip);
+                labelSpanShip.style.cssText = `font-size: 12px; color: ${isDarkMode ? '#ccc' : '#333'}; white-space: normal; overflow-wrap: anywhere; line-height: 1.25;`;
+                leftHalfShip.append(labelSpanShip, segShip);
 
                 const rightHalfShip = document.createElement('div');
                 rightHalfShip.style.cssText = `flex: 0 0 50%; max-width: 50%; font-size: 10px; line-height: 1.25; color: ${isDarkMode ? '#aaa' : '#666'};`;

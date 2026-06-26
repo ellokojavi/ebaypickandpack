@@ -1,5 +1,12 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.70
+- Fixed the layout of the global "ship date (all orders)" segmented control,
+  which was being clipped ("Tomorrow" cut off) because the pill was squeezed
+  beside its label in a narrow column. The label now sits above the pill
+  (matching the per-order cards), and the Today/Tomorrow buttons no longer
+  shrink or wrap.
+
 ## v3.69
 - Replaced the ambiguous "ship tomorrow" on/off toggle with an explicit
   "Today | Tomorrow" segmented control, in both the Configuration panel
