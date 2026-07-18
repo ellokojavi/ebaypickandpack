@@ -1,5 +1,10 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.77
+- Renamed the ship-date row label from "Will ship" to "Ships" (adopted from a
+  manual edit made in the live Tampermonkey copy, with its unclosed `<span>`
+  typo corrected to a proper closing tag).
+
 ## v3.76
 - Enabled tabular (monospaced) numerals across the UI via
   `font-variant-numeric: tabular-nums` on the body, so digits in prices,
