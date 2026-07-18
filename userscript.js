@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260626-v3.76-tabular-nums
+// @version      20260718-v3.77-ships-label
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -963,7 +963,7 @@
                 shipTomorrowContainer.innerHTML = `
                     <input type="checkbox" id="${shipTomorrowCheckboxId}" class="ship-tomorrow-checkbox" checked hidden>
                     <div class="ship-when-row">
-                        <span class="ship-when-label">Will ship</span>
+                        <span class="ship-when-label">Ships</span>
                         <div class="ship-when-seg" role="group" aria-label="Ship date">
                             <button type="button" class="ship-when-btn" data-when="today" aria-pressed="false">Today</button>
                             <button type="button" class="ship-when-btn ship-when-active" data-when="tomorrow" aria-pressed="true">Tomorrow</button>
@@ -2971,6 +2971,5 @@
         return result;
     }
     // --- END CUSTOM ENVELOPE FEATURE (utility) ---
-
 })();
 
