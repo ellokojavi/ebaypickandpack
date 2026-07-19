@@ -1,5 +1,10 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.80
+- Favicon badge redesigned for legibility (Gmail-style): rendered at 128px for
+  high-DPI displays, balloon enlarged to roughly two-thirds of the icon with a
+  white outline and a much bigger digit, "A" mark shrunk to the top-left.
+
 ## v3.79
 - The browser tab now shows the pending pick-and-pack count: the favicon gets a
   red badge with the number of unshipped SKUs (green check when everything is
