@@ -1,5 +1,11 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.79
+- The browser tab now shows the pending pick-and-pack count: the favicon gets a
+  red badge with the number of unshipped SKUs (green check when everything is
+  shipped) and the tab title is prefixed with "(N)". Both update live as orders
+  are marked shipped or the SKU panel refreshes.
+
 ## v3.78
 - The v2 tracking flow (`/ship/tr/update`) now auto-presses **Save** after
   filling the tracking number(s) and carrier, instead of only focusing the
