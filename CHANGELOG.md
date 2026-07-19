@@ -1,5 +1,9 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.82
+- Favicon counter color changed from red to eBay blue (#3665f3) — matches the
+  script's accent color and distinguishes the tab from Gmail's red badge.
+
 ## v3.81
 - Favicon counter goes full-bleed: with pending SKUs the entire icon is now a
   red square with a giant white digit (no more corner balloon — it was too

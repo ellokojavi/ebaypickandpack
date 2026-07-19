@@ -1665,8 +1665,8 @@
                 };
 
                 if (pendingCount > 0) {
-                    // Full-bleed red counter
-                    drawRoundedBase('#f4212e');
+                    // Full-bleed blue counter (eBay blue, matches script accent)
+                    drawRoundedBase('#3665f3');
                     const label = pendingCount > 99 ? '99+' : String(pendingCount);
                     ctx.fillStyle = '#ffffff';
                     ctx.font = `bold ${label.length >= 3 ? 60 : (label.length === 2 ? 80 : 100)}px sans-serif`;
