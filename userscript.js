@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260719-v3.82-blue-favicon-counter
+// @version      20260719-v3.83-favicon-live-sync
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -2222,6 +2222,16 @@
             skuManager.createSKUPackingList();
             refreshAddressBanner();
             console.debug('[Tampermonkey][MAIN] Order cards processed & SKU panel built');
+
+            // Favicon counter safety sync: recount pending SKU pills every 3s
+            // and redraw when the count changes in either direction (orders
+            // marked shipped OR unmarked) or eBay re-injected its own favicon.
+            // updatePendingBadge skips the redraw when nothing changed, so
+            // this is effectively free.
+            setInterval(() => {
+                const pending = document.querySelectorAll(`.${CONFIG.classNames.skuItem}:not(.${CONFIG.classNames.skuShipped})`).length;
+                updatePendingBadge(pending);
+            }, 3000);
 
             // Listen for note confirmation
             GM_addValueChangeListener(CONFIRMED_NOTE_KEY, (name, oldValue, newValue) => {
