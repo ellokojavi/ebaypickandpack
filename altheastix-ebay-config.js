@@ -348,6 +348,15 @@ window.AltheastixConfig = {
             `I never knew anything until I started playing guitar.\n— Slash`,
             `Music is the one area where I've always felt most free to express myself.\n— Slash`
         ],
+        "Alice in Chains": [
+            `I think our lyrics reflect reality. Maybe not someone else's reality, but definitely ours.\n— Layne Staley`,
+            `My bad habits aren't my title. My strengths and my talent are my title.\n— Layne Staley`,
+            `I know that the guys in this band would do anything for me and I'd do the same for them.\n— Layne Staley`,
+            `We don't stuff our personal demons inside us, we get them out. It's therapeutic.\n— Layne Staley`,
+            `The riff. The melody. And something to say.\n— Jerry Cantrell, on what makes a great song`,
+            `I've never been a big soloist — I just do what fits the part.\n— Jerry Cantrell`,
+            `Yeah, it's fine, we'll walk down the line, leave our rain, a cold trade for warm sunshine.\n— Jerry Cantrell, "No Excuses"`
+        ],
         "Punk Rock": [
             `Anger is an energy.\n— John Lydon`,
             `Punk is not dead. Punk will only die when corporations can exploit and mass produce it.\n— Jello Biafra`,
