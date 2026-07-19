@@ -1637,6 +1637,12 @@
         // ignores dynamic favicons, hence the title fallback too.)
         function updatePendingBadge(pendingCount) {
             try {
+                // Skip the redraw if the count is unchanged AND our favicon is
+                // still in place (eBay occasionally re-injects its own icon)
+                const ourIcon = document.querySelector('link[data-altheastix-favicon]');
+                if (pendingCount === updatePendingBadge._lastCount && ourIcon) return;
+                updatePendingBadge._lastCount = pendingCount;
+
                 const baseTitle = 'Altheastix: Pick-and-Pack';
                 document.title = pendingCount > 0 ? `(${pendingCount}) ${baseTitle}` : baseTitle;
 
