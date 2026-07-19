@@ -1707,6 +1707,9 @@
                 const container = document.getElementById(CONFIG.ids.skuPanelContainer);
                 if (!container) return;
                 container.innerHTML = '';
+                // Update favicon balloon + tab title with the pending SKU count
+                // (checks live card state, same as the ✔️ pill logic below)
+                updatePendingBadge(SKU.filter(s => !document.getElementById(`order-item-${s.orderId}`)?.classList.contains(CONFIG.classNames.orderShipped)).length);
                 const isDarkMode = localStorage.getItem(CONFIG.localStorageKeys.darkMode) !== 'false';
                 const title = document.createElement('h2');
                 title.className = 'sku-title';
