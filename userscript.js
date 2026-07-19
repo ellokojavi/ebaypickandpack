@@ -1174,6 +1174,10 @@
                     tooltip.innerHTML = `
                         <label for="tracking-input-${orderId}" style="font-size: 12px; font-weight: bold;">Tracking for order ${orderId}:</label>
                         <input type="text" id="tracking-input-${orderId}" class="tracking-tooltip-input" placeholder="XXXX XXXX XXXX XXXX XXXX XX" value="${USER_CONFIG.defaultTrackingNumber}">
+                        <label class="tracking-autosubmit-label" style="display:flex; align-items:center; gap:6px; font-size:12px; margin-top:6px; cursor:pointer;">
+                            <input type="checkbox" class="tracking-autosubmit-checkbox" checked>
+                            Auto-press Save on eBay
+                        </label>
                         <button type="button" class="tracking-tooltip-submit" data-order-id="${orderId}">Submit</button>
                     `;
                     document.body.appendChild(tooltip);
