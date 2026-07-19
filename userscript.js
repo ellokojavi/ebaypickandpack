@@ -2332,7 +2332,42 @@
                         const carrierInput = input.closest('td.textbox')?.nextElementSibling?.querySelector('input[type="text"][role="combobox"]');
                         if (carrierInput) setAndTriggerInputValue(carrierInput, 'USPS');
                     });
-                    document.querySelector('button.btn.btn--primary')?.focus();
+
+                    // Locate the Save button by its label so we never accidentally
+                    // grab a dialog's "Continue" button (also .btn--primary).
+                    const findSaveButton = () => Array.from(document.querySelectorAll('button.btn.btn--primary'))
+                        .find(b => b.textContent.trim().toLowerCase() === 'save');
+                    const saveBtn = findSaveButton();
+
+                    if (trackingData.autoSubmit && saveBtn) {
+                        await sleep(400); // let React settle so Save is enabled
+                        saveBtn.click();
+
+                        // eBay may interrupt Save with a validation dialog. Auto-continue
+                        // past the two benign warnings, but STOP on a genuinely invalid
+                        // number (that dialog warns about losing Top Rated Seller status).
+                        const isDialogVisible = (el) => el && !el.hidden && el.getAttribute('aria-hidden') !== 'true';
+                        const benignDialogIds = ['insuranceSignature', 'unknownCarrier'];
+                        for (let i = 0; i < 25; i++) { // poll ~5s
+                            await sleep(200);
+                            if (isDialogVisible(document.getElementById('invalidUSPSTrkNumber'))) {
+                                console.warn('[Track-v2] Invalid USPS tracking number — leaving tab open for manual review.');
+                                break; // do NOT auto-continue past an invalid number
+                            }
+                            let handled = false;
+                            for (const id of benignDialogIds) {
+                                const dlg = document.getElementById(id);
+                                if (isDialogVisible(dlg)) {
+                                    dlg.querySelector('button.btn.btn--primary')?.click();
+                                    handled = true;
+                                    break;
+                                }
+                            }
+                            if (handled) break; // Continue click proceeds with submission
+                        }
+                    } else if (saveBtn) {
+                        saveBtn.focus(); // legacy behavior: fill only, user clicks Save
+                    }
                     await GM_setValue(TRACKING_ADD_KEY_V2, null);
                 }
                 return;
