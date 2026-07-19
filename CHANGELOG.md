@@ -1,5 +1,12 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.83
+- Favicon counter now reliably updates when orders are marked shipped — and
+  when they're unmarked: a 3-second sync recounts pending SKU pills and redraws
+  the icon whenever the count changes (either direction) or eBay re-injects its
+  own favicon. Redraws are skipped when nothing changed, so the sync is
+  effectively free.
+
 ## v3.82
 - Favicon counter color changed from red to eBay blue (#3665f3) — matches the
   script's accent color and distinguishes the tab from Gmail's red badge.
