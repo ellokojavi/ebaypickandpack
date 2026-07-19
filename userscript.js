@@ -1628,6 +1628,77 @@
             });
         }
 
+        // --- Favicon & Tab Title Pending Badge ---
+        // Draws a dynamic favicon (dark rounded square with "A") with a red
+        // balloon showing the number of pending (unshipped) SKUs, and prefixes
+        // the tab title with "(N)". When nothing is pending, shows a green
+        // check instead. Called from PrintSKUTable so it updates on every
+        // panel refresh and shipped confirmation. (Works in Firefox; Safari
+        // ignores dynamic favicons, hence the title fallback too.)
+        function updatePendingBadge(pendingCount) {
+            try {
+                const baseTitle = 'Altheastix: Pick-and-Pack';
+                document.title = pendingCount > 0 ? `(${pendingCount}) ${baseTitle}` : baseTitle;
+
+                const size = 64;
+                const canvas = document.createElement('canvas');
+                canvas.width = canvas.height = size;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return;
+
+                // Base icon: dark rounded square with a white "A"
+                ctx.fillStyle = '#1f1f1f';
+                if (typeof ctx.roundRect === 'function') {
+                    ctx.beginPath();
+                    ctx.roundRect(0, 0, size, size, 12);
+                    ctx.fill();
+                } else {
+                    ctx.fillRect(0, 0, size, size);
+                }
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 40px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('A', size / 2, size / 2 + 3);
+
+                // Badge balloon (bottom-right)
+                const bx = 44, by = 44, br = 19;
+                if (pendingCount > 0) {
+                    ctx.fillStyle = '#e53935';
+                    ctx.beginPath();
+                    ctx.arc(bx, by, br, 0, Math.PI * 2);
+                    ctx.fill();
+                    const label = pendingCount > 99 ? '99+' : String(pendingCount);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = `bold ${label.length >= 3 ? 17 : (label.length === 2 ? 21 : 26)}px sans-serif`;
+                    ctx.fillText(label, bx, by + 1);
+                } else {
+                    ctx.fillStyle = '#2e7d32';
+                    ctx.beginPath();
+                    ctx.arc(bx, by, br, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 5;
+                    ctx.lineCap = 'round';
+                    ctx.beginPath();
+                    ctx.moveTo(bx - 8, by + 1);
+                    ctx.lineTo(bx - 2, by + 7);
+                    ctx.lineTo(bx + 9, by - 6);
+                    ctx.stroke();
+                }
+
+                // Swap the favicon in (remove eBay's, append ours)
+                document.querySelectorAll('link[rel*="icon"]').forEach(l => l.remove());
+                const link = document.createElement('link');
+                link.rel = 'icon';
+                link.type = 'image/png';
+                link.href = canvas.toDataURL('image/png');
+                document.head.appendChild(link);
+            } catch (e) {
+                console.debug('[Tampermonkey][BADGE] updatePendingBadge failed:', e);
+            }
+        }
+
         // --- SKU Management Logic ---
         // Contains all logic for creating, displaying, and updating the "SKUs to Pack" panel.
         function setupSkuLogic() {
