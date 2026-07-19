@@ -418,6 +418,7 @@ window.AltheastixConfig = {
         "Peanuts": ["Snoopy", "Peanuts", "Charlie Brown"],
         "Lynyrd Skynyrd": ["Lynyrd Skynyrd", "Freebird"],
         "Guns N' Roses": ["Guns N Roses", "Axl Rose", "Slash"],
+        "Alice in Chains": ["Alice in Chains", "Alice n Chains", "AIC", "Layne Staley", "Jerry Cantrell", "Staley", "Cantrell"],
         "Punk Rock": ["Misfits", "Rancid", "Dead Kennedys", "Sex Pistols", "Rage Against", "Korn", "Slipknot", "Punk"],
         "Messi": ["Messi", "Inter Milan", "Seleccion", "Colo-Colo", "Boca Juniors", "CDUC", "Futbol", "Soccer"],
         "Star Wars": ["Star Wars", "Mandalorian", "Grogu", "Baby Yoda", "C3PO", "Jedi"],
