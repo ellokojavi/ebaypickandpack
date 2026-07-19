@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260719-v3.81-fullbleed-favicon-counter
+// @version      20260719-v3.82-blue-favicon-counter
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -1642,7 +1642,7 @@
 
                 // Rendered at 128px so the favicon stays crisp on high-DPI
                 // displays. With pending SKUs, the counter IS the icon: a
-                // full-bleed red square with a giant white digit — a corner
+                // full-bleed blue square with a giant white digit — a corner
                 // balloon is unreadable at 16px tab size. Identity comes from
                 // the tab title.
                 const size = 128;
