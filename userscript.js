@@ -1212,7 +1212,8 @@
                             target.classList.add(CONFIG.classNames.trackingLinkSubmitted);
                         }
                         if (action === 'track-v2') {
-                            await GM_setValue(TRACKING_ADD_KEY_V2, { orderId: orderId, trackingNumber: trackingNumberClean });
+                            const autoSubmit = tooltip.querySelector('.tracking-autosubmit-checkbox')?.checked ?? true;
+                            await GM_setValue(TRACKING_ADD_KEY_V2, { orderId: orderId, trackingNumber: trackingNumberClean, autoSubmit: autoSubmit });
                             GM_openInTab(`https://www.ebay.com/ship/tr/update?orders=${orderId}`, { active: true });
                         } else {
                             await GM_setValue(TRACKING_ADD_KEY, { orderId: orderId, trackingNumber: trackingNumberClean, timestamp: Date.now() });
