@@ -1,5 +1,17 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.78
+- The v2 tracking flow (`/ship/tr/update`) now auto-presses **Save** after
+  filling the tracking number(s) and carrier, instead of only focusing the
+  button — removing the manual confirmation click. If eBay interrupts Save with
+  a benign warning dialog (unsupported carrier or USPS insurance/signature), the
+  script auto-clicks Continue; if it flags the number as an invalid USPS
+  tracking number, the tab is left open for manual review rather than submitting
+  a bad number.
+- Added an **"Auto-press Save on eBay"** checkbox to the tracking tooltip
+  (checked by default). Unchecking it falls back to the old fill-only behavior
+  so the flow can be tested without auto-submitting.
+
 ## v3.77
 - Renamed the ship-date row label from "Will ship" to "Ships" (adopted from a
   manual edit made in the live Tampermonkey copy, with its unclosed `<span>`
