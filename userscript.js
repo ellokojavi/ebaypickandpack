@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260719-v3.79-favicon-pending-badge
+// @version      20260719-v3.80-bigger-favicon-badge
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -1640,50 +1640,55 @@
                 const baseTitle = 'Altheastix: Pick-and-Pack';
                 document.title = pendingCount > 0 ? `(${pendingCount}) ${baseTitle}` : baseTitle;
 
-                const size = 64;
+                // Rendered at 128px so the favicon stays crisp on high-DPI
+                // displays; the badge takes ~2/3 of the icon (Gmail-style) so
+                // the digit is readable even at 16px tab size.
+                const size = 128;
                 const canvas = document.createElement('canvas');
                 canvas.width = canvas.height = size;
                 const ctx = canvas.getContext('2d');
                 if (!ctx) return;
 
-                // Base icon: dark rounded square with a white "A"
+                // Base icon: dark rounded square with a white "A" (shrunk to
+                // the top-left so the badge can dominate)
                 ctx.fillStyle = '#1f1f1f';
                 if (typeof ctx.roundRect === 'function') {
                     ctx.beginPath();
-                    ctx.roundRect(0, 0, size, size, 12);
+                    ctx.roundRect(0, 0, size, size, 24);
                     ctx.fill();
                 } else {
                     ctx.fillRect(0, 0, size, size);
                 }
                 ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 40px sans-serif';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.fillText('A', size / 2, size / 2 + 3);
+                ctx.font = 'bold 60px sans-serif';
+                ctx.fillText('A', 42, 44);
 
-                // Badge balloon (bottom-right)
-                const bx = 44, by = 44, br = 19;
+                // Badge balloon (bottom-right, ~2/3 of the icon, white outline
+                // for contrast against the dark base and any tab background)
+                const bx = 82, by = 82, br = 44;
+                ctx.beginPath();
+                ctx.arc(bx, by, br, 0, Math.PI * 2);
+                ctx.fillStyle = pendingCount > 0 ? '#f4212e' : '#2e7d32';
+                ctx.fill();
+                ctx.lineWidth = 7;
+                ctx.strokeStyle = '#ffffff';
+                ctx.stroke();
                 if (pendingCount > 0) {
-                    ctx.fillStyle = '#e53935';
-                    ctx.beginPath();
-                    ctx.arc(bx, by, br, 0, Math.PI * 2);
-                    ctx.fill();
                     const label = pendingCount > 99 ? '99+' : String(pendingCount);
                     ctx.fillStyle = '#ffffff';
-                    ctx.font = `bold ${label.length >= 3 ? 17 : (label.length === 2 ? 21 : 26)}px sans-serif`;
-                    ctx.fillText(label, bx, by + 1);
+                    ctx.font = `bold ${label.length >= 3 ? 40 : (label.length === 2 ? 50 : 62)}px sans-serif`;
+                    ctx.fillText(label, bx, by + 3);
                 } else {
-                    ctx.fillStyle = '#2e7d32';
-                    ctx.beginPath();
-                    ctx.arc(bx, by, br, 0, Math.PI * 2);
-                    ctx.fill();
                     ctx.strokeStyle = '#ffffff';
-                    ctx.lineWidth = 5;
+                    ctx.lineWidth = 11;
                     ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
                     ctx.beginPath();
-                    ctx.moveTo(bx - 8, by + 1);
-                    ctx.lineTo(bx - 2, by + 7);
-                    ctx.lineTo(bx + 9, by - 6);
+                    ctx.moveTo(bx - 18, by + 2);
+                    ctx.lineTo(bx - 5, by + 16);
+                    ctx.lineTo(bx + 20, by - 14);
                     ctx.stroke();
                 }
 
