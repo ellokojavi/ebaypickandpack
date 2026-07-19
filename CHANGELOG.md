@@ -1,5 +1,11 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.81
+- Favicon counter goes full-bleed: with pending SKUs the entire icon is now a
+  red square with a giant white digit (no more corner balloon — it was too
+  small to read at tab size). When everything is shipped, the icon reverts to
+  the dark "A" with a green check.
+
 ## v3.80
 - Favicon badge redesigned for legibility (Gmail-style): rendered at 128px for
   high-DPI displays, balloon enlarged to roughly two-thirds of the icon with a

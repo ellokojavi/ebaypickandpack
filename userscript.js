@@ -1641,47 +1641,50 @@
                 document.title = pendingCount > 0 ? `(${pendingCount}) ${baseTitle}` : baseTitle;
 
                 // Rendered at 128px so the favicon stays crisp on high-DPI
-                // displays; the badge takes ~2/3 of the icon (Gmail-style) so
-                // the digit is readable even at 16px tab size.
+                // displays. With pending SKUs, the counter IS the icon: a
+                // full-bleed red square with a giant white digit — a corner
+                // balloon is unreadable at 16px tab size. Identity comes from
+                // the tab title.
                 const size = 128;
                 const canvas = document.createElement('canvas');
                 canvas.width = canvas.height = size;
                 const ctx = canvas.getContext('2d');
                 if (!ctx) return;
-
-                // Base icon: dark rounded square with a white "A" (shrunk to
-                // the top-left so the badge can dominate)
-                ctx.fillStyle = '#1f1f1f';
-                if (typeof ctx.roundRect === 'function') {
-                    ctx.beginPath();
-                    ctx.roundRect(0, 0, size, size, 24);
-                    ctx.fill();
-                } else {
-                    ctx.fillRect(0, 0, size, size);
-                }
-                ctx.fillStyle = '#ffffff';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.font = 'bold 60px sans-serif';
-                ctx.fillText('A', 42, 44);
 
-                // Badge balloon (bottom-right, ~2/3 of the icon, white outline
-                // for contrast against the dark base and any tab background)
-                const bx = 82, by = 82, br = 44;
-                ctx.beginPath();
-                ctx.arc(bx, by, br, 0, Math.PI * 2);
-                ctx.fillStyle = pendingCount > 0 ? '#f4212e' : '#2e7d32';
-                ctx.fill();
-                ctx.lineWidth = 7;
-                ctx.strokeStyle = '#ffffff';
-                ctx.stroke();
+                const drawRoundedBase = (color) => {
+                    ctx.fillStyle = color;
+                    if (typeof ctx.roundRect === 'function') {
+                        ctx.beginPath();
+                        ctx.roundRect(0, 0, size, size, 24);
+                        ctx.fill();
+                    } else {
+                        ctx.fillRect(0, 0, size, size);
+                    }
+                };
+
                 if (pendingCount > 0) {
+                    // Full-bleed red counter
+                    drawRoundedBase('#f4212e');
                     const label = pendingCount > 99 ? '99+' : String(pendingCount);
                     ctx.fillStyle = '#ffffff';
-                    ctx.font = `bold ${label.length >= 3 ? 40 : (label.length === 2 ? 50 : 62)}px sans-serif`;
-                    ctx.fillText(label, bx, by + 3);
+                    ctx.font = `bold ${label.length >= 3 ? 60 : (label.length === 2 ? 80 : 100)}px sans-serif`;
+                    ctx.fillText(label, size / 2, size / 2 + 6);
                 } else {
+                    // All shipped: dark "A" with a green check balloon
+                    drawRoundedBase('#1f1f1f');
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 60px sans-serif';
+                    ctx.fillText('A', 42, 44);
+                    const bx = 82, by = 82, br = 44;
+                    ctx.beginPath();
+                    ctx.arc(bx, by, br, 0, Math.PI * 2);
+                    ctx.fillStyle = '#2e7d32';
+                    ctx.fill();
+                    ctx.lineWidth = 7;
                     ctx.strokeStyle = '#ffffff';
+                    ctx.stroke();
                     ctx.lineWidth = 11;
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
