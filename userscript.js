@@ -1706,6 +1706,7 @@
                 const link = document.createElement('link');
                 link.rel = 'icon';
                 link.type = 'image/png';
+                link.dataset.altheastixFavicon = '1';
                 link.href = canvas.toDataURL('image/png');
                 document.head.appendChild(link);
             } catch (e) {
