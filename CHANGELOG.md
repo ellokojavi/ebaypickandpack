@@ -1,5 +1,14 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.84
+- Favicon counter now decrements as soon as an order is marked shipped: the
+  count previously only recognized the final background-tab confirmation
+  (`orderShipped` class), ignoring cards in the immediate "Marked as Shipped"
+  overlay state — so the number never moved while confirmations were pending.
+  Cards now count as done with either the overlay or the confirmed class, and
+  Undo restores the count instantly.
+- Favicon counter color changed from eBay blue to purple (#7c4dff).
+
 ## v3.83
 - Favicon counter now reliably updates when orders are marked shipped — and
   when they're unmarked: a 3-second sync recounts pending SKU pills and redraws

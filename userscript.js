@@ -1714,6 +1714,27 @@
             }
         }
 
+        // A card counts as "done" for the favicon counter when it has either
+        // the confirmed orderShipped class (background tab confirmed) OR the
+        // immediate "Marked as Shipped" pending overlay. Undo removes the
+        // overlay, which restores the card to pending.
+        function isOrderCardDone(card) {
+            return !!card && (
+                card.classList.contains(CONFIG.classNames.orderShipped) ||
+                !!card.querySelector('.' + CONFIG.classNames.pendingOverlay)
+            );
+        }
+
+        // Recounts pending SKUs from the live SKU pills and redraws the
+        // favicon/title. Cheap: updatePendingBadge no-ops when unchanged.
+        function syncPendingBadge() {
+            let pending = 0;
+            document.querySelectorAll('.' + CONFIG.classNames.skuItem).forEach(pill => {
+                if (!isOrderCardDone(document.getElementById(pill.dataset.orderItemId || ''))) pending++;
+            });
+            updatePendingBadge(pending);
+        }
+
         // --- SKU Management Logic ---
         // Contains all logic for creating, displaying, and updating the "SKUs to Pack" panel.
         function setupSkuLogic() {
