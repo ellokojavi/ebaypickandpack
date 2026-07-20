@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260719-v3.85-ebay-favicon-counter-box
+// @version      20260719-v3.86-wider-counter-box
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -1697,7 +1697,7 @@
         }
 
         // Draws the favicon at 128px (crisp on high-DPI): eBay's real favicon
-        // as the base, with a white rounded box — half the icon's width,
+        // as the base, with a white rounded box — 65% of the icon's width,
         // justified bottom-right — showing the unshipped count in black.
         // All-shipped: green check balloon instead. If the eBay icon couldn't
         // be fetched, the base falls back to a dark rounded square with "A".
@@ -1743,7 +1743,7 @@
                     ctx.stroke();
                     const label = pendingCount > 99 ? '99+' : String(pendingCount);
                     ctx.fillStyle = '#000000';
-                    ctx.font = `bold ${label.length >= 3 ? 28 : (label.length === 2 ? 38 : 46)}px sans-serif`;
+                    ctx.font = `bold ${label.length >= 3 ? 36 : (label.length === 2 ? 50 : 60)}px sans-serif`;
                     ctx.fillText(label, bx + bw / 2, by + bh / 2 + 2);
                 } else {
                     // All shipped: green check balloon, bottom-right
