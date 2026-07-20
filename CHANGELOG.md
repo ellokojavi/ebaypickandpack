@@ -1,5 +1,12 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.88
+- Favicon counter no longer changes when order cards are selected/deselected:
+  it previously counted the SKU panel's pills, which shrink to the selected
+  subset when checkboxes are checked. The counter now reads all order cards
+  directly, so it always reflects the total unshipped count regardless of
+  selection.
+
 ## v3.87
 - Favicon counter box background is now 30% transparent (70% opacity white),
   letting the eBay logo show through behind the number.
