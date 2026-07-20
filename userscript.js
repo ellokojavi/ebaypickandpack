@@ -1789,12 +1789,21 @@
             );
         }
 
-        // Recounts pending SKUs from the live SKU pills and redraws the
-        // favicon/title. Cheap: updatePendingBadge no-ops when unchanged.
+        // Recounts pending SKUs directly from ALL order cards and redraws the
+        // favicon/title. Deliberately does NOT read the SKU panel pills: when
+        // checkboxes are selected, the panel shrinks to the selected subset,
+        // but the badge must always show the total unshipped count. Cheap:
+        // updatePendingBadge no-ops when unchanged.
         function syncPendingBadge() {
             let pending = 0;
-            document.querySelectorAll('.' + CONFIG.classNames.skuItem).forEach(pill => {
-                if (!isOrderCardDone(document.getElementById(pill.dataset.orderItemId || ''))) pending++;
+            document.querySelectorAll(CONFIG.selectors.orderItem).forEach(card => {
+                if (isOrderCardDone(card)) return;
+                card.querySelectorAll('.item').forEach(itemEl => {
+                    const detailsList = itemEl.querySelector('[class*="item__details"]');
+                    if (!detailsList) return;
+                    const hasSku = Array.from(detailsList.querySelectorAll('li')).some(li => li.innerText.trim().startsWith('SKU:'));
+                    if (hasSku) pending++;
+                });
             });
             updatePendingBadge(pending);
         }
