@@ -1640,6 +1640,45 @@
         // check instead. Called from PrintSKUTable so it updates on every
         // panel refresh and shipped confirmation. (Works in Firefox; Safari
         // ignores dynamic favicons, hence the title fallback too.)
+        // Fetches eBay's real favicon once via GM_xmlhttpRequest and converts
+        // it to a data URL so it can be drawn on a canvas without tainting it
+        // (a cross-origin <img> would block toDataURL). Resolves to a loaded
+        // Image, or null on any failure (the badge then falls back to a dark
+        // "A" square).
+        let ebayFaviconPromise = null;
+        function getEbayFaviconImage() {
+            if (!ebayFaviconPromise) {
+                ebayFaviconPromise = new Promise((resolve) => {
+                    const finish = (dataUrl) => {
+                        if (!dataUrl) return resolve(null);
+                        const img = new Image();
+                        img.onload = () => resolve(img);
+                        img.onerror = () => resolve(null);
+                        img.src = dataUrl;
+                    };
+                    try {
+                        GM_xmlhttpRequest({
+                            method: 'GET',
+                            url: 'https://www.ebay.com/favicon.ico',
+                            responseType: 'blob',
+                            timeout: 10000,
+                            onload: (res) => {
+                                try {
+                                    const reader = new FileReader();
+                                    reader.onload = () => finish(reader.result);
+                                    reader.onerror = () => finish(null);
+                                    reader.readAsDataURL(res.response);
+                                } catch (e) { finish(null); }
+                            },
+                            onerror: () => finish(null),
+                            ontimeout: () => finish(null)
+                        });
+                    } catch (e) { finish(null); }
+                });
+            }
+            return ebayFaviconPromise;
+        }
+
         function updatePendingBadge(pendingCount) {
             try {
                 // Skip the redraw if the count is unchanged AND our favicon is
@@ -1651,11 +1690,19 @@
                 const baseTitle = 'Altheastix: Pick-and-Pack';
                 document.title = pendingCount > 0 ? `(${pendingCount}) ${baseTitle}` : baseTitle;
 
-                // Rendered at 128px so the favicon stays crisp on high-DPI
-                // displays. With pending SKUs, the counter IS the icon: a
-                // full-bleed blue square with a giant white digit — a corner
-                // balloon is unreadable at 16px tab size. Identity comes from
-                // the tab title.
+                getEbayFaviconImage().then((baseImg) => drawFaviconCounter(baseImg, pendingCount));
+            } catch (e) {
+                console.debug('[Tampermonkey][BADGE] updatePendingBadge failed:', e);
+            }
+        }
+
+        // Draws the favicon at 128px (crisp on high-DPI): eBay's real favicon
+        // as the base, with a white rounded box — half the icon's width,
+        // justified bottom-right — showing the unshipped count in black.
+        // All-shipped: green check balloon instead. If the eBay icon couldn't
+        // be fetched, the base falls back to a dark rounded square with "A".
+        function drawFaviconCounter(baseImg, pendingCount) {
+            try {
                 const size = 128;
                 const canvas = document.createElement('canvas');
                 canvas.width = canvas.height = size;
@@ -1664,8 +1711,10 @@
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
 
-                const drawRoundedBase = (color) => {
-                    ctx.fillStyle = color;
+                if (baseImg) {
+                    ctx.drawImage(baseImg, 0, 0, size, size);
+                } else {
+                    ctx.fillStyle = '#1f1f1f';
                     if (typeof ctx.roundRect === 'function') {
                         ctx.beginPath();
                         ctx.roundRect(0, 0, size, size, 24);
@@ -1673,36 +1722,46 @@
                     } else {
                         ctx.fillRect(0, 0, size, size);
                     }
-                };
-
-                if (pendingCount > 0) {
-                    // Full-bleed purple counter
-                    drawRoundedBase('#7c4dff');
-                    const label = pendingCount > 99 ? '99+' : String(pendingCount);
-                    ctx.fillStyle = '#ffffff';
-                    ctx.font = `bold ${label.length >= 3 ? 60 : (label.length === 2 ? 80 : 100)}px sans-serif`;
-                    ctx.fillText(label, size / 2, size / 2 + 6);
-                } else {
-                    // All shipped: dark "A" with a green check balloon
-                    drawRoundedBase('#1f1f1f');
                     ctx.fillStyle = '#ffffff';
                     ctx.font = 'bold 60px sans-serif';
                     ctx.fillText('A', 42, 44);
-                    const bx = 82, by = 82, br = 44;
+                }
+
+                if (pendingCount > 0) {
+                    // White counter box: half the icon's width, bottom-right
+                    const bw = 64, bh = 56, bx = size - bw, by = size - bh, r = 12;
+                    ctx.beginPath();
+                    if (typeof ctx.roundRect === 'function') {
+                        ctx.roundRect(bx, by, bw, bh, r);
+                    } else {
+                        ctx.rect(bx, by, bw, bh);
+                    }
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fill();
+                    ctx.lineWidth = 3;
+                    ctx.strokeStyle = '#999999';
+                    ctx.stroke();
+                    const label = pendingCount > 99 ? '99+' : String(pendingCount);
+                    ctx.fillStyle = '#000000';
+                    ctx.font = `bold ${label.length >= 3 ? 28 : (label.length === 2 ? 38 : 46)}px sans-serif`;
+                    ctx.fillText(label, bx + bw / 2, by + bh / 2 + 2);
+                } else {
+                    // All shipped: green check balloon, bottom-right
+                    const bx = 96, by = 96, br = 30;
                     ctx.beginPath();
                     ctx.arc(bx, by, br, 0, Math.PI * 2);
                     ctx.fillStyle = '#2e7d32';
                     ctx.fill();
-                    ctx.lineWidth = 7;
+                    ctx.lineWidth = 6;
                     ctx.strokeStyle = '#ffffff';
                     ctx.stroke();
-                    ctx.lineWidth = 11;
+                    ctx.lineWidth = 8;
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
                     ctx.beginPath();
-                    ctx.moveTo(bx - 18, by + 2);
-                    ctx.lineTo(bx - 5, by + 16);
-                    ctx.lineTo(bx + 20, by - 14);
+                    ctx.moveTo(bx - 13, by + 1);
+                    ctx.lineTo(bx - 4, by + 11);
+                    ctx.lineTo(bx + 14, by - 10);
                     ctx.stroke();
                 }
 
@@ -1715,7 +1774,7 @@
                 link.href = canvas.toDataURL('image/png');
                 document.head.appendChild(link);
             } catch (e) {
-                console.debug('[Tampermonkey][BADGE] updatePendingBadge failed:', e);
+                console.debug('[Tampermonkey][BADGE] drawFaviconCounter failed:', e);
             }
         }
 
