@@ -17,6 +17,9 @@
 // @grant        GM_getValue
 // @grant        GM_addValueChangeListener
 // @grant        GM_openInTab
+// @grant        GM_xmlhttpRequest
+// @connect      ebay.com
+// @connect      www.ebay.com
 // @grant        window.close
 // @require      https://raw.githubusercontent.com/ellokojavi/ebaypickandpack/main/altheastix-ebay-config.js
 // @updateURL    https://raw.githubusercontent.com/ellokojavi/ebaypickandpack/main/userscript.js

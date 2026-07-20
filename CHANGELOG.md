@@ -1,5 +1,13 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.85
+- Favicon counter redesigned: the real eBay favicon is now the base image
+  (fetched once via GM_xmlhttpRequest to avoid canvas tainting; new
+  @grant/@connect headers), with a white rounded box — half the icon's width,
+  bottom-right — showing the unshipped count in black. Falls back to the dark
+  "A" square if the fetch fails. All-shipped state keeps the green check over
+  the eBay icon.
+
 ## v3.84
 - Favicon counter now decrements as soon as an order is marked shipped: the
   count previously only recognized the final background-tab confirmation
