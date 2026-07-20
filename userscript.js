@@ -1728,8 +1728,8 @@
                 }
 
                 if (pendingCount > 0) {
-                    // White counter box: half the icon's width, bottom-right
-                    const bw = 64, bh = 56, bx = size - bw, by = size - bh, r = 12;
+                    // White counter box: 65% of the icon's width, bottom-right
+                    const bw = 83, bh = 72, bx = size - bw, by = size - bh, r = 16;
                     ctx.beginPath();
                     if (typeof ctx.roundRect === 'function') {
                         ctx.roundRect(bx, by, bw, bh, r);

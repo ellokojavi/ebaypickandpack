@@ -1,5 +1,9 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.86
+- Favicon counter box enlarged from 50% to 65% of the icon's width (with the
+  number scaled up to match) for better legibility at tab size.
+
 ## v3.85
 - Favicon counter redesigned: the real eBay favicon is now the base image
   (fetched once via GM_xmlhttpRequest to avoid canvas tainting; new
