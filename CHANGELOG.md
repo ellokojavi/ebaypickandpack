@@ -1,5 +1,9 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.87
+- Favicon counter box background is now 30% transparent (70% opacity white),
+  letting the eBay logo show through behind the number.
+
 ## v3.86
 - Favicon counter box enlarged from 50% to 65% of the icon's width (with the
   number scaled up to match) for better legibility at tab size.

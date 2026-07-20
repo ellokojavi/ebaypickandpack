@@ -42,7 +42,7 @@ Orders are visually flagged by type at a glance:
 - Alphabetical grouping with visual horizontal separators between letter groups
 - Special styling for Manila SKUs, LG SKUs, and multi-quantity SKUs
 - Shipped SKUs are visually marked as completed ✅
-- **Favicon & tab-title badge** — the browser tab shows the eBay favicon with a white bottom-right box (65% of the icon's width) counting the SKUs still pending in black, and the tab title is prefixed with "(N)"; when everything is shipped, the box turns into a green check
+- **Favicon & tab-title badge** — the browser tab shows the eBay favicon with a semi-transparent white bottom-right box (65% of the icon's width) counting the SKUs still pending in black, and the tab title is prefixed with "(N)"; when everything is shipped, the box turns into a green check
 
 ### 🔍 Address Validation
 Every order's shipping address is automatically linted against structural rules:
