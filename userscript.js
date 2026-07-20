@@ -1375,9 +1375,11 @@
                             target.textContent = orderItemElement.querySelector('.thank-you-checkbox')?.checked ? 'Mark as Shipped & Msg' : 'Mark as Shipped';
                             target.disabled = false;
                             target.classList.remove(CONFIG.classNames.markAsShippedWaiting);
+                            syncPendingBadge();
                         };
                         overlay.firstChild.appendChild(undoBtn);
                         orderItemElement.appendChild(overlay);
+                        syncPendingBadge();
                         const textElement = overlay.querySelector('#overlay-text');
                         target.textContent = 'Requested...';
                         target.disabled = true;
@@ -1671,8 +1673,8 @@
                 };
 
                 if (pendingCount > 0) {
-                    // Full-bleed blue counter (eBay blue, matches script accent)
-                    drawRoundedBase('#3665f3');
+                    // Full-bleed purple counter
+                    drawRoundedBase('#7c4dff');
                     const label = pendingCount > 99 ? '99+' : String(pendingCount);
                     ctx.fillStyle = '#ffffff';
                     ctx.font = `bold ${label.length >= 3 ? 60 : (label.length === 2 ? 80 : 100)}px sans-serif`;
