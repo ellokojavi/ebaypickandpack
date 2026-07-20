@@ -1743,9 +1743,10 @@
                 const container = document.getElementById(CONFIG.ids.skuPanelContainer);
                 if (!container) return;
                 container.innerHTML = '';
-                // Update favicon balloon + tab title with the pending SKU count
-                // (checks live card state, same as the ✔️ pill logic below)
-                updatePendingBadge(SKU.filter(s => !document.getElementById(`order-item-${s.orderId}`)?.classList.contains(CONFIG.classNames.orderShipped)).length);
+                // Update favicon counter + tab title with the pending SKU count
+                // (counts a card as done when confirmed shipped OR showing the
+                // immediate "Marked as Shipped" overlay)
+                updatePendingBadge(SKU.filter(s => !isOrderCardDone(document.getElementById(`order-item-${s.orderId}`))).length);
                 const isDarkMode = localStorage.getItem(CONFIG.localStorageKeys.darkMode) !== 'false';
                 const title = document.createElement('h2');
                 title.className = 'sku-title';
@@ -2249,10 +2250,7 @@
             // marked shipped OR unmarked) or eBay re-injected its own favicon.
             // updatePendingBadge skips the redraw when nothing changed, so
             // this is effectively free.
-            setInterval(() => {
-                const pending = document.querySelectorAll(`.${CONFIG.classNames.skuItem}:not(.${CONFIG.classNames.skuShipped})`).length;
-                updatePendingBadge(pending);
-            }, 3000);
+            setInterval(syncPendingBadge, 3000);
 
             // Listen for note confirmation
             GM_addValueChangeListener(CONFIRMED_NOTE_KEY, (name, oldValue, newValue) => {
