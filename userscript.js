@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260719-v3.87-translucent-counter-box
+// @version      20260719-v3.88-count-ignores-selection
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -1816,10 +1816,9 @@
                 const container = document.getElementById(CONFIG.ids.skuPanelContainer);
                 if (!container) return;
                 container.innerHTML = '';
-                // Update favicon counter + tab title with the pending SKU count
-                // (counts a card as done when confirmed shipped OR showing the
-                // immediate "Marked as Shipped" overlay)
-                updatePendingBadge(SKU.filter(s => !isOrderCardDone(document.getElementById(`order-item-${s.orderId}`))).length);
+                // Update favicon counter + tab title. Counts from all order
+                // cards (not the SKU array, which may be a selected subset).
+                syncPendingBadge();
                 const isDarkMode = localStorage.getItem(CONFIG.localStorageKeys.darkMode) !== 'false';
                 const title = document.createElement('h2');
                 title.className = 'sku-title';
