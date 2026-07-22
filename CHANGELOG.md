@@ -1,5 +1,12 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.89
+- Raised `trackingOrderAmountThreshold` from $20 to $30. Orders must now exceed
+  $30 to get a `+tracking` pill, and the buyer thank-you message's tracking note
+  (which interpolates the threshold) now reads "orders at or under $30 ship
+  without tracking." Also updated the hardcoded fallback in the tracking-note
+  logic from 20 to 30 to stay consistent with `USER_CONFIG`.
+
 ## v3.88
 - Favicon counter no longer changes when order cards are selected/deselected:
   it previously counted the SKU panel's pills, which shrink to the selected
