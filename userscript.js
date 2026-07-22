@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260719-v3.88-count-ignores-selection
+// @version      20260722-v3.89-tracking-threshold-30
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -1312,7 +1312,7 @@
                                 ? dn.canada
                                 : `${plural ? dn.usualPlural : dn.usualSingular}, ${dn.patienceVariants[Math.floor(Math.random() * dn.patienceVariants.length)]}`;
                             // Dynamic tracking note based on order total value vs threshold
-                            const threshold = USER_CONFIG.trackingOrderAmountThreshold || 20;
+                            const threshold = USER_CONFIG.trackingOrderAmountThreshold || 30;
                             const trackingNote = totalItemsPrice > threshold
                                 ? ''
                                 : `To keep prices fair, orders at or under $${threshold} ship without tracking.`;
