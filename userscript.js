@@ -46,7 +46,7 @@
     // ===================================================================
     const USER_CONFIG = {
         returnAddress: "Altheastix ⚡<br>3015 E Howell St.<br>Seattle, WA 98122<br>USA",
-        trackingOrderAmountThreshold: 20,
+        trackingOrderAmountThreshold: 30,
         useAlternativeTracking: true,
         scriptLoadDelay: 15 * 1000,
         defaultTrackingNumber: "9114 9023 0722 4938 6961 ",
