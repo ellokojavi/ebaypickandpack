@@ -1,5 +1,14 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.95
+- Buy-label automation: the length dimension (only field that failed) ignores
+  plain React value-injection and reverts to "1". Switched dimension entry to
+  `execCommand('insertText')`, which fires the native beforeinput/input events the
+  field actually listens to — the same path manual typing uses (works in Firefox).
+  Added a redundant final verify-and-re-type pass over all three dimensions after
+  the service is selected, so any field the post-selection rate refetch reverts
+  gets corrected as the last action before the seller clicks Buy.
+
 ## v3.94
 - Buy-label automation: fixed the length field reverting to "1" and the slow,
   laggy service selection. Root cause was set ORDER, not timing — eBay only
