@@ -868,6 +868,23 @@
                 }
             }
 
+            // --- Append "United States" for domestic orders ---
+            // eBay only renders a .print__address__country span for international
+            // destinations (e.g. Canada); US addresses have no country line at all.
+            // Absence of that span is the reliable US signal, so add the country
+            // line explicitly — Copy and Print Envelope both read the address
+            // block's text, so they pick it up automatically. Runs after the
+            // integrity check so validation still sees eBay's original lines.
+            {
+                const addrEl = orderItem.querySelector(`.${CONFIG.classNames.addressContainer}`);
+                if (addrEl && !addrEl.querySelector('.print__address__country')) {
+                    const countrySpan = document.createElement('span');
+                    countrySpan.className = 'print__address__country';
+                    countrySpan.innerHTML = 'United States<br>';
+                    addrEl.appendChild(countrySpan);
+                }
+            }
+
             orderItem.querySelectorAll(`${CONFIG.selectors.itemDescription} a[href*="&item="]`).forEach(itemLink => {
                 const itemIDMatch = itemLink.href.match(/&item=(\d+)/);
                 if (itemIDMatch?.[1]) {

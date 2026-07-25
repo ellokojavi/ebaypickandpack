@@ -49,6 +49,7 @@ Every order's shipping address is automatically linted against structural rules:
 - Minimum line count, buyer name presence, street number format
 - Valid `City ST ZIPCODE` line matching eBay's format
 - Recognized US state and territory abbreviations 🇺🇸
+- **US addresses** get an explicit "United States" country line appended (eBay omits it for domestic orders), so copied/printed addresses are complete; international orders keep eBay's own country line
 - **Canadian addresses** 🇨🇦 validated separately: postal code format (`A1A 1A1`) and all 13 province/territory codes
 - **PO Box addresses** accepted as valid (skips the street-number rule) 📮
 - Addresses with issues show an inline **⚠️ badge** next to the recipient name; hovering reveals a tooltip listing every issue found

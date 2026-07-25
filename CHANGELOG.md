@@ -1,5 +1,13 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.00
+- Domestic (US) order cards now show an explicit "United States" country line.
+  eBay omits the country for US addresses (only international destinations get a
+  `.print__address__country` span), so absence of that span is used as the
+  US signal — the line is appended only when eBay didn't already render one, so
+  Canadian and other international addresses are untouched. Copy and Print
+  Envelope pick it up automatically since both read the address block's text.
+
 ## v3.99
 - Suppress the `.service-actions__pay` block so it no longer shows on the
   pick-and-pack page.
