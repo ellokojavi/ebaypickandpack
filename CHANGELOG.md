@@ -1,5 +1,13 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.96
+- Buy-label automation: dimensions are now entered as **9.5 × 4.125 × 0.1 in**
+  (was 4.125 × 9.5 × 0.1). Once the value actually reached eBay's validation, eBay
+  clamped a 4.125 length up to its minimum (showed "7"), because the longest side
+  must go in the length box and 9.5 exceeds the eBay Standard Envelope width max
+  (6.125). Same physical envelope, but this order is the one eBay accepts, so the
+  fields now stick.
+
 ## v3.95
 - Buy-label automation: the length dimension (only field that failed) ignores
   plain React value-injection and reverts to "1". Switched dimension entry to
