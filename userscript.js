@@ -268,6 +268,10 @@
                 .${CONFIG.classNames.shippingInfoBlock} p a:not(.${CONFIG.classNames.addTrackingLink}):not(.${CONFIG.classNames.addNoteLink}) { text-decoration: underline; }
                 .${CONFIG.classNames.shippingInfoBlock} span { vertical-align: top; }
                 .${CONFIG.classNames.shippingInfoBlock} ${CONFIG.selectors.uniqueOrderIdLink} { font-weight: bold; color: ${isDarkMode ? '#99ccff' : '#003087'}; }
+                .${CONFIG.classNames.buyerNoteCallout} { display: flex; align-items: flex-start; gap: 8px; margin: -2px 0 10px; padding: 8px 12px; border-radius: 8px; border-left: 3px solid ${isDarkMode ? '#c97d20' : '#f59e0b'}; background: ${isDarkMode ? 'rgba(255,179,71,0.08)' : '#fffbeb'}; font-size: 13px; line-height: 1.45; color: ${isDarkMode ? '#FFD580' : '#78350f'}; }
+                .${CONFIG.classNames.buyerNoteCallout} .buyer-note-icon { flex: 0 0 auto; font-size: 14px; line-height: 1.4; }
+                .${CONFIG.classNames.buyerNoteCallout} .buyer-note-text { font-style: italic; word-break: break-word; }
+                .${CONFIG.classNames.buyerNoteCallout} .buyer-note-label { font-style: normal; font-weight: 600; opacity: 0.8; margin-right: 4px; }
                 .header__links a { color: ${isDarkMode ? '#b0b0b0' : '#555'}; }
                 .${CONFIG.classNames.highlightManila} ${CONFIG.selectors.uniqueOrderIdLink}, .${CONFIG.classNames.highlightLg} ${CONFIG.selectors.uniqueOrderIdLink}, .${CONFIG.classNames.highlightMultiItem} ${CONFIG.selectors.uniqueOrderIdLink} { color: ${isDarkMode ? '#e0e0e0' : '#000'}; font-weight: bold; }
                 .${CONFIG.classNames.itemContainer} { display: flex; align-items: center; gap: 16px; flex-grow: 1; min-width: 0; }
