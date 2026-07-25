@@ -2677,37 +2677,43 @@
                 const customRadio = await waitForElement('input[data-testid="custom-size-radio-btn"]');
                 if (customRadio && !customRadio.checked) customRadio.click();
 
+                // Sets a React-controlled input and HOLDS it against eBay's debounced
+                // rate-refetch, which re-renders the form and echoes the length field
+                // back to its "1" default — so a one-shot set (even retried a few times)
+                // loses the race. Keep re-setting on every poll until the value stays put
+                // for several consecutive checks (stability), or we time out.
+                const enforceInputValue = async (selector, value, { maxMs = 9000, stableNeeded = 4, gap = 200 } = {}) => {
+                    const start = Date.now();
+                    let stable = 0;
+                    while (Date.now() - start < maxMs) {
+                        const el = document.querySelector(selector);
+                        if (el && el.value === value) {
+                            if (++stable >= stableNeeded) return true;
+                        } else {
+                            stable = 0;
+                            if (el) {
+                                el.focus({ preventScroll: true });
+                                setAndTriggerInputValue(el, value);
+                                el.dispatchEvent(new Event('blur', { bubbles: true }));
+                            }
+                        }
+                        await sleep(gap);
+                    }
+                    return document.querySelector(selector)?.value === value;
+                };
+
                 // 2. Weight → 0 lb, 1 oz
-                const ozInput = await waitForElement('input[aria-label="Package weight in ounces"]');
                 const lbInput = document.querySelector('input[aria-label="Package weight in pounds"]');
+                const ozInput = await waitForElement('input[aria-label="Package weight in ounces"]');
                 if (lbInput) setAndTriggerInputValue(lbInput, '0');
                 if (ozInput) setAndTriggerInputValue(ozInput, '1');
 
-                // 3. Dimensions → 4.125 × 9.5 × 0.1 in. Each keystroke makes eBay
-                // refetch rates and re-render, which can wipe a value that was set on a
-                // now-stale node (the length field was dropping its "4"). Re-query fresh
-                // nodes and re-set any field that isn't holding its target until all
-                // three converge.
-                await waitForElement('input[name="dimensions.length"]');
-                const dimTargets = [
-                    ['input[name="dimensions.length"]', '4.125'],
-                    ['input[name="dimensions.width"]',  '9.5'],
-                    ['input[name="dimensions.height"]', '0.1'],
-                ];
-                for (let attempt = 0; attempt < 8; attempt++) {
-                    let allSet = true;
-                    for (const [sel, val] of dimTargets) {
-                        const el = document.querySelector(sel);
-                        if (!el) { allSet = false; continue; }
-                        if (el.value !== val) {
-                            setAndTriggerInputValue(el, val);
-                            el.dispatchEvent(new Event('blur', { bubbles: true }));
-                            allSet = false;
-                        }
-                    }
-                    if (allSet) break;
-                    await sleep(300);
-                }
+                // 3. Dimensions → 4.125 × 9.5 × 0.1 in. Set width/height first (they
+                // stick), then the length field LAST and hold it — eBay was reverting it.
+                await waitForElement('input[name="dimensions.width"]');
+                await enforceInputValue('input[name="dimensions.width"]',  '9.5');
+                await enforceInputValue('input[name="dimensions.height"]', '0.1');
+                await enforceInputValue('input[name="dimensions.length"]', '4.125');
 
                 // 4. Service → eBay Standard Envelope. eBay refetches rates after the
                 // dimensions change and re-renders the service table, which can wipe a
@@ -2724,6 +2730,10 @@
                         await sleep(300);
                     }
                 }
+
+                // 5. Selecting the service triggers one last rate refetch that can revert
+                // the length field — re-assert it as the final step.
+                await enforceInputValue('input[name="dimensions.length"]', '4.125');
                 console.log('[Buy-Label] Done. Seller can confirm the purchase.');
                 return;
             }
