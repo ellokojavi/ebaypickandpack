@@ -958,6 +958,20 @@
                 infoBlock.innerHTML = `<p>${orderIdContainer.innerHTML} │ ${totalHTML} │ ${expectedByText} │ ${shippingText}</p>`;
                 tcellItem.insertBefore(infoBlock, tcellItem.firstChild);
                 transactionCell.style.display = 'none';
+
+                // --- Buyer note callout ---
+                // eBay tucks any buyer-left note inside .grouping_summary, which the
+                // script hides wholesale. Surface it as a soft callout right under the
+                // shipping info line so friendly notes don't get lost. Text-only
+                // (textContent) to avoid injecting any buyer-supplied markup.
+                const buyerNoteText = orderItem.querySelector('.buyer_note')?.textContent.trim();
+                if (buyerNoteText) {
+                    const noteEl = document.createElement('div');
+                    noteEl.className = CONFIG.classNames.buyerNoteCallout;
+                    noteEl.innerHTML = `<span class="buyer-note-icon">💬</span><span class="buyer-note-text"><span class="buyer-note-label">Buyer note:</span></span>`;
+                    noteEl.querySelector('.buyer-note-text').append(buyerNoteText);
+                    infoBlock.after(noteEl);
+                }
             }
 
             let hasManila = false, hasLg = false, skuCount = 0;
