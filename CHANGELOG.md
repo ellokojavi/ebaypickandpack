@@ -1,5 +1,9 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.99
+- Suppress the `.service-actions__pay` block so it no longer shows on the
+  pick-and-pack page.
+
 ## v3.98
 - Buy-label automation: after all inputs are filled, it now blurs the focused
   field and fires a synthetic click on a neutral part of the page. This commits
