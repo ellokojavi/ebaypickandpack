@@ -2743,6 +2743,15 @@
                 // that drifted, as the last action before the seller clicks Buy.
                 await sleep(400);
                 for (const [sel, val] of DIMS) await ensureTyped(sel, val);
+
+                // 6. Click outside the dimension inputs so eBay commits the values and
+                // recalculates — this is what flips the "Buy shipping label" button from
+                // disabled to active. Blur the focused field, then dispatch a real click
+                // sequence on a neutral part of the page.
+                document.activeElement?.blur?.();
+                const neutralTarget = document.querySelector('main') || document.body;
+                ['mousedown', 'mouseup', 'click'].forEach(type =>
+                    neutralTarget.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window })));
                 console.log('[Buy-Label] Done. Seller can confirm the purchase.');
                 return;
             }
