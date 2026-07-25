@@ -2677,27 +2677,18 @@
                 const customRadio = await waitForElement('input[data-testid="custom-size-radio-btn"]');
                 if (customRadio && !customRadio.checked) customRadio.click();
 
-                // Sets a React-controlled input and HOLDS it against eBay's debounced
-                // rate-refetch, which re-renders the form and echoes the length field
-                // back to its "1" default — so a one-shot set (even retried a few times)
-                // loses the race. Keep re-setting on every poll until the value stays put
-                // for several consecutive checks (stability), or we time out.
-                const enforceInputValue = async (selector, value, { maxMs = 9000, stableNeeded = 4, gap = 200 } = {}) => {
-                    const start = Date.now();
-                    let stable = 0;
-                    while (Date.now() - start < maxMs) {
+                // Fast set of a React-controlled input: set the value, fire the events
+                // React listens for, and verify in a few quick tries (no long polling).
+                const quickSetInput = async (selector, value, tries = 5) => {
+                    for (let i = 0; i < tries; i++) {
                         const el = document.querySelector(selector);
-                        if (el && el.value === value) {
-                            if (++stable >= stableNeeded) return true;
-                        } else {
-                            stable = 0;
-                            if (el) {
-                                el.focus({ preventScroll: true });
-                                setAndTriggerInputValue(el, value);
-                                el.dispatchEvent(new Event('blur', { bubbles: true }));
-                            }
+                        if (el) {
+                            if (el.value === value) return true;
+                            el.focus({ preventScroll: true });
+                            setAndTriggerInputValue(el, value);
+                            el.dispatchEvent(new Event('blur', { bubbles: true }));
                         }
-                        await sleep(gap);
+                        await sleep(150);
                     }
                     return document.querySelector(selector)?.value === value;
                 };
@@ -2708,32 +2699,30 @@
                 if (lbInput) setAndTriggerInputValue(lbInput, '0');
                 if (ozInput) setAndTriggerInputValue(ozInput, '1');
 
-                // 3. Dimensions → 4.125 × 9.5 × 0.1 in. Set width/height first (they
-                // stick), then the length field LAST and hold it — eBay was reverting it.
-                await waitForElement('input[name="dimensions.width"]');
-                await enforceInputValue('input[name="dimensions.width"]',  '9.5');
-                await enforceInputValue('input[name="dimensions.height"]', '0.1');
-                await enforceInputValue('input[name="dimensions.length"]', '4.125');
+                // 3. Dimensions → 4.125 × 9.5 × 0.1 in. Order matters: set LENGTH FIRST,
+                // while width is still at its default, exactly the way manual entry works.
+                // eBay only re-validates the length field when length itself changes, so
+                // committing 4.125 before width grows to 9.5 lets it stick. Setting length
+                // after width (as before) made eBay revert it to "1". Do NOT re-touch
+                // length afterwards, or that revalidation fires again.
+                await waitForElement('input[name="dimensions.length"]');
+                await quickSetInput('input[name="dimensions.length"]', '4.125');
+                await quickSetInput('input[name="dimensions.width"]',  '9.5');
+                await quickSetInput('input[name="dimensions.height"]', '0.1');
 
-                // 4. Service → eBay Standard Envelope. eBay refetches rates after the
-                // dimensions change and re-renders the service table, which can wipe a
-                // too-early selection — so poll, click, and confirm the choice stuck.
-                await sleep(800);
+                // 4. Service → eBay Standard Envelope. Poll for the radio (it appears once
+                // eBay refetches rates for the new dimensions), click, and confirm.
                 const ESE_SELECTOR = 'input[data-testid="EBAYSEND_US-STD_ENV-PACKAGE-DROP_OFF"]';
                 for (let i = 0; i < 25; i++) {
                     const eseRadio = document.querySelector(ESE_SELECTOR);
                     if (eseRadio) {
                         if (!eseRadio.checked) eseRadio.click();
-                        await sleep(300);
+                        await sleep(200);
                         if (document.querySelector(ESE_SELECTOR)?.checked) break;
                     } else {
-                        await sleep(300);
+                        await sleep(200);
                     }
                 }
-
-                // 5. Selecting the service triggers one last rate refetch that can revert
-                // the length field — re-assert it as the final step.
-                await enforceInputValue('input[name="dimensions.length"]', '4.125');
                 console.log('[Buy-Label] Done. Seller can confirm the purchase.');
                 return;
             }
