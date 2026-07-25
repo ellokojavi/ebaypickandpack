@@ -1,5 +1,15 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.94
+- Buy-label automation: fixed the length field reverting to "1" and the slow,
+  laggy service selection. Root cause was set ORDER, not timing — eBay only
+  re-validates length when length itself changes, and the previous code set width
+  (9.5) before length (4.125), so length was always compared against a larger
+  width and got reverted. Now sets LENGTH FIRST (while width is still default),
+  then width and height, and never re-touches length. Dropped the multi-second
+  stability-enforcement loop for a fast few-tries set, so the form fills and the
+  eBay Standard Envelope service is selected quickly.
+
 ## v3.93
 - Buy-label automation: the length dimension still reverted to eBay's "1" default
   because eBay's debounced rate-refetch re-renders the form and echoes the field
