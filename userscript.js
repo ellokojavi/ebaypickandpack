@@ -2677,21 +2677,38 @@
                 const customRadio = await waitForElement('input[data-testid="custom-size-radio-btn"]');
                 if (customRadio && !customRadio.checked) customRadio.click();
 
-                // Fast set of a React-controlled input: set the value, fire the events
-                // React listens for, and verify in a few quick tries (no long polling).
-                const quickSetInput = async (selector, value, tries = 5) => {
+                // Types into an input the way a human does. The length field ignores
+                // plain value-injection (it snaps back to "1"), so we focus, select the
+                // existing text, and use execCommand('insertText') — that fires the native
+                // beforeinput/input events the field actually listens to (works in
+                // Firefox, which is what Javier runs). Falls back to a direct value-set.
+                const typeIntoInput = (selector, value) => {
+                    const el = document.querySelector(selector);
+                    if (!el) return false;
+                    el.focus({ preventScroll: true });
+                    try { el.setSelectionRange(0, (el.value || '').length); }
+                    catch (e) { try { el.select(); } catch (_) {} }
+                    let ok = false;
+                    try { ok = document.execCommand('insertText', false, value); } catch (e) { ok = false; }
+                    if (!ok || el.value !== value) setAndTriggerInputValue(el, value);
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                    el.dispatchEvent(new Event('blur', { bubbles: true }));
+                    return el.value === value;
+                };
+                // Re-type a field until it holds its value (a few quick tries).
+                const ensureTyped = async (selector, value, tries = 6) => {
                     for (let i = 0; i < tries; i++) {
-                        const el = document.querySelector(selector);
-                        if (el) {
-                            if (el.value === value) return true;
-                            el.focus({ preventScroll: true });
-                            setAndTriggerInputValue(el, value);
-                            el.dispatchEvent(new Event('blur', { bubbles: true }));
-                        }
+                        if (document.querySelector(selector)?.value === value) return true;
+                        typeIntoInput(selector, value);
                         await sleep(150);
                     }
                     return document.querySelector(selector)?.value === value;
                 };
+                const DIMS = [
+                    ['input[name="dimensions.length"]', '4.125'],
+                    ['input[name="dimensions.width"]',  '9.5'],
+                    ['input[name="dimensions.height"]', '0.1'],
+                ];
 
                 // 2. Weight → 0 lb, 1 oz
                 const lbInput = document.querySelector('input[aria-label="Package weight in pounds"]');
@@ -2699,16 +2716,11 @@
                 if (lbInput) setAndTriggerInputValue(lbInput, '0');
                 if (ozInput) setAndTriggerInputValue(ozInput, '1');
 
-                // 3. Dimensions → 4.125 × 9.5 × 0.1 in. Order matters: set LENGTH FIRST,
-                // while width is still at its default, exactly the way manual entry works.
-                // eBay only re-validates the length field when length itself changes, so
-                // committing 4.125 before width grows to 9.5 lets it stick. Setting length
-                // after width (as before) made eBay revert it to "1". Do NOT re-touch
-                // length afterwards, or that revalidation fires again.
+                // 3. Dimensions → 4.125 × 9.5 × 0.1 in. LENGTH FIRST (while width is still
+                // at its default), the way manual entry works, and via real-keystroke
+                // insertText so the length field doesn't ignore it.
                 await waitForElement('input[name="dimensions.length"]');
-                await quickSetInput('input[name="dimensions.length"]', '4.125');
-                await quickSetInput('input[name="dimensions.width"]',  '9.5');
-                await quickSetInput('input[name="dimensions.height"]', '0.1');
+                for (const [sel, val] of DIMS) await ensureTyped(sel, val);
 
                 // 4. Service → eBay Standard Envelope. Poll for the radio (it appears once
                 // eBay refetches rates for the new dimensions), click, and confirm.
@@ -2723,6 +2735,12 @@
                         await sleep(200);
                     }
                 }
+
+                // 5. Redundant final pass: the rate refetch triggered by selecting the
+                // service can revert a dimension (length especially). Re-type any field
+                // that drifted, as the last action before the seller clicks Buy.
+                await sleep(400);
+                for (const [sel, val] of DIMS) await ensureTyped(sel, val);
                 console.log('[Buy-Label] Done. Seller can confirm the purchase.');
                 return;
             }
