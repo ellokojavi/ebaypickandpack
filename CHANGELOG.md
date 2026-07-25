@@ -1,5 +1,15 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.91
+- Added a **"Buy shipping label"** link under each order card's Print Envelope
+  button. It opens eBay's single-label page
+  (`/ship/single/<orderId>?tm_action=buy_label`) in a focused tab.
+- New automation on the `/ship/single/*` page (triggered by
+  `tm_action=buy_label`): selects **Custom size**, sets weight to **1 oz**,
+  dimensions to **4.125 × 9.5 × 0.1 in**, and picks the **eBay Standard
+  Envelope** service — leaving the seller to just click "Buy shipping label".
+  Re-selects the service after eBay refetches rates so the choice sticks.
+
 ## v3.90
 - Suppress the new eBay bulk-shipping label cells that appeared after enabling
   buy-shipping-directly: `.tcell__delivery-service-type`,
