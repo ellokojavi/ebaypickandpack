@@ -2719,7 +2719,7 @@
                 if (lbInput) setAndTriggerInputValue(lbInput, '0');
                 if (ozInput) setAndTriggerInputValue(ozInput, '1');
 
-                // 3. Dimensions → 9.5 × 4.125 × 0.1 in, entered via real-keystroke
+                // 3. Dimensions → 9 × 4.1 × 0.1 in, entered via real-keystroke
                 // insertText (plain value-injection was ignored / clamped by eBay).
                 await waitForElement('input[name="dimensions.length"]');
                 for (const [sel, val] of DIMS) await ensureTyped(sel, val);

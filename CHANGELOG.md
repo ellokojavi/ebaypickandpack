@@ -1,5 +1,9 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.97
+- Buy-label automation: dimensions changed to **9 × 4.1 × 0.1 in** (was
+  9.5 × 4.125 × 0.1).
+
 ## v3.96
 - Buy-label automation: dimensions are now entered as **9.5 × 4.125 × 0.1 in**
   (was 4.125 × 9.5 × 0.1). Once the value actually reached eBay's validation, eBay
