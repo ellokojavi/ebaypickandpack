@@ -365,6 +365,11 @@
                     border-color: ${isDarkMode ? '#777' : '#c0c8d4'};
                     box-shadow: 0 2px 2px ${isDarkMode ? 'rgba(0,0,0,0.2)' : 'rgba(39, 44, 52, 0.12)'};
                 }
+                .${CONFIG.classNames.buyLabelLink} {
+                    display: block; margin-top: 6px; font-size: 13px; font-weight: 600;
+                    color: ${isDarkMode ? '#5a82f5' : '#0070d2'}; text-decoration: none; cursor: pointer;
+                }
+                .${CONFIG.classNames.buyLabelLink}:hover { text-decoration: underline; }
                 ${CONFIG.selectors.orderItem}.${CONFIG.classNames.orderShipped} { opacity: 0.8 !important; border-left: 5px solid ${isDarkMode ? '#4caf50' : '#2e7d32'}; }
                 .${CONFIG.classNames.pendingOverlay} { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: ${isDarkMode ? 'rgba(40, 40, 40, 0.7)' : 'rgba(255, 255, 255, 0.7)'}; z-index: 10; border-radius: 12px; backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; }
                 .${CONFIG.classNames.pendingOverlayContent} { display: flex; flex-direction: column; align-items: center; gap: 10px; color: ${isDarkMode ? '#e0e0e0' : '#000'}; font-size: 16px; font-weight: bold; }
@@ -1011,6 +1016,23 @@
             printButton.className = CONFIG.classNames.printEnvelopeBtn;
             printButton.textContent = "Print Envelope";
             tcellItem.appendChild(printButton);
+
+            // "Buy shipping label" link — opens eBay's single-label page in a
+            // focused tab; the /ship/single automation pre-fills it for an eBay
+            // Standard Envelope (see the buy_label branch below).
+            const firstOrderIdForLabel = (allOrderIds || '').split(',')[0];
+            if (firstOrderIdForLabel) {
+                const buyLabelLink = document.createElement('a');
+                buyLabelLink.className = CONFIG.classNames.buyLabelLink;
+                buyLabelLink.textContent = 'Buy shipping label →';
+                buyLabelLink.href = `https://www.ebay.com/ship/single/${firstOrderIdForLabel}?tm_action=buy_label`;
+                buyLabelLink.title = 'Open eBay\'s Buy Shipping Label page, pre-filled for an eBay Standard Envelope';
+                buyLabelLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    GM_openInTab(buyLabelLink.href, { active: true });
+                });
+                tcellItem.appendChild(buyLabelLink);
+            }
             orderItem.style.opacity = '1';
         }
 
