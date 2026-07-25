@@ -1,5 +1,12 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.92
+- Buy-label automation: fixed the first dimension (length) sometimes losing its
+  "4" and ending up wrong. Each dimension keystroke makes eBay refetch rates and
+  re-render, wiping values set on now-stale nodes. The three dimension fields are
+  now set in a convergence loop that re-queries fresh nodes and re-sets any field
+  not holding its target (4.125 × 9.5 × 0.1 in) until all three stick.
+
 ## v3.91
 - Added a **"Buy shipping label"** link under each order card's Print Envelope
   button. It opens eBay's single-label page
