@@ -2704,9 +2704,12 @@
                     }
                     return document.querySelector(selector)?.value === value;
                 };
+                // Longest side (9.5) goes in the length box: eBay rejects a 4.125 length
+                // (clamps it up to its minimum) and 9.5 exceeds the eBay Standard Envelope
+                // width max of 6.125, so this is the only order eBay accepts.
                 const DIMS = [
-                    ['input[name="dimensions.length"]', '4.125'],
-                    ['input[name="dimensions.width"]',  '9.5'],
+                    ['input[name="dimensions.length"]', '9.5'],
+                    ['input[name="dimensions.width"]',  '4.125'],
                     ['input[name="dimensions.height"]', '0.1'],
                 ];
 
