@@ -2499,7 +2499,7 @@
     // ===================================================================
     // LOGIC FOR THE EBAY AUTOMATION PAGES
     // ===================================================================
-    else if (window.location.href.includes('ebay.com/mesh/ord/details') || window.location.href.includes('ebay.com/om/shipment/update') || window.location.href.includes('ebay.com/ship/trk/') || window.location.href.includes('ebay.com/ship/tr/update')) {
+    else if (window.location.href.includes('ebay.com/mesh/ord/details') || window.location.href.includes('ebay.com/om/shipment/update') || window.location.href.includes('ebay.com/ship/trk/') || window.location.href.includes('ebay.com/ship/tr/update') || window.location.href.includes('ebay.com/ship/single/')) {
         const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
         // --- Messaging Textarea Auto-Expand (Order Details page) ---
         (function enableFourLineTextarea() {
