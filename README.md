@@ -57,7 +57,7 @@ Every order's shipping address is automatically linted against structural rules:
 ### 🖨️ Envelope Printing
 - **Print All Envelopes** — consolidates all envelopes into a single print window with one envelope per page (no more N separate dialogs!) 🎉
 - **Envelope #10 format** (9.5in × 4.125in) with auto-scaled content
-- **Buy shipping label** 🏷️ — a link under each card's Print Envelope button opens eBay's single-label page in a focused tab and auto-fills it for an **eBay Standard Envelope**: Custom size, 1 oz, 9.5 × 4.125 × 0.1 in. You just click "Buy shipping label" to confirm
+- **Buy shipping label** 🏷️ — a link under each card's Print Envelope button opens eBay's single-label page in a focused tab and auto-fills it for an **eBay Standard Envelope**: Custom size, 1 oz, 9 × 4.1 × 0.1 in. You just click "Buy shipping label" to confirm
 - **Custom Envelope modal** — paste any address block, auto-parse it into editable fields, and print a one-off envelope for orders not in the active queue
 - **Canadian envelopes** include a faint 🇨🇦 + "Int'l Stamp" reminder sized to be covered by an international stamp
 - Return address fully configurable in `USER_CONFIG`
