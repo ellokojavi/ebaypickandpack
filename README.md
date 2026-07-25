@@ -27,6 +27,7 @@ The script self-updates via `@updateURL` / `@downloadURL` pointing to this repo,
 - **Custom header navigation** with quick links to Seller Hub, All Orders, Listings, Feedback, and Help
 - **Larger product images** (130px) for faster visual identification 🔍
 - **Startup countdown overlay** with a "Run Now" shortcut to skip the delay ⏱️
+- **Buyer notes surfaced** 💬 — any note a buyer left on their order (normally hidden with eBay's grouping summary) is shown as a soft callout under the card's shipping info line
 
 ### 🎨 Color-Coded Order Cards
 Orders are visually flagged by type at a glance:
