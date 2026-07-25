@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260724-v3.95-buy-label-insert-text
+// @version      20260724-v3.96-buy-label-dims-order
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -2719,9 +2719,8 @@
                 if (lbInput) setAndTriggerInputValue(lbInput, '0');
                 if (ozInput) setAndTriggerInputValue(ozInput, '1');
 
-                // 3. Dimensions → 4.125 × 9.5 × 0.1 in. LENGTH FIRST (while width is still
-                // at its default), the way manual entry works, and via real-keystroke
-                // insertText so the length field doesn't ignore it.
+                // 3. Dimensions → 9.5 × 4.125 × 0.1 in, entered via real-keystroke
+                // insertText (plain value-injection was ignored / clamped by eBay).
                 await waitForElement('input[name="dimensions.length"]');
                 for (const [sel, val] of DIMS) await ensureTyped(sel, val);
 
