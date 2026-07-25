@@ -1,5 +1,11 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.98
+- Buy-label automation: after all inputs are filled, it now blurs the focused
+  field and fires a synthetic click on a neutral part of the page. This commits
+  the dimension values and triggers eBay's recalculation, flipping the "Buy
+  shipping label" button from disabled to active without any manual click.
+
 ## v3.97
 - Buy-label automation: dimensions changed to **9 × 4.1 × 0.1 in** (was
   9.5 × 4.125 × 0.1).
