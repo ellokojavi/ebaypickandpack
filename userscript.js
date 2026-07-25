@@ -2683,13 +2683,31 @@
                 if (lbInput) setAndTriggerInputValue(lbInput, '0');
                 if (ozInput) setAndTriggerInputValue(ozInput, '1');
 
-                // 3. Dimensions → 4.125 × 9.5 × 0.1 in
-                const lengthInput = await waitForElement('input[name="dimensions.length"]');
-                const widthInput = document.querySelector('input[name="dimensions.width"]');
-                const heightInput = document.querySelector('input[name="dimensions.height"]');
-                if (lengthInput) setAndTriggerInputValue(lengthInput, '4.125');
-                if (widthInput) setAndTriggerInputValue(widthInput, '9.5');
-                if (heightInput) setAndTriggerInputValue(heightInput, '0.1');
+                // 3. Dimensions → 4.125 × 9.5 × 0.1 in. Each keystroke makes eBay
+                // refetch rates and re-render, which can wipe a value that was set on a
+                // now-stale node (the length field was dropping its "4"). Re-query fresh
+                // nodes and re-set any field that isn't holding its target until all
+                // three converge.
+                await waitForElement('input[name="dimensions.length"]');
+                const dimTargets = [
+                    ['input[name="dimensions.length"]', '4.125'],
+                    ['input[name="dimensions.width"]',  '9.5'],
+                    ['input[name="dimensions.height"]', '0.1'],
+                ];
+                for (let attempt = 0; attempt < 8; attempt++) {
+                    let allSet = true;
+                    for (const [sel, val] of dimTargets) {
+                        const el = document.querySelector(sel);
+                        if (!el) { allSet = false; continue; }
+                        if (el.value !== val) {
+                            setAndTriggerInputValue(el, val);
+                            el.dispatchEvent(new Event('blur', { bubbles: true }));
+                            allSet = false;
+                        }
+                    }
+                    if (allSet) break;
+                    await sleep(300);
+                }
 
                 // 4. Service → eBay Standard Envelope. eBay refetches rates after the
                 // dimensions change and re-renders the service table, which can wipe a
