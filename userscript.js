@@ -10,6 +10,7 @@
 // @match        https://www.ebay.com/om/shipment/update*
 // @match        https://www.ebay.com/ship/trk/*
 // @match        https://www.ebay.com/ship/tr/update*
+// @match        https://www.ebay.com/ship/single/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=ebay.com
 // @grant        GM_setClipboard
 // @grant        GM_addStyle
