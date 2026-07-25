@@ -1,5 +1,11 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.01
+- Surface buyer-left notes. eBay tucks these inside `.grouping_summary`, which
+  the script hides wholesale, so they were invisible. Now each order card renders
+  the note as a soft 💬 callout directly under the shipping info line (dark/light
+  aware, buyer text inserted as plain text — no markup injection).
+
 ## v4.00
 - Domestic (US) order cards now show an explicit "United States" country line.
   eBay omits the country for US addresses (only international destinations get a
