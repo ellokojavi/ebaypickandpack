@@ -1,5 +1,11 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.90
+- Suppress the new eBay bulk-shipping label cells that appeared after enabling
+  buy-shipping-directly: `.tcell__delivery-service-type`,
+  `.tcell__proof-of-delivery`, and `.tcell__price-status` are now hidden so they
+  don't clutter the order cards. Groundwork for building features on top of them.
+
 ## v3.89
 - Raised `trackingOrderAmountThreshold` from $20 to $30. Orders must now exceed
   $30 to get a `+tracking` pill, and the buyer thank-you message's tracking note
