@@ -2667,6 +2667,48 @@
                     }
                 }
             }
+            else if (urlAction === 'buy_label') {
+                // Single-label page: pre-fill for an eBay Standard Envelope so the
+                // seller only has to click "Buy shipping label".
+                if (!window.location.pathname.startsWith('/ship/single/')) return;
+                console.log('[Buy-Label] Pre-filling single-label form…');
+
+                // 1. Package type → Custom size
+                const customRadio = await waitForElement('input[data-testid="custom-size-radio-btn"]');
+                if (customRadio && !customRadio.checked) customRadio.click();
+
+                // 2. Weight → 0 lb, 1 oz
+                const ozInput = await waitForElement('input[aria-label="Package weight in ounces"]');
+                const lbInput = document.querySelector('input[aria-label="Package weight in pounds"]');
+                if (lbInput) setAndTriggerInputValue(lbInput, '0');
+                if (ozInput) setAndTriggerInputValue(ozInput, '1');
+
+                // 3. Dimensions → 4.125 × 9.5 × 0.1 in
+                const lengthInput = await waitForElement('input[name="dimensions.length"]');
+                const widthInput = document.querySelector('input[name="dimensions.width"]');
+                const heightInput = document.querySelector('input[name="dimensions.height"]');
+                if (lengthInput) setAndTriggerInputValue(lengthInput, '4.125');
+                if (widthInput) setAndTriggerInputValue(widthInput, '9.5');
+                if (heightInput) setAndTriggerInputValue(heightInput, '0.1');
+
+                // 4. Service → eBay Standard Envelope. eBay refetches rates after the
+                // dimensions change and re-renders the service table, which can wipe a
+                // too-early selection — so poll, click, and confirm the choice stuck.
+                await sleep(800);
+                const ESE_SELECTOR = 'input[data-testid="EBAYSEND_US-STD_ENV-PACKAGE-DROP_OFF"]';
+                for (let i = 0; i < 25; i++) {
+                    const eseRadio = document.querySelector(ESE_SELECTOR);
+                    if (eseRadio) {
+                        if (!eseRadio.checked) eseRadio.click();
+                        await sleep(300);
+                        if (document.querySelector(ESE_SELECTOR)?.checked) break;
+                    } else {
+                        await sleep(300);
+                    }
+                }
+                console.log('[Buy-Label] Done. Seller can confirm the purchase.');
+                return;
+            }
             else if (urlAction === 'manual_message') {
                 console.log('[Manual-Message] Draft insertion mode started.');
                 const messageData = await GM_getValue('ebay_manual_message_to_send');
