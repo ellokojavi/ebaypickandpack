@@ -143,6 +143,7 @@ If the config file fails to load, the script falls back to built-in defaults and
 | `ebay.com/om/shipment/update*` | 📬 Shipment update page |
 | `ebay.com/ship/trk/*` | 🚚 Tracking page |
 | `ebay.com/ship/tr/update*` | 🚚 Tracking update page |
+| `ebay.com/ship/single/*` | 🏷️ Single shipping-label page (Buy label auto-fill) |
 
 ---
 
