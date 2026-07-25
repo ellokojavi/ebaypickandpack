@@ -1,5 +1,14 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v3.93
+- Buy-label automation: the length dimension still reverted to eBay's "1" default
+  because eBay's debounced rate-refetch re-renders the form and echoes the field
+  back faster than a one-shot (or briefly-retried) set could survive. Replaced the
+  convergence loop with a stability-based `enforceInputValue` that keeps re-setting
+  a field until its value persists across several consecutive polls. Length is now
+  set last and re-asserted once more after the service is chosen (that selection
+  fires a final refetch). Width/height are enforced the same way.
+
 ## v3.92
 - Buy-label automation: fixed the first dimension (length) sometimes losing its
   "4" and ending up wrong. Each dimension keystroke makes eBay refetch rates and
