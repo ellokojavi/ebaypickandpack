@@ -70,6 +70,7 @@ Every order's shipping address is automatically linted against structural rules:
 - **"Send thank you msg" master switch** — the top-level toggle for messaging; when off, the auto-send and ship-date controls are greyed out since no message will be sent ✉️
 - **Add Tracking** — supports both legacy and new eBay tracking systems (v1 + v2) 📬. On the v2 flow the tracking view is filled *and* Save is pressed automatically (auto-continuing past benign carrier/insurance warnings, but pausing on an invalid-number warning). An **"Auto-press Save on eBay"** checkbox in the tracking tooltip (checked by default) lets you turn the auto-submit off and fall back to fill-only
 - Tracking is automatically suggested for orders above the configurable dollar threshold (default: $30) 💰
+- **Show postage cost on label → No** is forced automatically whenever eBay's "Edit labels" modal opens, so the postage amount is never printed on the label 🏷️
 - **Add Note** to orders with custom date formatting 📝
 - **Send Messages** to buyers using templated thank-you drafts loaded from the external config file 💌
 - Random quotes optionally appended to outgoing messages (configurable) 💬

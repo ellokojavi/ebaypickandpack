@@ -1,5 +1,12 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.02
+- Auto-set "Show postage cost on label" → No: whenever eBay's "Edit labels" modal
+  opens (from an order card's proof-of-delivery "Edit" link), the script forces
+  the `.bulk-edit_postage_cost_on_label` dropdown to "No" so the postage amount is
+  never printed on the label. A MutationObserver catches the modal each time it
+  opens; a per-node flag lets a later manual change stick.
+
 ## v4.01
 - Surface buyer-left notes. eBay tucks these inside `.grouping_summary`, which
   the script hides wholesale, so they were invisible. Now each order card renders
