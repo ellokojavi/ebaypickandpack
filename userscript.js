@@ -47,7 +47,7 @@
     // ===================================================================
     const USER_CONFIG = {
         returnAddress: "Altheastix ⚡<br>3015 E Howell St.<br>Seattle, WA 98122<br>USA",
-        trackingOrderAmountThreshold: 30,
+        trackingOrderAmountThreshold: 25,
         useAlternativeTracking: true,
         scriptLoadDelay: 15 * 1000,
         defaultTrackingNumber: "9114 9023 0722 4938 6961 ",
@@ -1372,7 +1372,7 @@
                                 ? dn.canada
                                 : `${plural ? dn.usualPlural : dn.usualSingular}, ${dn.patienceVariants[Math.floor(Math.random() * dn.patienceVariants.length)]}`;
                             // Dynamic tracking note based on order total value vs threshold
-                            const threshold = USER_CONFIG.trackingOrderAmountThreshold || 30;
+                            const threshold = USER_CONFIG.trackingOrderAmountThreshold || 25;
                             const trackingNote = totalItemsPrice > threshold
                                 ? ''
                                 : `To keep prices fair, orders at or under $${threshold} ship without tracking.`;
