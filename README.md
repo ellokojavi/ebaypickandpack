@@ -97,7 +97,7 @@ Edit the `USER_CONFIG` object near the top of the script to customize local pref
 | Key | Default | Description |
 |-----|---------|-------------|
 | `returnAddress` | Altheastix Seattle address | Return address printed on envelopes |
-| `trackingOrderAmountThreshold` | `30` | Orders at or above this dollar amount get a tracking suggestion 💰 |
+| `trackingOrderAmountThreshold` | `25` | Orders at or above this dollar amount get a tracking suggestion 💰 |
 | `useAlternativeTracking` | `true` | Use the newer eBay v2 tracking system |
 | `scriptLoadDelay` | `15000` | Startup delay in milliseconds before the script runs ⏱️ |
 | `defaultTrackingNumber` | pre-filled value | Default tracking number pre-filled in the tracking input |

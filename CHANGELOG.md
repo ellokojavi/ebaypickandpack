@@ -1,5 +1,11 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.03
+- Lowered `trackingOrderAmountThreshold` from $30 to $25. Orders must now exceed
+  $25 to get a `+tracking` pill and the highlighted total, and the buyer
+  thank-you message's "ship without tracking" note (which reads the threshold
+  dynamically) now says "orders at or under $25."
+
 ## v4.02
 - Auto-set "Show postage cost on label" → No: whenever eBay's "Edit labels" modal
   opens (from an order card's proof-of-delivery "Edit" link), the script forces
