@@ -2375,6 +2375,7 @@
             setupGlobalEventListeners(skuManager);
             skuManager.createSKUPackingList();
             refreshAddressBanner();
+            autoHidePostageCostOnLabel();
             console.debug('[Tampermonkey][MAIN] Order cards processed & SKU panel built');
 
             // Favicon counter safety sync: recount pending SKU pills every 3s
