@@ -2362,6 +2362,23 @@
         // --- Main Execution Function ---
         // This is the core function that orchestrates the script's execution on the main page.
         // It calls the initialization, processing, and event listener setup functions in order.
+        // --- Auto-set "Show postage cost on label" → No ---
+        // eBay's "Edit labels" modal (opened from an order card's proof-of-delivery
+        // "Edit" link) has a "Show postage cost on label" dropdown. Force it to "No"
+        // (value "false") whenever the modal appears, so the postage amount is never
+        // printed on the label. Respects a later manual change on the same node.
+        function autoHidePostageCostOnLabel() {
+            const applyNo = () => {
+                document.querySelectorAll('.bulk-edit_postage_cost_on_label select').forEach(sel => {
+                    if (sel.dataset._postageForcedNo) return;
+                    if (sel.value !== 'false') setAndTriggerInputValue(sel, 'false');
+                    sel.dataset._postageForcedNo = '1';
+                });
+            };
+            applyNo();
+            new MutationObserver(applyNo).observe(document.body, { childList: true, subtree: true });
+        }
+
         async function main() {
             console.debug('[Tampermonkey][MAIN] main() start');
             initializePageLayout();
