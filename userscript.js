@@ -726,7 +726,7 @@
                             // Re-inject the "Select non-label" control if eBay
                             // re-renders the batch-select bar.
                             if ((n.matches && n.matches(CONFIG.selectors.batchSelect)) || (n.querySelector && n.querySelector(CONFIG.selectors.batchSelect))) {
-                                injectSelectNonLabelControl();
+                                refreshSelectNonLabelControl();
                             }
                         }
                     });
