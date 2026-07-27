@@ -723,6 +723,11 @@
                             if ((n.matches && n.matches(CONFIG.selectors.serviceActions)) || (n.closest && n.closest(CONFIG.selectors.serviceActions))) {
                                 ensureOrdersCombined();
                             }
+                            // Re-inject the "Select non-label" control if eBay
+                            // re-renders the batch-select bar.
+                            if ((n.matches && n.matches(CONFIG.selectors.batchSelect)) || (n.querySelector && n.querySelector(CONFIG.selectors.batchSelect))) {
+                                injectSelectNonLabelControl();
+                            }
                         }
                     });
                 });
