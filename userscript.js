@@ -920,7 +920,14 @@
                     }
                 });
 
-                if (totalItemsPrice > USER_CONFIG.trackingOrderAmountThreshold) {
+                // Orders over the tracking threshold ship with an eBay label (with
+                // tracking), not a hand-addressed envelope. Tag the card so the
+                // "Select non-label" control can exclude it from the bulk envelope
+                // run. The 📦 label pill (below) lets this be toggled either way.
+                const shipsWithLabel = totalItemsPrice > USER_CONFIG.trackingOrderAmountThreshold;
+                orderItem.dataset.shipsWithLabel = shipsWithLabel ? 'true' : 'false';
+
+                if (shipsWithLabel) {
                     orderIdLinks.forEach(link => {
                         const orderId = new URLSearchParams(link.href).get('orderId') || link.innerText.trim();
                         if (!link.nextElementSibling || !link.nextElementSibling.classList.contains(CONFIG.classNames.addTrackingLink)) {
