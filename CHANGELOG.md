@@ -1,5 +1,11 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.05
+- The "Select non-label" control now shows a live count of envelope orders, e.g.
+  "Select non-label (3)", and hides itself entirely when there are no label
+  orders (selecting non-label would be identical to "Select all"). The count
+  refreshes whenever a 📦 label pill is toggled.
+
 ## v4.04
 - Split envelope printing from label orders. Each order card now carries a
   `📦 label` pill in its shipping-info row — active (blue) on orders over the
