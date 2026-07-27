@@ -751,36 +751,53 @@
             // Attempt to combine orders before proceeding
             ensureOrdersCombined();
 
-            // --- "Select non-label" batch control ---
-            // Adds a second option next to eBay's native "Select all" that checks
-            // only orders NOT shipping with a label (i.e. envelope orders). It reuses
-            // eBay's native per-order checkboxes, so the SKUs-to-Pack panel shrinks to
-            // the selection and the print button becomes "Print N Selected Envelopes".
-            function selectNonLabelOrders() {
-                document.querySelectorAll(CONFIG.selectors.orderItem).forEach(orderEl => {
-                    const cb = orderEl.querySelector(CONFIG.selectors.checkbox);
-                    if (!cb) return;
-                    const shouldCheck = orderEl.dataset.shipsWithLabel !== 'true';
-                    // Real click (not a .checked assignment) so eBay's React selection
-                    // state and the script's change listeners both stay in sync.
-                    if (cb.checked !== shouldCheck) cb.click();
-                });
+            // Add the "Select non-label" batch control (defined at IIFE scope so
+            // the pill toggle handler can refresh its count too).
+            refreshSelectNonLabelControl();
+
+            console.debug('[Tampermonkey][INIT] Header & base layout adjustments complete');
+        }
+
+        // --- "Select non-label" batch control ---
+        // A second option next to eBay's native "Select all" that checks only orders
+        // NOT shipping with a label (i.e. envelope orders), reusing eBay's native
+        // per-order checkboxes so the SKUs-to-Pack panel shrinks to the selection and
+        // the print button becomes "Print N Selected Envelopes".
+        function selectNonLabelOrders() {
+            document.querySelectorAll(CONFIG.selectors.orderItem).forEach(orderEl => {
+                const cb = orderEl.querySelector(CONFIG.selectors.checkbox);
+                if (!cb) return;
+                const shouldCheck = orderEl.dataset.shipsWithLabel !== 'true';
+                // Real click (not a .checked assignment) so eBay's React selection
+                // state and the script's change listeners both stay in sync.
+                if (cb.checked !== shouldCheck) cb.click();
+            });
+        }
+        // Injects or updates the control. Hidden entirely when every order is a
+        // non-label order (selecting non-label would equal "Select all"); otherwise
+        // shows the live envelope-order count, e.g. "Select non-label (3)". Safe to
+        // call repeatedly (on init, on batch-select re-render, on pill toggle).
+        function refreshSelectNonLabelControl() {
+            const batchSelect = document.querySelector(CONFIG.selectors.batchSelect);
+            if (!batchSelect) return;
+            const orders = document.querySelectorAll(CONFIG.selectors.orderItem);
+            let nonLabel = 0, labelCount = 0;
+            orders.forEach(o => { o.dataset.shipsWithLabel === 'true' ? labelCount++ : nonLabel++; });
+            let btn = batchSelect.querySelector(`.${CONFIG.classNames.selectNonLabelBtn}`);
+            // Redundant with "Select all" when there are no label orders → remove it.
+            if (orders.length === 0 || labelCount === 0) {
+                if (btn) btn.remove();
+                return;
             }
-            function injectSelectNonLabelControl() {
-                const batchSelect = document.querySelector(CONFIG.selectors.batchSelect);
-                if (!batchSelect) return;
-                if (batchSelect.querySelector(`.${CONFIG.classNames.selectNonLabelBtn}`)) return;
-                const btn = document.createElement('a');
+            if (!btn) {
+                btn = document.createElement('a');
                 btn.href = '#';
                 btn.className = CONFIG.classNames.selectNonLabelBtn;
-                btn.textContent = 'Select non-label';
                 btn.title = 'Check only envelope orders (those without an active 📦 label pill), then press Print Selected Envelopes';
                 btn.addEventListener('click', (e) => { e.preventDefault(); selectNonLabelOrders(); });
                 batchSelect.appendChild(btn);
             }
-            injectSelectNonLabelControl();
-
-            console.debug('[Tampermonkey][INIT] Header & base layout adjustments complete');
+            btn.textContent = `Select non-label (${nonLabel})`;
         }
 
         // --- Address Warning Banner ---
