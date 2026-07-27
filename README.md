@@ -58,6 +58,7 @@ Every order's shipping address is automatically linted against structural rules:
 
 ### 🖨️ Envelope Printing
 - **Print All Envelopes** — consolidates all envelopes into a single print window with one envelope per page (no more N separate dialogs!) 🎉
+- **Label vs. envelope split** 📦 — each card shows a `📦 label` pill in its shipping-info row, active on orders over the tracking threshold (these ship with an eBay label, not a hand-addressed envelope) and muted on the rest. Click it to reclassify an order either way. A **"Select non-label"** control beside eBay's native "Select all" checks only the envelope orders, shrinking the SKUs-to-Pack panel to that subset and turning the button into "Print N Selected Envelopes" — keeping label orders out of the bulk envelope run
 - **Envelope #10 format** (9.5in × 4.125in) with auto-scaled content
 - **Buy shipping label** 🏷️ — a link under each card's Print Envelope button opens eBay's single-label page in a focused tab and auto-fills it for an **eBay Standard Envelope**: Custom size, 1 oz, 9 × 4.1 × 0.1 in. You just click "Buy shipping label" to confirm
 - **Custom Envelope modal** — paste any address block, auto-parse it into editable fields, and print a one-off envelope for orders not in the active queue
@@ -69,7 +70,7 @@ Every order's shipping address is automatically linted against structural rules:
 - **Today / Tomorrow ship control** — an explicit segmented toggle (per order *and* globally) that sets whether the buyer is told the order ships same-day or next-day. "Tomorrow" also adds the internal "Will be shipped on `<date>`" note. Each card shows a live ship-date preview (e.g. "Fri, Jun 27") 📅
 - **"Send thank you msg" master switch** — the top-level toggle for messaging; when off, the auto-send and ship-date controls are greyed out since no message will be sent ✉️
 - **Add Tracking** — supports both legacy and new eBay tracking systems (v1 + v2) 📬. On the v2 flow the tracking view is filled *and* Save is pressed automatically (auto-continuing past benign carrier/insurance warnings, but pausing on an invalid-number warning). An **"Auto-press Save on eBay"** checkbox in the tracking tooltip (checked by default) lets you turn the auto-submit off and fall back to fill-only
-- Tracking is automatically suggested for orders above the configurable dollar threshold (default: $30) 💰
+- Tracking is automatically suggested for orders above the configurable dollar threshold (default: $25) 💰
 - **Show postage cost on label → No** is forced automatically whenever eBay's "Edit labels" modal opens, so the postage amount is never printed on the label 🏷️
 - **Add Note** to orders with custom date formatting 📝
 - **Send Messages** to buyers using templated thank-you drafts loaded from the external config file 💌
