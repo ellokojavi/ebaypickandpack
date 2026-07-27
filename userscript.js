@@ -963,7 +963,8 @@
                     if (shippingCostMatch) shippingText = `Shipping: <span style="font-weight: bold; color: red;">${shippingCostMatch[0]}</span>`;
                 }
                 if (orderItem.dataset.isCanadian === 'true') shippingText += ' 🇨🇦';
-                infoBlock.innerHTML = `<p>${orderIdContainer.innerHTML} │ ${totalHTML} │ ${expectedByText} │ ${shippingText}</p>`;
+                const labelPillHTML = `<span class="${CONFIG.classNames.shipsLabelPill}${shipsWithLabel ? ' ' + CONFIG.classNames.shipsLabelActive : ''}" title="Ships with an eBay label (tracking) — excluded from bulk envelope printing. Click to toggle.">📦 label</span>`;
+                infoBlock.innerHTML = `<p>${orderIdContainer.innerHTML} │ ${totalHTML} │ ${expectedByText} │ ${shippingText} ${labelPillHTML}</p>`;
                 tcellItem.insertBefore(infoBlock, tcellItem.firstChild);
                 transactionCell.style.display = 'none';
 
