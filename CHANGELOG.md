@@ -1,5 +1,16 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.04
+- Split envelope printing from label orders. Each order card now carries a
+  `📦 label` pill in its shipping-info row — active (blue) on orders over the
+  `trackingOrderAmountThreshold` ($25), muted on the rest. Clicking the pill
+  toggles the classification either way (promote a plain sub-$25 order, or demote
+  a >$25 one you're mailing in an envelope). A new **"Select non-label"** control
+  next to eBay's native "Select all" checks only the envelope orders (those whose
+  pill is off), which shrinks the SKUs-to-Pack panel to that subset and flips the
+  print button to "Print N Selected Envelopes" — so the label orders (printed
+  individually via eBay) stay out of the bulk envelope run.
+
 ## v4.03
 - Lowered `trackingOrderAmountThreshold` from $30 to $25. Orders must now exceed
   $25 to get a `+tracking` pill and the highlighted total, and the buyer
