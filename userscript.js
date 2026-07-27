@@ -395,6 +395,22 @@
                 .${CONFIG.classNames.sendCannedMessageBtn}:hover {
                     background-color: ${isDarkMode ? '#5a82f5' : '#005fb8'};
                 }
+                .${CONFIG.classNames.shipsLabelPill} {
+                    display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 12px;
+                    font-size: 11px; font-weight: bold; cursor: pointer; user-select: none; white-space: nowrap;
+                    background-color: ${isDarkMode ? '#3a3a3a' : '#eef0f2'}; color: ${isDarkMode ? '#8a8a8a' : '#9aa0a6'};
+                    border: 1px solid ${isDarkMode ? '#555' : '#d5d9dd'}; opacity: 0.7; transition: all 0.2s ease;
+                }
+                .${CONFIG.classNames.shipsLabelPill}:hover { opacity: 1; }
+                .${CONFIG.classNames.shipsLabelPill}.${CONFIG.classNames.shipsLabelActive} {
+                    background-color: ${isDarkMode ? '#2c3e5a' : '#E1ECFF'}; color: ${isDarkMode ? '#78BFFF' : '#0b5cad'};
+                    border-color: ${isDarkMode ? '#3f5a86' : '#B7CCF0'}; opacity: 1;
+                }
+                .${CONFIG.classNames.selectNonLabelBtn} {
+                    margin-left: 16px; font-size: 13px; font-weight: 600; text-decoration: none; cursor: pointer;
+                    white-space: nowrap; color: ${isDarkMode ? '#78BFFF' : '#3665f3'};
+                }
+                .${CONFIG.classNames.selectNonLabelBtn}:hover { text-decoration: underline; }
                 .${CONFIG.classNames.addTrackingLink} {
                     display: inline-block; margin-left: 5px; padding: 2px 8px; border-radius: 12px;
                     font-size: 11px; font-weight: bold; text-decoration: none;
