@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260727-v4.04-select-non-label-orders
+// @version      20260727-v4.05-select-non-label-count
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -1235,6 +1235,7 @@
                         const nowLabel = orderItemElement.dataset.shipsWithLabel !== 'true';
                         orderItemElement.dataset.shipsWithLabel = nowLabel ? 'true' : 'false';
                         target.classList.toggle(CONFIG.classNames.shipsLabelActive, nowLabel);
+                        refreshSelectNonLabelControl();
                     }
                     return;
                 }
