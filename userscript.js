@@ -1162,6 +1162,15 @@
             ordersContainerForEvents.addEventListener('click', async function(event) {
                 const target = event.target;
                 const orderItemElement = target.closest(CONFIG.selectors.orderItem);
+                if (target.classList.contains(CONFIG.classNames.shipsLabelPill)) {
+                    event.preventDefault();
+                    if (orderItemElement) {
+                        const nowLabel = orderItemElement.dataset.shipsWithLabel !== 'true';
+                        orderItemElement.dataset.shipsWithLabel = nowLabel ? 'true' : 'false';
+                        target.classList.toggle(CONFIG.classNames.shipsLabelActive, nowLabel);
+                    }
+                    return;
+                }
                 if (target.classList.contains('ship-when-btn')) {
                     event.preventDefault();
                     setShipWhenState(orderItemElement, target.dataset.when === 'tomorrow');
