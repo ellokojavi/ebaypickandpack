@@ -1,5 +1,11 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.06
+- The order total is now highlighted with an amber "highlighter" pill when the
+  order is over the `trackingOrderAmountThreshold` ($25), so higher-value orders
+  stand out at a glance. Fixes the previous highlight, which used white text on a
+  faint green background and was effectively invisible in light mode.
+
 ## v4.05
 - The "Select non-label" control now shows a live count of envelope orders, e.g.
   "Select non-label (3)", and hides itself entirely when there are no label
