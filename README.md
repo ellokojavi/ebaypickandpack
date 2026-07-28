@@ -83,7 +83,7 @@ Every order's shipping address is automatically linted against structural rules:
 - Templates and quotes loaded from an **external config file** (`altheastix-ebay-config.js`) so you can update them without touching the script 🧩
 
 ### 🧠 Smart Extras
-- **Order totals** calculated automatically from item prices and quantities 🧮
+- **Order totals** calculated automatically from item prices and quantities, with totals over the dollar threshold (default: $25) highlighted to stand out 🧮
 - **Canadian order detection** with automatic flagging and delivery note insertion 🇨🇦
 - **"Revise" item links** to jump directly to the eBay listing editor ✏️
 
