@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260728-v4.06-highlight-total-over-threshold
+// @version      20260729-v4.07-hide-customs-acknowledgement
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -185,6 +185,7 @@
                 .service-actions__wrapper.sticky.sticky-full-width { display: none !important; }
                 .tcell__delivery-service-type, .tcell__proof-of-delivery, .tcell__price-status { display: none !important; }
                 .service-actions__pay { display: none !important; }
+                [data-testid="customs-form-acknowledgement"] { display: none !important; }
                 #${CONFIG.ids.skuPanelContainer} { position: fixed; top: 110px; width: 360px; max-height: calc(100vh - 130px); overflow-y: auto; z-index: 1000; background: ${isDarkMode ? '#2a2a2a' : '#fdfdfd'}; padding: 0; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: 1px solid ${isDarkMode ? '#444' : '#ddd'}; transition: top 0.3s ease-in-out; }
                 #altheastix-config-container { position: fixed; width: 360px; z-index: 1000; background: ${isDarkMode ? '#2a2a2a' : '#fdfdfd'}; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: 1px solid ${isDarkMode ? '#444' : '#ddd'}; transition: top 0.3s ease-in-out; }
                 ${CONFIG.selectors.skuPanelTitle} { position: sticky; top: 0; background: ${isDarkMode ? '#333' : '#f5f5f5'}; z-index: 1; margin: 0; padding: 12px 15px; font-size: 16px; border-bottom: 1px solid ${isDarkMode ? '#444' : '#ddd'}; display: flex; justify-content: space-between; align-items: center; color: ${isDarkMode ? '#e0e0e0' : '#000'}; }
