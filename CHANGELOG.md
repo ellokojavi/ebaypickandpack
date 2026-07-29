@@ -1,5 +1,10 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.07
+- Hides eBay's "Please open the Customs Form and confirm its content" customs-
+  form-acknowledgement notice, which isn't relevant to the pick-and-pack
+  workflow and only added clutter.
+
 ## v4.06
 - The order total is now highlighted with an amber "highlighter" pill when the
   order is over the `trackingOrderAmountThreshold` ($25), so higher-value orders
