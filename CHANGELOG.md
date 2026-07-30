@@ -1,5 +1,15 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.08
+- Fixes horizontal overflow in the order cards. The buyer column used a rigid
+  `width: 30%` that swelled on wide screens and pinched on narrow ones; combined
+  with `flex-shrink: 0` and a non-wrapping ship-date row, the "Ships … Fri, Jul
+  31" line spilled out of its rounded box, and the shipping-info line was
+  squeezed enough to wrap the label pill. The buyer column is now a predictable
+  fixed 300px (`box-sizing: border-box`), the ship-date row wraps as a safety
+  net, and the shipping-info line uses `overflow-wrap: anywhere` so it never
+  overflows.
+
 ## v4.07
 - Hides eBay's "Please open the Customs Form and confirm its content" customs-
   form-acknowledgement notice, which isn't relevant to the pick-and-pack
