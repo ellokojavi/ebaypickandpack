@@ -1,5 +1,12 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.12
+- The per-order "Ships / Today-Tomorrow / date" row no longer wraps the resolved
+  date onto a second line inside the (now narrower) address box. The row is now
+  single-line (no flex-wrap) with tighter spacing — smaller gaps, reduced
+  segmented-button padding, and a slightly smaller font — so "Ships [Today]
+  [Tomorrow] Fri, Jul 31" fits on one line.
+
 ## v4.11
 - Removed the "Expected by <date>" segment from the order card's shipping-info
   header line to reduce header clutter and free up horizontal space.
