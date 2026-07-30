@@ -1033,7 +1033,17 @@
                 if (orderItem.dataset.isCanadian === 'true') shippingText += ' 🇨🇦';
                 const labelPillHTML = `<span class="${CONFIG.classNames.shipsLabelPill}${shipsWithLabel ? ' ' + CONFIG.classNames.shipsLabelActive : ''}" title="Ships with an eBay label (tracking) — excluded from bulk envelope printing. Click to toggle.">📦 label</span>`;
                 infoBlock.innerHTML = `<p>${orderIdContainer.innerHTML} │ ${totalHTML} │ ${expectedByText} │ ${shippingText} ${labelPillHTML}</p>`;
-                tcellItem.insertBefore(infoBlock, tcellItem.firstChild);
+                // Place the info line as a full-width header ABOVE the grid row
+                // (item + buyer columns) rather than inside the item column, so it
+                // always spans the whole card and never wraps just because the
+                // address box is taking up horizontal space. Fall back to the old
+                // in-column placement if the grid group can't be found.
+                const gridGroup = orderItem.querySelector(CONFIG.selectors.gridGroup);
+                if (gridGroup && gridGroup.parentNode) {
+                    gridGroup.parentNode.insertBefore(infoBlock, gridGroup);
+                } else {
+                    tcellItem.insertBefore(infoBlock, tcellItem.firstChild);
+                }
                 transactionCell.style.display = 'none';
 
                 // --- Buyer note callout ---
