@@ -1,5 +1,13 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.09
+- Follow-up to v4.08. The shipping-info line still wrapped to two lines on
+  narrower windows because it lived inside the item column and only got that
+  column's width. It's now rendered as a full-width header above the whole grid
+  row (item + address columns), so it spans the entire card and stays on one
+  line regardless of the address box. Also narrowed the address box from 300px
+  to 250px, which was too wide after v4.08.
+
 ## v4.08
 - Fixes horizontal overflow in the order cards. The buyer column used a rigid
   `width: 30%` that swelled on wide screens and pinched on narrow ones; combined
