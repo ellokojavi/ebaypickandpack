@@ -479,7 +479,7 @@
                 .ship-when-label { font-size: 10px; color: ${isDarkMode ? '#aaa' : '#666'}; white-space: nowrap; flex: 0 0 auto; }
                 .ship-when-row { display: flex; align-items: center; flex-wrap: nowrap; gap: 5px; min-width: 0; }
                 .ship-when-seg { display: inline-flex; flex: 0 0 auto; max-width: 100%; border: 1px solid ${isDarkMode ? '#555' : '#ccc'}; border-radius: 999px; overflow: hidden; }
-                .ship-when-btn { padding: 3px 11px; font-size: 11px; font-weight: 500; line-height: 1.2; white-space: nowrap; flex: 0 0 auto; background-color: ${isDarkMode ? '#2a2a2a' : '#fff'}; color: ${isDarkMode ? '#bbb' : '#555'}; border: none; cursor: pointer; transition: background-color 0.15s ease, color 0.15s ease; }
+                .ship-when-btn { padding: 3px 8px; font-size: 10px; font-weight: 500; line-height: 1.2; white-space: nowrap; flex: 0 0 auto; background-color: ${isDarkMode ? '#2a2a2a' : '#fff'}; color: ${isDarkMode ? '#bbb' : '#555'}; border: none; cursor: pointer; transition: background-color 0.15s ease, color 0.15s ease; }
                 .ship-when-btn + .ship-when-btn { border-left: 1px solid ${isDarkMode ? '#555' : '#ccc'}; }
                 .ship-when-btn.ship-when-active { background-color: ${isDarkMode ? '#3665f3' : '#0070d2'}; color: #fff; }
                 .ship-when-btn:hover:not(.ship-when-active) { background-color: ${isDarkMode ? '#3a3a3a' : '#f0f0f0'}; }
