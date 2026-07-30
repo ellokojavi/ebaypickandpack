@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
 // @namespace    http://tampermonkey.net/
-// @version      20260730-v4.11-remove-expected-by
+// @version      20260730-v4.12-ship-when-one-line
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -483,7 +483,7 @@
                 .ship-when-btn + .ship-when-btn { border-left: 1px solid ${isDarkMode ? '#555' : '#ccc'}; }
                 .ship-when-btn.ship-when-active { background-color: ${isDarkMode ? '#3665f3' : '#0070d2'}; color: #fff; }
                 .ship-when-btn:hover:not(.ship-when-active) { background-color: ${isDarkMode ? '#3a3a3a' : '#f0f0f0'}; }
-                .ship-when-preview { font-size: 11px; color: ${isDarkMode ? '#aaa' : '#666'}; white-space: nowrap; }
+                .ship-when-preview { font-size: 10px; color: ${isDarkMode ? '#aaa' : '#666'}; white-space: nowrap; flex: 0 0 auto; }
                 .is-msg-disabled { opacity: 0.45; pointer-events: none; }
                 .imageupload__option { margin-top: 10px !important; }
                 .canned-modal-overlay {
