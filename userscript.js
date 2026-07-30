@@ -1031,7 +1031,7 @@
                 }
                 if (orderItem.dataset.isCanadian === 'true') shippingText += ' 🇨🇦';
                 const labelPillHTML = `<span class="${CONFIG.classNames.shipsLabelPill}${shipsWithLabel ? ' ' + CONFIG.classNames.shipsLabelActive : ''}" title="Ships with an eBay label (tracking) — excluded from bulk envelope printing. Click to toggle.">📦 label</span>`;
-                infoBlock.innerHTML = `<p>${orderIdContainer.innerHTML} │ ${totalHTML} │ ${expectedByText} │ ${shippingText} ${labelPillHTML}</p>`;
+                infoBlock.innerHTML = `<p>${orderIdContainer.innerHTML} │ ${totalHTML} │ ${shippingText} ${labelPillHTML}</p>`;
                 tcellItem.insertBefore(infoBlock, tcellItem.firstChild);
                 transactionCell.style.display = 'none';
 
