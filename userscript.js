@@ -266,7 +266,7 @@
                 .${CONFIG.classNames.addressFullname} { font-weight: bold; }
                 ${CONFIG.selectors.buyerCell} { width: 300px !important; flex: 0 0 300px; box-sizing: border-box; min-width: 0; border: 1px solid ${isDarkMode ? '#555' : '#e0e0e0'}; border-radius: 8px; padding: .5rem !important; background-color: ${isDarkMode ? '#333' : '#fff'}; box-shadow: 0 2px 4px rgba(0,0,0,0.05); font-size: 11pt; color: ${isDarkMode ? '#e0e0e0' : '#000'}; }
                 .${CONFIG.classNames.shippingInfoBlock} { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid ${isDarkMode ? '#444' : '#eee'}; }
-                .${CONFIG.classNames.shippingInfoBlock} p { margin: 0; font-size: 13px; color: ${isDarkMode ? '#b0b0b0' : '#555'}; white-space: normal; word-break: break-word; text-decoration: none; }
+                .${CONFIG.classNames.shippingInfoBlock} p { margin: 0; font-size: 13px; color: ${isDarkMode ? '#b0b0b0' : '#555'}; white-space: normal; word-break: break-word; overflow-wrap: anywhere; text-decoration: none; }
                 .${CONFIG.classNames.shippingInfoBlock} p a:not(.${CONFIG.classNames.addTrackingLink}):not(.${CONFIG.classNames.addNoteLink}) { text-decoration: underline; }
                 .${CONFIG.classNames.shippingInfoBlock} span { vertical-align: top; }
                 .${CONFIG.classNames.shippingInfoBlock} ${CONFIG.selectors.uniqueOrderIdLink} { font-weight: bold; color: ${isDarkMode ? '#99ccff' : '#003087'}; }
@@ -477,7 +477,7 @@
                 }
                 .ship-when-caption { font-size: 11px; color: ${isDarkMode ? '#aaa' : '#666'}; margin-bottom: 4px; }
                 .ship-when-label { font-size: 11px; color: ${isDarkMode ? '#aaa' : '#666'}; white-space: nowrap; flex: 0 0 auto; }
-                .ship-when-row { display: flex; align-items: center; gap: 8px; }
+                .ship-when-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 8px; min-width: 0; }
                 .ship-when-seg { display: inline-flex; flex: 0 0 auto; max-width: 100%; border: 1px solid ${isDarkMode ? '#555' : '#ccc'}; border-radius: 999px; overflow: hidden; }
                 .ship-when-btn { padding: 3px 11px; font-size: 11px; font-weight: 500; line-height: 1.2; white-space: nowrap; flex: 0 0 auto; background-color: ${isDarkMode ? '#2a2a2a' : '#fff'}; color: ${isDarkMode ? '#bbb' : '#555'}; border: none; cursor: pointer; transition: background-color 0.15s ease, color 0.15s ease; }
                 .ship-when-btn + .ship-when-btn { border-left: 1px solid ${isDarkMode ? '#555' : '#ccc'}; }
