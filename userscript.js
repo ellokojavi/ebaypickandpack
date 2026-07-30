@@ -264,11 +264,8 @@
                 ${CONFIG.selectors.gridGroup} { display: flex; align-items: flex-start; }
                 ${CONFIG.selectors.tcellItem} { display: flex; flex-direction: column; flex-grow: 1; min-width: 0; }
                 .${CONFIG.classNames.addressFullname} { font-weight: bold; }
-                ${CONFIG.selectors.buyerCell} { width: 250px !important; flex: 0 0 250px; box-sizing: border-box; min-width: 0; border: 1px solid ${isDarkMode ? '#555' : '#e0e0e0'}; border-radius: 8px; padding: .5rem !important; background-color: ${isDarkMode ? '#333' : '#fff'}; box-shadow: 0 2px 4px rgba(0,0,0,0.05); font-size: 11pt; color: ${isDarkMode ? '#e0e0e0' : '#000'}; }
+                ${CONFIG.selectors.buyerCell} { width: 235px !important; flex: 0 0 235px; box-sizing: border-box; min-width: 0; border: 1px solid ${isDarkMode ? '#555' : '#e0e0e0'}; border-radius: 8px; padding: .5rem !important; background-color: ${isDarkMode ? '#333' : '#fff'}; box-shadow: 0 2px 4px rgba(0,0,0,0.05); font-size: 11pt; color: ${isDarkMode ? '#e0e0e0' : '#000'}; }
                 .${CONFIG.classNames.shippingInfoBlock} { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid ${isDarkMode ? '#444' : '#eee'}; }
-                .shipping-info-block--with-select { display: flex; align-items: center; gap: 10px; }
-                .shipping-info-block--with-select > p { flex: 1 1 auto; min-width: 0; }
-                .info-row-select { flex: 0 0 auto; margin: 0 !important; padding: 0 !important; }
                 .${CONFIG.classNames.shippingInfoBlock} p { margin: 0; font-size: 13px; color: ${isDarkMode ? '#b0b0b0' : '#555'}; white-space: normal; word-break: break-word; overflow-wrap: anywhere; text-decoration: none; }
                 .${CONFIG.classNames.shippingInfoBlock} p a:not(.${CONFIG.classNames.addTrackingLink}):not(.${CONFIG.classNames.addNoteLink}) { text-decoration: underline; }
                 .${CONFIG.classNames.shippingInfoBlock} span { vertical-align: top; }
