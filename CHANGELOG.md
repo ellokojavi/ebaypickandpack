@@ -1,5 +1,14 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.10
+- Fixes the row select checkbox alignment regression from v4.09. Moving the
+  shipping-info line into a full-width header above the grid row had orphaned the
+  per-row checkbox (which used to sit at the top of the item column and align to
+  that line). Reverted the header to its original in-column position — the
+  checkbox lines up again and its native select behavior is untouched. The info
+  line still stays on one line because the address box is now 235px (down from
+  250px), giving the info column enough room without the DOM move.
+
 ## v4.09
 - Follow-up to v4.08. The shipping-info line still wrapped to two lines on
   narrower windows because it lived inside the item column and only got that
