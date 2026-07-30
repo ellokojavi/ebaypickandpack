@@ -1,5 +1,9 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.11
+- Removed the "Expected by <date>" segment from the order card's shipping-info
+  header line to reduce header clutter and free up horizontal space.
+
 ## v4.10
 - Fixes the row select checkbox alignment regression from v4.09. Moving the
   shipping-info line into a full-width header above the grid row had orphaned the
