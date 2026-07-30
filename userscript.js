@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         eBay Address Clipboard Copier and Printer (Radical UI Decoupled)
+// @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
 // @version      20260730-v4.12-ship-when-one-line
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
