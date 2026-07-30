@@ -1036,27 +1036,7 @@
                 if (orderItem.dataset.isCanadian === 'true') shippingText += ' 🇨🇦';
                 const labelPillHTML = `<span class="${CONFIG.classNames.shipsLabelPill}${shipsWithLabel ? ' ' + CONFIG.classNames.shipsLabelActive : ''}" title="Ships with an eBay label (tracking) — excluded from bulk envelope printing. Click to toggle.">📦 label</span>`;
                 infoBlock.innerHTML = `<p>${orderIdContainer.innerHTML} │ ${totalHTML} │ ${expectedByText} │ ${shippingText} ${labelPillHTML}</p>`;
-                // Render the info line as a full-width header above the grid row so
-                // it never wraps just because the address box is taking horizontal
-                // space. The row's select checkbox used to live at the top of the
-                // item column and align to this line; moving the header out of that
-                // column leaves it orphaned, so relocate the checkbox widget into
-                // the header (as its first child) to keep everything aligned.
-                const gridGroup = orderItem.querySelector(CONFIG.selectors.gridGroup);
-                if (gridGroup && gridGroup.parentNode) {
-                    const rowSelect = orderItem.querySelector(CONFIG.selectors.checkbox);
-                    const selectWidget = rowSelect
-                        ? (rowSelect.closest('.checkbox') || rowSelect.closest('[class*="grid__cell"]') || rowSelect)
-                        : null;
-                    infoBlock.classList.add('shipping-info-block--with-select');
-                    if (selectWidget) {
-                        selectWidget.classList.add('info-row-select');
-                        infoBlock.insertBefore(selectWidget, infoBlock.firstChild);
-                    }
-                    gridGroup.parentNode.insertBefore(infoBlock, gridGroup);
-                } else {
-                    tcellItem.insertBefore(infoBlock, tcellItem.firstChild);
-                }
+                tcellItem.insertBefore(infoBlock, tcellItem.firstChild);
                 transactionCell.style.display = 'none';
 
                 // --- Buyer note callout ---
