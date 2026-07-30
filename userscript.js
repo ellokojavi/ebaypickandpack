@@ -1024,7 +1024,6 @@
                 const totalHTML = totalItemsPrice > USER_CONFIG.trackingOrderAmountThreshold
                     ? `<strong style="color: #000; background: #ffd54f; padding: 2px 6px; border-radius: 4px; font-weight: 700;">Total: $${totalItemsPrice.toFixed(2)}</strong>`
                     : `<strong>Total: $${totalItemsPrice.toFixed(2)}</strong>`;
-                const expectedByText = transactionCell.querySelector('p:first-child')?.innerText.trim() || '';
                 let shippingText = 'Free Shipping';
                 if (transactionCell.querySelector(CONFIG.selectors.buyerPaidService)?.innerText.trim() && !transactionCell.querySelector(CONFIG.selectors.buyerPaidService)?.innerText.trim().includes("$0.00")) {
                     const shippingCostMatch = transactionCell.querySelector(CONFIG.selectors.buyerPaidService)?.innerText.trim().match(/\$\d+\.\d{2}/);
