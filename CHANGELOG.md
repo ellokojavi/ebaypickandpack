@@ -1,5 +1,10 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.13
+- Renamed the userscript (`@name`) to "Altheastix eBay pick-and-pack workflow
+  optimizer" (was "eBay Address Clipboard Copier and Printer (Radical UI
+  Decoupled)") so the Tampermonkey entry reflects what the script actually does.
+
 ## v4.12
 - The per-order "Ships / Today-Tomorrow / date" row no longer wraps the resolved
   date onto a second line inside the (now narrower) address box. The row is now
