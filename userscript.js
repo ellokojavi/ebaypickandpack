@@ -893,6 +893,25 @@
         // --- Order Card Processing ---
         // This function iterates over each order card on the page, redesigning it,
         // extracting data, and adding new UI elements like action buttons and info blocks.
+        // Strips every node the script injects into an order card so
+        // processOrderCard can safely run again on a card eBay has re-rendered
+        // (see the combined-card re-render watchdog in main()). Without this,
+        // any injected node that survived the re-render (e.g. the +note links
+        // living in the hidden .grouping_summary) would be duplicated.
+        function cleanupCardInjections(orderItem) {
+            const cn = CONFIG.classNames;
+            const staleSelectors = [
+                cn.shippingInfoBlock, cn.buyerNoteCallout, cn.addNoteLink,
+                cn.addTrackingLink, cn.reviseLink, cn.addrWarningBadge,
+                cn.addrOkBadge, cn.messageContainer, cn.markAsShippedBtn,
+                cn.printEnvelopeBtn, cn.buyLabelLink, cn.shippedLabel,
+                cn.pendingOverlay
+            ].map(c => '.' + c).join(', ');
+            orderItem.querySelectorAll(staleSelectors).forEach(el => el.remove());
+            orderItem.querySelectorAll('.ship-when-wrap').forEach(el => el.remove());
+            orderItem.querySelectorAll('.thank-you-checkbox').forEach(el => el.parentElement?.remove());
+        }
+
         function processOrderCard(orderItem, index) {
             console.debug(`[Tampermonkey][ORDERS] Processing order card index=${index}`);
             orderItem.id = `order-item-${index}`;
@@ -901,6 +920,7 @@
                 console.warn(`[Tampermonkey] Skipping incomplete order card at index ${index}.`);
                 return;
             }
+            cleanupCardInjections(orderItem);
             orderItem.querySelector('.btn--undo-combine')?.remove();
             const orderIdLinks = orderItem.querySelectorAll('.unique_order_id_container a[href*="orderId"]');
             const orderIdsArray = Array.from(orderIdLinks).map(link => new URLSearchParams(link.href).get('orderId') || link.innerText.trim()).filter(id => id);
