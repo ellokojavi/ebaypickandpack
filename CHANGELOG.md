@@ -1,5 +1,17 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.14
+- Fixed combined-order cards losing all injected controls (shipping-info line,
+  Mark as Shipped, Message, Edit/Copy address, Print Envelope, address badge)
+  and reverting to eBay's raw layout. Cause: after the auto-combine, eBay
+  asynchronously recalculates shipping for combined orders and re-renders those
+  cards' inner cells AFTER the initial processing pass, wiping everything the
+  script injected. Added a debounced re-render watchdog (MutationObserver on
+  the orders container) that re-processes any card missing its shipping-info
+  block, then rebuilds the SKU panel, address banner, and Select non-label
+  control. processOrderCard now strips its own stale injections first so
+  re-processing never duplicates +note/+tracking/revise links or badges.
+
 ## v4.13
 - Renamed the userscript (`@name`) to "Altheastix eBay pick-and-pack workflow
   optimizer" (was "eBay Address Clipboard Copier and Printer (Radical UI
