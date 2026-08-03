@@ -2558,6 +2558,46 @@
                     await GM_setValue(CONFIRMED_SHIP_KEY, null);
                 }
             }, CONFIG.timing.pollingInterval);
+
+            // --- Combined-card re-render watchdog ---
+            // eBay recalculates shipping for combined orders asynchronously and
+            // re-renders those cards' inner grid cells AFTER the initial
+            // processing pass, wiping every injected control (shipping-info
+            // block, buttons, badges) while the reused <li> keeps its id/classes
+            // and the hidden .grouping_summary keeps the injected +note links.
+            // Watch the orders container and re-process any card that has lost
+            // its shipping-info block. processOrderCard strips stale injections
+            // first (cleanupCardInjections), so re-runs are safe.
+            const ordersContainerToWatch = document.querySelector(CONFIG.selectors.ordersContainer) || document.body;
+            let reprocessTimer = null;
+            const reprocessWipedCards = () => {
+                let reprocessed = 0;
+                document.querySelectorAll(CONFIG.selectors.orderItem).forEach((card, pos) => {
+                    if (card.querySelector(`.${CONFIG.classNames.shippingInfoBlock}`)) return; // still intact
+                    if (!card.querySelector(CONFIG.selectors.tcellItem)) return; // mid-render / incomplete
+                    // Reuse the index already stamped on the card so checkbox ids
+                    // and SKU-panel references stay stable across re-processing.
+                    const idMatch = (card.id || '').match(/^order-item-(\d+)$/);
+                    const index = idMatch ? parseInt(idMatch[1], 10) : pos;
+                    console.debug(`[Tampermonkey][ORDERS] Card index=${index} was re-rendered by eBay — re-processing`);
+                    processOrderCard(card, index);
+                    checkAndFinalizeCardState(card); // restore ✓ Shipped state if already confirmed
+                    reprocessed++;
+                });
+                if (reprocessed > 0) {
+                    skuManager.createSKUPackingList();
+                    refreshAddressBanner();
+                    refreshSelectNonLabelControl();
+                    console.debug(`[Tampermonkey][ORDERS] Re-processed ${reprocessed} re-rendered card(s)`);
+                }
+            };
+            new MutationObserver(() => {
+                if (reprocessTimer) clearTimeout(reprocessTimer);
+                reprocessTimer = setTimeout(reprocessWipedCards, 500);
+            }).observe(ordersContainerToWatch, { childList: true, subtree: true });
+            // Safety net in case the re-render happened between the processing
+            // pass above and the observer attaching just now.
+            reprocessWipedCards();
         }
 
         // --- Script Entry Point ---
