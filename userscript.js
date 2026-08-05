@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260803-v4.14-reprocess-rerendered-combined-cards
+// @version      20260804-v4.15-editable-canned-preview
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -1705,12 +1705,29 @@
                         });
                         renderPreview();
 
+                        previewEl.addEventListener('input', () => {
+                            if (!previewManuallyEdited) {
+                                previewManuallyEdited = true;
+                                previewStatusEl.style.display = '';
+                            }
+                        });
+                        previewStatusEl.querySelector('#canned-preview-reset').addEventListener('click', (e) => {
+                            e.preventDefault();
+                            previewManuallyEdited = false;
+                            previewStatusEl.style.display = 'none';
+                            renderPreview();
+                        });
+
                         document.getElementById('cancel-canned').addEventListener('click', () => {
                             modalOverlay.remove();
                         });
 
                         document.getElementById('generate-canned').addEventListener('click', async () => {
-                            const messageText = buildMessageText();
+                            // If the preview was hand-edited, send exactly what's shown there
+                            // (innerText preserves the line breaks of the pre-wrap preview).
+                            const messageText = previewManuallyEdited
+                                ? previewEl.innerText.trim()
+                                : buildMessageText();
 
                             await GM_setValue('ebay_manual_message_to_send', { orderId: orderId, message: messageText });
                             GM_openInTab(`https://www.ebay.com/mesh/ord/details?orderid=${orderId}&tm_action=manual_message`, { active: true });
