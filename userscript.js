@@ -555,6 +555,19 @@
                     background-color: ${isDarkMode ? 'rgba(95,217,138,0.14)' : 'rgba(12,122,62,0.10)'};
                     border: 1px dashed ${isDarkMode ? '#3f7a55' : '#9bcdb0'};
                 }
+                .canned-modal-preview[contenteditable] { cursor: text; }
+                .canned-modal-preview:focus {
+                    outline: none;
+                    border-style: solid;
+                    border-color: ${isDarkMode ? '#3665f3' : '#0070d2'};
+                }
+                .canned-modal-preview-status {
+                    text-transform: none; letter-spacing: normal; font-weight: 400;
+                    color: ${isDarkMode ? '#e8b74a' : '#a15c00'};
+                }
+                .canned-modal-preview-status a {
+                    color: inherit; text-decoration: underline; cursor: pointer;
+                }
             `;
         }
 

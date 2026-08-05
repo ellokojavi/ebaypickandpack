@@ -80,6 +80,7 @@ Every order's shipping address is automatically linted against structural rules:
 ### ✉️ Canned Messages & Templates
 - Fully templated messages with variable substitution: `{BUYER_FIRST}`, `{STICKER_NAME}`, `{ARRIVAL_DATE}`, `{SURPRISE_STICKER}`, `{SHIPPING_DATE}`, etc.
 - Multiple canned message drafts for backorder, pre-order, and delay scenarios
+- **Editable live preview** — the customize-message modal shows the fully interpolated message as you type, and you can click into the preview to hand-edit any part of the final text before sending (a reset link restores template sync) ✍️
 - Templates and quotes loaded from an **external config file** (`altheastix-ebay-config.js`) so you can update them without touching the script 🧩
 
 ### 🧠 Smart Extras
