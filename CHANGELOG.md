@@ -1,5 +1,12 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.15
+- The canned-message modal's live preview (Late + Gift, Late no gift, Preorder)
+  is now directly editable: click into the preview to hand-edit any part of the
+  final message text. Once edited, the field inputs stop overwriting the text,
+  an "edited by hand" indicator appears next to the preview label, and a reset
+  link restores the template-synced preview.
+
 ## v4.14
 - Fixed combined-order cards losing all injected controls (shipping-info line,
   Mark as Shipped, Message, Edit/Copy address, Print Envelope, address badge)
