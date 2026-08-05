@@ -1606,8 +1606,8 @@
                         }
 
                         const previewBlock = `
-                                <div class="canned-modal-preview-label">Live preview</div>
-                                <div class="canned-modal-preview" id="canned-preview"></div>`;
+                                <div class="canned-modal-preview-label">Live preview <span class="canned-modal-preview-status" id="canned-preview-status" style="display:none;">— edited by hand (<a id="canned-preview-reset">reset</a>)</span></div>
+                                <div class="canned-modal-preview" id="canned-preview" contenteditable="true" spellcheck="true"></div>`;
 
                         if (isPreorder) {
                             modalContent.innerHTML = `
@@ -1667,7 +1667,16 @@
                             SURPRISE_STICKER: { id: 'surprise-sticker', label: 'surprise sticker' }
                         };
                         const previewEl = modalContent.querySelector('#canned-preview');
+                        // Manual-edit support: the preview is contenteditable so the user can
+                        // tweak any part of the final message text directly. As soon as the
+                        // user types inside the preview, template sync stops (so field inputs
+                        // don't clobber the hand edits), an "edited by hand" indicator appears,
+                        // and the message sent is taken verbatim from the preview. The reset
+                        // link discards manual edits and restores the template-synced preview.
+                        let previewManuallyEdited = false;
+                        const previewStatusEl = modalContent.querySelector('#canned-preview-status');
                         const renderPreview = () => {
+                            if (previewManuallyEdited) return;
                             let html = '';
                             let lastIndex = 0;
                             let match;
