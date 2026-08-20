@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260804-v4.15-editable-canned-preview
+// @version      20260820-v4.16-reliable-auto-send
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -41,6 +41,8 @@
     const NOTE_ADD_KEY = 'ebay_note_to_add';
     const CONFIRMED_NOTE_KEY = 'ebay_note_confirmed';
     const AUTO_SEND_MESSAGES_KEY = 'ebay_auto_send_messages';
+    const MESSAGE_SEND_KEY = 'ebay_message_to_send';
+    const MANUAL_MESSAGE_SEND_KEY = 'ebay_manual_message_to_send';
 
     // ===================================================================
     // USER CONFIGURATION (Local Preferences)
@@ -1539,7 +1541,7 @@
                                 .replace(/\bon\s+today\b(?=[^\w]|$)/gi, 'today')
                                 // Collapse any leftover blank lines from an empty {TRACKING_NOTE}
                                 .replace(/\n{3,}/g, '\n\n');
-                            await GM_setValue('ebay_message_to_send', { orderId: firstOrderId, message: finalMessageText });
+                            await queueBuyerMessage(MESSAGE_SEND_KEY, firstOrderId, finalMessageText);
                             // Open the message tab in the foreground so paste/auto-send runs with focus
                             GM_openInTab(`https://www.ebay.com/mesh/ord/details?orderid=${firstOrderId}&tm_action=auto_message`, { active: true });
                         }
@@ -1729,7 +1731,7 @@
                                 ? previewEl.innerText.trim()
                                 : buildMessageText();
 
-                            await GM_setValue('ebay_manual_message_to_send', { orderId: orderId, message: messageText });
+                            await queueBuyerMessage(MANUAL_MESSAGE_SEND_KEY, orderId, messageText);
                             GM_openInTab(`https://www.ebay.com/mesh/ord/details?orderid=${orderId}&tm_action=manual_message`, { active: true });
 
                             modalOverlay.remove();
@@ -1748,7 +1750,7 @@
                             }
                         }
 
-                        await GM_setValue('ebay_manual_message_to_send', { orderId: orderId, message: messageText });
+                        await queueBuyerMessage(MANUAL_MESSAGE_SEND_KEY, orderId, messageText);
                         GM_openInTab(`https://www.ebay.com/mesh/ord/details?orderid=${orderId}&tm_action=manual_message`, { active: true });
                     }
                     return;
@@ -2995,207 +2997,27 @@
                 return;
             }
             else if (urlAction === 'manual_message') {
-                console.log('[Manual-Message] Draft insertion mode started.');
-                const messageData = await GM_getValue('ebay_manual_message_to_send');
-                if (!messageData || messageData.orderId !== urlOrderId) {
-                    console.warn('[Manual-Message] No message data or order mismatch.');
-                    return;
-                }
-
-                const openBtn = await waitForElement('div[data-action-id="MESSAGE_BUYER_PANEL"] button');
-                if (!openBtn) { console.error('[Manual-Message] Cannot find Message Buyer button.'); return; }
-                openBtn.click();
-                console.log('[Manual-Message] Message panel opened, locating textarea…');
-
-                const candidateSelectors = [
-                    '#imageupload__sendmessage--textbox',
-                    '#textarea',
-                    'textarea#imageupload__sendmessage--textbox',
-                    'textarea.textbox__control[placeholder*="Send message"]'
-                ];
-                const findTextarea = (root) => {
-                    for (const sel of candidateSelectors) {
-                        const el = root.querySelector(sel);
-                        if (el) return el;
-                    }
-                    return null;
-                };
-                // Wait up to 8s for panel + possible iframe + textarea
-                const start = Date.now();
-                let textarea = null;
-                while ((Date.now() - start) < 8000 && !textarea) {
-                    const iframe = document.querySelector('.ordui-m2m-panel__iframe');
-                    if (iframe?.contentDocument) textarea = findTextarea(iframe.contentDocument);
-                    if (!textarea) textarea = findTextarea(document);
-                    if (!textarea) await sleep(150);
-                }
-                if (!textarea) { console.error('[Manual-Message] Failed to find textarea.'); return; }
-
-                if (messageData.message) {
-                    setAndTriggerInputValue(textarea, messageData.message || '');
-                    textarea.focus({ preventScroll: true });
-                    try { textarea.selectionStart = textarea.selectionEnd = textarea.value.length; } catch(e) {}
-                }
-
-                (function activateSendButton(){
-                    const rootDoc = textarea.ownerDocument;
-                    const sendButtonSelectors = [
-                        'button.btn.btn--primary',
-                        'button[type="submit"]',
-                        'button'
-                    ];
-                    const locateSendButton = () => {
-                        for (const sel of sendButtonSelectors) {
-                            const candidates = Array.from(rootDoc.querySelectorAll(sel));
-                            const btn = candidates.find(b => /send/i.test(b.textContent || ''));
-                            if (btn) return btn;
-                        }
-                        return null;
-                    };
-                    const dispatchKey = (type, key) => {
-                        textarea.dispatchEvent(new KeyboardEvent(type, { key, code: key === ' ' ? 'Space' : key, bubbles: true, cancelable: true }));
-                    };
-                    const spaceSim = () => {
-                        dispatchKey('keydown',' ');
-                        dispatchKey('keypress',' ');
-                        const original = textarea.value;
-                        textarea.value = original + ' ';
-                        textarea.dispatchEvent(new InputEvent('input', { data: ' ', inputType: 'insertText', bubbles: true }));
-                        dispatchKey('keyup',' ');
-                        // Remove the space so final text unchanged
-                        dispatchKey('keydown','Backspace');
-                        dispatchKey('keypress','Backspace');
-                        textarea.value = original;
-                        textarea.dispatchEvent(new InputEvent('input', { data: null, inputType: 'deleteContentBackward', bubbles: true }));
-                        dispatchKey('keyup','Backspace');
-                        textarea.dispatchEvent(new Event('change', { bubbles: true }));
-                    };
-                    spaceSim();
-                    let attempts = 0;
-                    const maxAttempts = 20;
-                    const interval = setInterval(() => {
-                        attempts++;
-                        const btn = locateSendButton();
-                        if (btn) {
-                            if (btn.disabled) {
-                                if (attempts > 5) btn.disabled = false;
-                            } else {
-                                clearInterval(interval);
-                            }
-                        }
-                        if (attempts === 3) spaceSim();
-                        if (attempts >= maxAttempts) clearInterval(interval);
-                    }, 100);
-                })();
-
-                await GM_setValue('ebay_manual_message_to_send', null);
+                await runBuyerMessageAutomation({
+                    storageKey: MANUAL_MESSAGE_SEND_KEY,
+                    orderId: urlOrderId,
+                    autoSend: false,
+                    label: 'Manual-Message'
+                });
             }
             else if (urlAction === 'message') {
                  const messageButton = await waitForElement('div[data-action-id="MESSAGE_BUYER_PANEL"] button');
                  if (messageButton) messageButton.click();
             }
             else if (urlAction === 'auto_message') {
-                console.log('[Auto-Message] Draft insertion mode started.');
-                const messageData = await GM_getValue('ebay_message_to_send');
-                if (!messageData || messageData.orderId !== urlOrderId) {
-                    console.warn('[Auto-Message] No message data or order mismatch.');
-                    return;
-                }
-                const autoSendEnabled = !!(await GM_getValue(AUTO_SEND_MESSAGES_KEY, false));
-                const openBtn = await waitForElement('div[data-action-id="MESSAGE_BUYER_PANEL"] button');
-                if (!openBtn) { console.error('[Auto-Message] Cannot find Message Buyer button.'); return; }
-                openBtn.click();
-                console.log('[Auto-Message] Message panel opened, locating textarea…');
-                const candidateSelectors = [
-                    '#imageupload__sendmessage--textbox',
-                    '#textarea',
-                    'textarea#imageupload__sendmessage--textbox',
-                    'textarea.textbox__control[placeholder*="Send message"]'
-                ];
-                const findTextarea = (root) => {
-                    for (const sel of candidateSelectors) {
-                        const el = root.querySelector(sel);
-                        if (el) return el;
-                    }
-                    return null;
-                };
-                // Wait up to 8s for panel + possible iframe + textarea
-                const start = Date.now();
-                let textarea = null;
-                while ((Date.now() - start) < 8000 && !textarea) {
-                    const iframe = document.querySelector('.ordui-m2m-panel__iframe');
-                    if (iframe?.contentDocument) textarea = findTextarea(iframe.contentDocument);
-                    if (!textarea) textarea = findTextarea(document);
-                    if (!textarea) await sleep(150);
-                }
-                if (!textarea) { console.error('[Auto-Message] Failed to find textarea.'); return; }
-                setAndTriggerInputValue(textarea, messageData.message || '');
-                textarea.focus({ preventScroll: true });
-                try { textarea.selectionStart = textarea.selectionEnd = textarea.value.length; } catch(e) {}
-
-                // --- Enable Send Button Logic ---
-                // Some eBay messaging UIs only enable the Send button after a genuine keystroke.
-                // We simulate a user typing a space then deleting it, dispatching the full set of keyboard + input events.
-                (function activateSendButton(){
-                    const rootDoc = textarea.ownerDocument;
-                    const sendButtonSelectors = [
-                        'button.btn.btn--primary',
-                        'button[type="submit"]',
-                        'button'
-                    ];
-                    const locateSendButton = () => {
-                        for (const sel of sendButtonSelectors) {
-                            const candidates = Array.from(rootDoc.querySelectorAll(sel));
-                            const btn = candidates.find(b => /send/i.test(b.textContent || ''));
-                            if (btn) return btn;
-                        }
-                        return null;
-                    };
-                    const dispatchKey = (type, key) => {
-                        textarea.dispatchEvent(new KeyboardEvent(type, { key, code: key === ' ' ? 'Space' : key, bubbles: true, cancelable: true }));
-                    };
-                    const spaceSim = () => {
-                        dispatchKey('keydown',' ');
-                        dispatchKey('keypress',' ');
-                        const original = textarea.value;
-                        textarea.value = original + ' ';
-                        textarea.dispatchEvent(new InputEvent('input', { data: ' ', inputType: 'insertText', bubbles: true }));
-                        dispatchKey('keyup',' ');
-                        // Remove the space so final text unchanged
-                        dispatchKey('keydown','Backspace');
-                        dispatchKey('keypress','Backspace');
-                        textarea.value = original;
-                        textarea.dispatchEvent(new InputEvent('input', { data: null, inputType: 'deleteContentBackward', bubbles: true }));
-                        dispatchKey('keyup','Backspace');
-                        textarea.dispatchEvent(new Event('change', { bubbles: true }));
-                    };
-                    spaceSim();
-                    // Poll briefly to force-enable if still disabled (as a fallback)
-                    let attempts = 0;
-                    const maxAttempts = 20; // ~2s
-                    const interval = setInterval(() => {
-                        attempts++;
-                        const btn = locateSendButton();
-                        if (btn) {
-                            if (btn.disabled) {
-                                // Final fallback: if React didn't pick up events, manually toggle disabled off
-                                if (attempts > 5) btn.disabled = false;
-                            } else {
-                                clearInterval(interval);
-                                if (autoSendEnabled) {
-                                    console.log('[Auto-Message] Auto-send enabled — clicking Send…');
-                                    btn.click();
-                                    setTimeout(() => window.close(), 1200);
-                                }
-                            }
-                        }
-                        if (attempts === 3) spaceSim(); // reinforce early
-                        if (attempts >= maxAttempts) clearInterval(interval);
-                    }, 100);
-                })();
-
-                if (!autoSendEnabled) console.log('[Auto-Message] Draft inserted and focused. (Manual Send mode)');
-                await GM_setValue('ebay_message_to_send', null); // Clear so it doesn't resend if tab reloaded
+                // Default true so a fresh Tampermonkey profile matches the
+                // "Auto-send messages" checkbox, which renders checked.
+                const autoSendEnabled = !!(await GM_getValue(AUTO_SEND_MESSAGES_KEY, true));
+                await runBuyerMessageAutomation({
+                    storageKey: MESSAGE_SEND_KEY,
+                    orderId: urlOrderId,
+                    autoSend: autoSendEnabled,
+                    label: 'Auto-Message'
+                });
             }
             else if (urlAction === 'add_note') {
                 (async () => {
@@ -3283,6 +3105,326 @@
             d.setDate(d.getDate() + 1);
         }
         return d;
+    }
+
+
+    // ===================================================================
+    // BUYER-MESSAGE AUTOMATION (tm_action=auto_message / manual_message)
+    // ===================================================================
+    // Why this is so defensive: the previous inline implementation failed
+    // intermittently with the draft visible but unsent. Four reasons, all
+    // timing-dependent, which is why it only happened "sometimes":
+    //   1. It clicked "Message buyer" exactly once. That button ships in
+    //      eBay's server-rendered HTML but lives inside a collapsed
+    //      "More actions" menu, so the click landed before React had
+    //      hydrated it and did nothing.
+    //   2. The composer is a same-origin IFRAME (/contact/sendmsg). The old
+    //      code grabbed the textarea the moment it appeared in the iframe's
+    //      DOM — i.e. during parse, before the composer's own JS had bound
+    //      its submit handler.
+    //   3. It then took the FIRST Send button that looked un-disabled and
+    //      clicked it. A server-rendered button has no `disabled` attribute
+    //      until JS adds one, so the very first poll saw "enabled", clicked a
+    //      button with no handler attached yet, and called clearInterval() —
+    //      no retry was possible after that.
+    //   4. Nothing verified the send. window.close() fired 1.2s later
+    //      regardless, so a failure looked identical to a success.
+    // This version waits for readiness, retries, verifies, and when it does
+    // give up it says so loudly and leaves the tab open with the draft.
+
+    const msgSleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const MSG_LOG = (...args) => console.log('[Buyer-Msg]', ...args);
+
+    // Message payloads are stored as a MAP keyed by order id. The old shape was
+    // a single {orderId, message} object: two message tabs opened close together
+    // clobbered each other, and the loser silently bailed on an order-id
+    // mismatch without sending anything.
+    async function queueBuyerMessage(storageKey, orderId, message) {
+        let store = await GM_getValue(storageKey);
+        if (!store || typeof store !== 'object' || Array.isArray(store) || typeof store.orderId === 'string') store = {};
+        store[orderId] = { message: message, queuedAt: Date.now() };
+        await GM_setValue(storageKey, store);
+    }
+
+    async function takeBuyerMessage(storageKey, orderId) {
+        const store = await GM_getValue(storageKey);
+        if (!store || typeof store !== 'object') return null;
+        // Legacy single-payload shape, still possible right after an update.
+        if (typeof store.orderId === 'string') {
+            if (store.orderId !== orderId) return null;
+            await GM_setValue(storageKey, {});
+            return typeof store.message === 'string' ? store.message : null;
+        }
+        const entry = store[orderId];
+        if (!entry) return null;
+        delete store[orderId];
+        // Drop stale entries so the map can't grow without bound.
+        const cutoff = Date.now() - 6 * 60 * 60 * 1000;
+        Object.keys(store).forEach(k => {
+            if (!store[k] || (store[k].queuedAt || 0) < cutoff) delete store[k];
+        });
+        await GM_setValue(storageKey, store);
+        return typeof entry.message === 'string' ? entry.message : null;
+    }
+
+    // Fixed banner at the top of the order-details tab so a failure is
+    // impossible to miss (the old code only whispered into the console).
+    function showMsgBanner(text, ok, fallbackText) {
+        try {
+            let el = document.getElementById('altheastix-msg-banner');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'altheastix-msg-banner';
+                el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:2147483647;padding:10px 16px;' +
+                    'font:600 14px/1.45 system-ui,-apple-system,sans-serif;text-align:center;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.25);';
+                document.body.appendChild(el);
+            }
+            el.style.background = ok ? '#2e7d32' : '#c62828';
+            el.textContent = text;
+            if (fallbackText) {
+                const pre = document.createElement('textarea');
+                pre.readOnly = true;
+                pre.value = fallbackText;
+                pre.style.cssText = 'display:block;width:100%;max-width:760px;margin:8px auto 0;height:110px;' +
+                    'font:400 12px/1.4 ui-monospace,monospace;color:#111;padding:6px;border-radius:4px;border:0;';
+                el.appendChild(pre);
+            }
+        } catch (e) { /* banner is best-effort */ }
+    }
+
+    function getComposerDoc() {
+        const iframe = document.querySelector('.ordui-m2m-panel__iframe');
+        if (!iframe) return null;
+        let doc = null;
+        try { doc = iframe.contentDocument; } catch (e) { return null; }
+        if (!doc || !doc.location) return null;
+        // The iframe ships with an empty src, so about:blank means the composer
+        // has not been loaded into the panel yet. Fall back to "does it hold a
+        // real textarea?" in case eBay ever populates it without navigating.
+        const href = doc.location.href || '';
+        const blank = !href || href === 'about:blank';
+        if (blank && !doc.querySelector('textarea')) return null;
+        return doc;
+    }
+
+    function findComposerTextarea(doc) {
+        if (!doc) return null;
+        const selectors = [
+            '#imageupload__sendmessage--textbox',
+            'textarea#imageupload__sendmessage--textbox',
+            'textarea.textbox__control[placeholder*="Send message"]',
+            'textarea[name*="message"]',
+            'textarea'
+        ];
+        for (const sel of selectors) {
+            let el = null;
+            try { el = doc.querySelector(sel); } catch (e) { continue; }
+            // Guard the tag: the old '#textarea' selector matched ANY element
+            // that happened to carry id="textarea".
+            if (el && el.tagName === 'TEXTAREA') return el;
+        }
+        return null;
+    }
+
+    // Deliberately strict. The old locator took any button whose text merely
+    // contained "send", which on an order-details page also matches
+    // "Send coupon".
+    function findComposerSendButton(doc) {
+        if (!doc) return null;
+        let candidates = [];
+        try { candidates = Array.from(doc.querySelectorAll('button, input[type="submit"]')); } catch (e) { return null; }
+        const labelOf = b => ((b.value || '') + ' ' + (b.textContent || '') + ' ' + (b.getAttribute('aria-label') || ''))
+            .replace(/\s+/g, ' ').trim();
+        let btn = candidates.find(b => /^send( message)?$/i.test(labelOf(b)));
+        if (!btn) btn = candidates.find(b => b.type === 'submit' && /\bsend\b/i.test(labelOf(b)) && !/coupon|copy|resend/i.test(labelOf(b)));
+        return btn || null;
+    }
+
+    // Click "Message buyer" until the composer iframe actually loads. Only
+    // clicks while the panel is closed, so a retry can't toggle it shut.
+    async function openMessageBuyerPanel(timeout = 20000) {
+        const start = Date.now();
+        const panelIsOpen = () => {
+            const p = document.querySelector('.ordui-m2m-panel');
+            return !!p && !p.hasAttribute('hidden');
+        };
+        let clicks = 0;
+        let lastClick = 0;
+        while (Date.now() - start < timeout) {
+            const doc = getComposerDoc();
+            if (doc) return doc;
+            if (!panelIsOpen() && (Date.now() - lastClick) > 1500) {
+                const btn = document.querySelector('div[data-action-id="MESSAGE_BUYER_PANEL"] button');
+                if (btn) {
+                    clicks++;
+                    lastClick = Date.now();
+                    MSG_LOG('Clicking "Message buyer" (attempt ' + clicks + ')');
+                    btn.click();
+                }
+            }
+            await msgSleep(250);
+        }
+        MSG_LOG('Gave up waiting for the message panel after ' + clicks + ' click(s).');
+        return null;
+    }
+
+    // Wait for the composer document to finish loading AND settle, so the
+    // page's own scripts have bound their handlers before we touch anything.
+    async function waitForComposerReady(timeout = 20000) {
+        const start = Date.now();
+        while (Date.now() - start < timeout) {
+            const doc = getComposerDoc();
+            if (doc && doc.readyState === 'complete' && findComposerTextarea(doc)) {
+                await msgSleep(700);
+                const settledDoc = getComposerDoc();
+                const textarea = findComposerTextarea(settledDoc || doc);
+                if (settledDoc && textarea) return { doc: settledDoc, textarea: textarea };
+            }
+            await msgSleep(200);
+        }
+        return null;
+    }
+
+    // Set the value through the native setter (so React's value tracker sees
+    // the change) and fire a full event set. Notably this never assigns to
+    // .value directly the way the old spaceSim() did — that desynced React's
+    // tracker and could leave the composer believing the box was empty.
+    function insertComposerText(textarea, text) {
+        try { textarea.focus({ preventScroll: true }); } catch (e) {}
+        setAndTriggerInputValue(textarea, text);
+        const win = textarea.ownerDocument.defaultView || window;
+        const KeyEvt = win.KeyboardEvent || KeyboardEvent;
+        const InpEvt = win.InputEvent || InputEvent;
+        ['keydown', 'keypress', 'keyup'].forEach(type => {
+            try { textarea.dispatchEvent(new KeyEvt(type, { key: 'a', code: 'KeyA', bubbles: true, cancelable: true })); } catch (e) {}
+        });
+        try {
+            textarea.dispatchEvent(new InpEvt('input', { data: text.slice(-1) || ' ', inputType: 'insertText', bubbles: true }));
+        } catch (e) {}
+        textarea.dispatchEvent(new Event('change', { bubbles: true }));
+        try {
+            textarea.focus({ preventScroll: true });
+            textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+        } catch (e) {}
+    }
+
+    // Click Send, then prove it went through. Retries up to 4 times and only
+    // reports success on positive evidence.
+    async function sendComposedMessage(doc, textarea, timeout = 25000) {
+        let startHref = '';
+        try { startHref = doc.location.href; } catch (e) {}
+        const evidenceOfSend = () => {
+            if (!textarea.isConnected) return 'composer re-rendered';
+            try {
+                if (doc.location.href !== startHref) return 'composer navigated';
+            } catch (e) { return 'composer navigated'; }
+            const panel = document.querySelector('.ordui-m2m-panel');
+            if (panel && panel.hasAttribute('hidden')) return 'panel closed itself';
+            let body = '';
+            try { body = (doc.body && doc.body.innerText) || ''; } catch (e) {}
+            if (/message (was )?sent|your message has been sent/i.test(body)) return 'confirmation text';
+            if (textarea.value === '') return 'draft box cleared';
+            return null;
+        };
+
+        const start = Date.now();
+        let clicks = 0;
+        let lastClick = 0;
+        let lastNudge = 0;
+        let forced = false;
+        const clickSend = (btn) => {
+            clicks++;
+            lastClick = Date.now();
+            MSG_LOG('Clicking Send (attempt ' + clicks + ')');
+            ['mousedown', 'mouseup', 'click'].forEach(type => {
+                try {
+                    btn.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: doc.defaultView || window }));
+                } catch (e) {}
+            });
+        };
+
+        while (Date.now() - start < timeout) {
+            // Only trust the evidence checks once we have actually clicked —
+            // otherwise a routine re-render would read as a successful send.
+            if (clicks > 0) {
+                const why = evidenceOfSend();
+                if (why) { MSG_LOG('Send confirmed (' + why + ') after ' + clicks + ' click(s).'); return true; }
+            }
+
+            const btn = findComposerSendButton(doc);
+            const enabled = !!btn && !btn.disabled && btn.getAttribute('aria-disabled') !== 'true';
+
+            if (clicks === 0) {
+                if (enabled) {
+                    clickSend(btn);
+                } else if (btn && (Date.now() - start) > 3000 && (Date.now() - lastNudge) > 2000) {
+                    // Still disabled: the composer does not believe there is any
+                    // text. Re-fire the input events; force the flag off only as
+                    // a genuine last resort, and keep verifying afterwards.
+                    lastNudge = Date.now();
+                    MSG_LOG('Send button still disabled — re-triggering input events.');
+                    insertComposerText(textarea, textarea.value);
+                    if (!forced && (Date.now() - start) > 8000) {
+                        forced = true;
+                        MSG_LOG('Forcing the Send button enabled (last resort).');
+                        try { btn.disabled = false; btn.removeAttribute('aria-disabled'); } catch (e) {}
+                    }
+                }
+            } else if (enabled && textarea.isConnected && textarea.value.trim() && clicks < 3 && (Date.now() - lastClick) > 5000) {
+                // A click already went out. Never re-insert text or force the
+                // button here — that is how you get a duplicate message. Retry
+                // only when the composer looks completely untouched: still
+                // enabled, still holding the draft, 5s later.
+                clickSend(btn);
+            }
+
+            await msgSleep(300);
+        }
+        MSG_LOG('Could not confirm the send after ' + clicks + ' click(s).');
+        return false;
+    }
+
+    async function runBuyerMessageAutomation(options) {
+        const storageKey = options.storageKey;
+        const urlOrderId = options.orderId;
+        const autoSend = !!options.autoSend;
+        const label = options.label || 'Buyer-Msg';
+        MSG_LOG(label + ': starting for order ' + urlOrderId + ' (autoSend=' + autoSend + ')');
+
+        const message = await takeBuyerMessage(storageKey, urlOrderId);
+        if (message === null) {
+            console.warn('[Buyer-Msg] ' + label + ': nothing queued for order ' + urlOrderId + ' — stopping.');
+            return;
+        }
+
+        const composerDoc = await openMessageBuyerPanel();
+        if (!composerDoc) {
+            showMsgBanner('Auto-message failed: the "Message buyer" panel never opened. Draft below — send it by hand.', false, message);
+            return;
+        }
+
+        const ready = await waitForComposerReady();
+        if (!ready) {
+            showMsgBanner('Auto-message failed: the message box never finished loading. Draft below — send it by hand.', false, message);
+            return;
+        }
+
+        insertComposerText(ready.textarea, message);
+        MSG_LOG(label + ': draft inserted (' + message.length + ' chars).');
+
+        if (!autoSend) {
+            showMsgBanner('Draft inserted — review it, then click Send.', true);
+            return;
+        }
+
+        const sent = await sendComposedMessage(ready.doc, ready.textarea);
+        if (sent) {
+            showMsgBanner('Thank-you message sent ✔ — closing this tab…', true);
+            setTimeout(() => { try { window.close(); } catch (e) {} }, 2500);
+        } else {
+            showMsgBanner('AUTO-SEND FAILED — the draft is in the box, click Send yourself. (Tab left open on purpose.)', false);
+            console.error('[Buyer-Msg] ' + label + ': send could not be confirmed for order ' + urlOrderId + '. Tab left open.');
+        }
     }
 
     function setAndTriggerInputValue(element, value) {
