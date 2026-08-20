@@ -1,5 +1,35 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.16
+- Fixed the thank-you/canned message automation intermittently leaving the
+  draft in the box without ever sending it. Four timing bugs stacked up: the
+  "Message buyer" button was clicked once, before eBay had hydrated it; the
+  composer textarea was grabbed mid-parse, before the /contact/sendmsg iframe
+  had bound its submit handler; the Send button was taken the first time it
+  merely looked un-disabled (a server-rendered button carries no `disabled`
+  attribute until JS adds one) and clicked exactly once with the polling
+  interval cleared immediately after, so no retry was possible; and nothing
+  verified the result before `window.close()` fired 1.2s later, which made a
+  failure look identical to a success. The panel click, the composer wait and
+  the Send click now all retry, and the tab only closes on positive evidence
+  that the message went out.
+- Auto-send now reports what happened. A green banner confirms the send, a red
+  one says it failed and leaves the tab open with the draft intact rather than
+  closing silently. If the panel never opens at all, the banner carries a copy
+  of the message text so it isn't lost.
+- Queued message payloads are now keyed by order id instead of living in a
+  single shared slot. Two message tabs opened close together used to clobber
+  each other's payload, and the loser bailed on an order-id mismatch without
+  sending anything.
+- Tightened the Send-button lookup: it no longer matches any button whose text
+  merely contains "send" (which also matches "Send coupon" and "Send a copy to
+  my email"), and the textarea lookup no longer matches a non-textarea element
+  that happens to carry `id="textarea"`.
+- Dropped the old simulated space-then-backspace keystroke hack, which wrote to
+  `textarea.value` directly and could desync React's value tracker — leaving the
+  composer convinced the box was empty. Value changes now go through the native
+  setter only.
+
 ## v4.15
 - The canned-message modal's live preview (Late + Gift, Late no gift, Preorder)
   is now directly editable: click into the preview to hand-edit any part of the
