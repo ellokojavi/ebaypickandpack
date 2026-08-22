@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260820-v4.16-reliable-auto-send
+// @version      20260822-v4.17-automation-tab-close-and-focus
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -55,6 +55,10 @@
         defaultTrackingNumber: "9114 9023 0722 4938 6961 ",
         enableDarkModeByDefault: true,
         enableQuotesInMessages: true,
+        // How long an automation tab (mark-as-shipped, note, tracking,
+        // message) may run before it gives up and flags itself instead of
+        // sitting there looking finished.
+        automationTabTimeoutSeconds: 45,
         orderColors: [
             // Expanded 40-color palette — hues spread across the spectrum and interleaved
             // so that consecutive assignments are always visually distinct
@@ -1176,7 +1180,7 @@
                 buyLabelLink.title = 'Open eBay\'s Buy Shipping Label page, pre-filled for an eBay Standard Envelope';
                 buyLabelLink.addEventListener('click', (e) => {
                     e.preventDefault();
-                    GM_openInTab(buyLabelLink.href, { active: true });
+                    openAutomationTab(buyLabelLink.href, { active: true });
                 });
                 tcellItem.appendChild(buyLabelLink);
             }
@@ -1339,7 +1343,7 @@
                         const noteText = noteInput.value.trim();
                         if (noteText) {
                             await GM_setValue(NOTE_ADD_KEY, { orderId: orderId, note: noteText });
-                            GM_openInTab(`https://www.ebay.com/mesh/ord/details?orderid=${orderId}&tm_action=add_note`, { active: false });
+                            openAutomationTab(`https://www.ebay.com/mesh/ord/details?orderid=${orderId}&tm_action=add_note`, { active: false });
                             target.textContent = 'note ✅';
                         }
                         tooltip.remove();
@@ -1398,10 +1402,10 @@
                         if (action === 'track-v2') {
                             const autoSubmit = tooltip.querySelector('.tracking-autosubmit-checkbox')?.checked ?? true;
                             await GM_setValue(TRACKING_ADD_KEY_V2, { orderId: orderId, trackingNumber: trackingNumberClean, autoSubmit: autoSubmit });
-                            GM_openInTab(`https://www.ebay.com/ship/tr/update?orders=${orderId}`, { active: true });
+                            openAutomationTab(`https://www.ebay.com/ship/tr/update?orders=${orderId}`, { active: true });
                         } else {
                             await GM_setValue(TRACKING_ADD_KEY, { orderId: orderId, trackingNumber: trackingNumberClean, timestamp: Date.now() });
-                            GM_openInTab(`https://www.ebay.com/mesh/ord/details?orderid=${orderId}&tm_action=track`, { active: true });
+                            openAutomationTab(`https://www.ebay.com/mesh/ord/details?orderid=${orderId}&tm_action=track`, { active: true });
                         }
                         tooltip.remove();
                         document.removeEventListener('click', closeTooltipHandler, true);
@@ -1424,7 +1428,7 @@
                             const noteText = `Will be shipped on ${formattedDate}`;
 
                             await GM_setValue(NOTE_ADD_KEY, { orderId: firstOrderId, note: noteText });
-                            GM_openInTab(`https://www.ebay.com/mesh/ord/details?orderid=${firstOrderId}&tm_action=add_note`, { active: false });
+                            openAutomationTab(`https://www.ebay.com/mesh/ord/details?orderid=${firstOrderId}&tm_action=add_note`, { active: false });
 
                             const noteLink = orderItemElement.querySelector(`.${CONFIG.classNames.addNoteLink}[data-order-id="${firstOrderId}"]`);
                             if (noteLink) {
@@ -1543,7 +1547,7 @@
                                 .replace(/\n{3,}/g, '\n\n');
                             await queueBuyerMessage(MESSAGE_SEND_KEY, firstOrderId, finalMessageText);
                             // Open the message tab in the foreground so paste/auto-send runs with focus
-                            GM_openInTab(`https://www.ebay.com/mesh/ord/details?orderid=${firstOrderId}&tm_action=auto_message`, { active: true });
+                            openAutomationTab(`https://www.ebay.com/mesh/ord/details?orderid=${firstOrderId}&tm_action=auto_message`, { active: true });
                         }
 
                         const orderIds = orderIdString.split(',');
@@ -1570,7 +1574,7 @@
                         target.classList.add(CONFIG.classNames.markAsShippedWaiting);
                         for (let i = 0; i < orderIds.length; i++) {
                             textElement.textContent = `Opening tab ${i + 1} of ${orderIds.length}...`;
-                            GM_openInTab(`https://www.ebay.com/mesh/ord/details?orderid=${orderIds[i]}&tm_action=ship`, { active: false, setParent: true });
+                            openAutomationTab(`https://www.ebay.com/mesh/ord/details?orderid=${orderIds[i]}&tm_action=ship`, { active: false });
                             if (i < orderIds.length - 1) await new Promise(resolve => setTimeout(resolve, CONFIG.timing.sequentialTabDelay));
                         }
                         textElement.textContent = 'Marked as Shipped';
@@ -1732,7 +1736,7 @@
                                 : buildMessageText();
 
                             await queueBuyerMessage(MANUAL_MESSAGE_SEND_KEY, orderId, messageText);
-                            GM_openInTab(`https://www.ebay.com/mesh/ord/details?orderid=${orderId}&tm_action=manual_message`, { active: true });
+                            openAutomationTab(`https://www.ebay.com/mesh/ord/details?orderid=${orderId}&tm_action=manual_message`, { active: true });
 
                             modalOverlay.remove();
                         });
@@ -1751,7 +1755,7 @@
                         }
 
                         await queueBuyerMessage(MANUAL_MESSAGE_SEND_KEY, orderId, messageText);
-                        GM_openInTab(`https://www.ebay.com/mesh/ord/details?orderid=${orderId}&tm_action=manual_message`, { active: true });
+                        openAutomationTab(`https://www.ebay.com/mesh/ord/details?orderid=${orderId}&tm_action=manual_message`, { active: true });
                     }
                     return;
                 }
@@ -2869,43 +2873,70 @@
                 }
             }
             else if (urlAction === 'ship') {
-                 if (window.location.pathname.startsWith('/mesh/ord/details')) {
-                    const markAsShippedLink = await waitForElement('div[data-action-id="MARK_SHIPPED"] a');
-                    if (markAsShippedLink) markAsShippedLink.click();
-                    else setTimeout(() => window.close(), 1000);
+                const SHIP_TIMEOUT = (USER_CONFIG.automationTabTimeoutSeconds || 45) * 1000;
+
+                if (window.location.pathname.startsWith('/mesh/ord/details')) {
+                    const cancelWatchdog = startAutomationWatchdog('Mark as Shipped', SHIP_TIMEOUT);
+                    const markAsShippedLink = await waitForElement('div[data-action-id="MARK_SHIPPED"] a', 12000);
+                    if (markAsShippedLink) {
+                        // This navigates the SAME tab to /om/shipment/update,
+                        // where the branch below takes over and closes it. If
+                        // that navigation never happens, the watchdog fires.
+                        markAsShippedLink.click();
+                    } else {
+                        // No Mark-as-shipped action on the page — almost always
+                        // because the order is already shipped. That counts as
+                        // the job being done, so confirm it and close.
+                        cancelWatchdog();
+                        await GM_setValue(CONFIRMED_SHIP_KEY, { orderId: urlOrderId, timestamp: Date.now(), alreadyShipped: true });
+                        finishAutomationTab('Order was already marked shipped');
+                    }
                 }
                 else if (window.location.pathname.startsWith('/om/shipment/update')) {
-                    const checkForSuccessAndClose = async () => {
-                        if (document.body.textContent.includes('"ack":"SUCCESS"')) {
-                            await GM_setValue(CONFIRMED_SHIP_KEY, { orderId: urlOrderId, timestamp: Date.now() });
-                            setTimeout(() => window.close(), 250); // Close quickly
-                            return true;
-                        }
-                        return false;
+                    const cancelWatchdog = startAutomationWatchdog('Shipment confirmation', SHIP_TIMEOUT);
+                    let done = false;
+                    let observer = null;
+
+                    const succeed = async (how) => {
+                        if (done) return;
+                        done = true;
+                        cancelWatchdog();
+                        if (observer) observer.disconnect();
+                        console.log('[Ship] Confirmed via ' + how + '.');
+                        await GM_setValue(CONFIRMED_SHIP_KEY, { orderId: urlOrderId, timestamp: Date.now() });
+                        // A short delay so eBay's request finishes before the
+                        // tab goes away, then close and hand focus back to the
+                        // pick-and-pack tab (see openAutomationTab/setParent).
+                        finishAutomationTab('Marked as shipped', 500);
                     };
 
-                    // Attempt 1: Check immediately in case it's already the JSON response
-                    if (await checkForSuccessAndClose()) return;
+                    const jsonSuccess = () => !!(document.body && document.body.textContent.includes('"ack":"SUCCESS"'));
 
-                    // Attempt 2: Set up an observer for changes, as the JSON might load dynamically
-                    const observer = new MutationObserver(async (mutations) => {
-                        if (await checkForSuccessAndClose()) {
-                            observer.disconnect();
-                        }
+                    // 1. Already the raw JSON response.
+                    if (jsonSuccess()) { await succeed('JSON ack'); return; }
+
+                    // 2. Watch for it arriving.
+                    observer = new MutationObserver(() => {
+                        if (!done && jsonSuccess()) succeed('JSON ack (observed)');
                     });
                     observer.observe(document.body, { childList: true, subtree: true });
 
-                    // Attempt 3: Fallback for the standard confirmation page with a button
-                    const confirmButton = await waitForElement('button.btn.btn--primary', el => el.innerText.toLowerCase().includes('confirm'), 5000);
-                    if (confirmButton) {
-                        observer.disconnect(); // Stop observing, we found the button
+                    // 3. Or a real confirmation page with a Confirm button. This
+                    //    fallback never ran before — see the waitForElement note.
+                    const confirmButton = await waitForElement(
+                        'button.btn.btn--primary',
+                        el => (el.innerText || '').toLowerCase().includes('confirm'),
+                        8000
+                    );
+                    if (confirmButton && !done) {
+                        console.log('[Ship] Clicking the Confirm button.');
                         confirmButton.click();
-                        await GM_setValue(CONFIRMED_SHIP_KEY, { orderId: urlOrderId, timestamp: Date.now() });
-                        setTimeout(() => window.close(), 1500);
-                    } else {
-                        // If no button is found after 5s, disconnect the observer
-                        setTimeout(() => observer.disconnect(), 5000);
+                        // Give the POST a beat; if the JSON ack lands first the
+                        // observer wins and this is a no-op.
+                        setTimeout(() => { if (!done) succeed('Confirm button'); }, 1800);
                     }
+                    // If neither path resolves, the watchdog banners the tab
+                    // instead of leaving a silent zombie.
                 }
             }
             else if (urlAction === 'buy_label') {
@@ -3073,7 +3104,7 @@
                                 saveButton.click();
                                 await GM_setValue(CONFIRMED_NOTE_KEY, { orderId: noteData.orderId, status: 'success' });
                                 await GM_setValue(NOTE_ADD_KEY, null);
-                                setTimeout(() => window.close(), 500);
+                                finishAutomationTab('Note added', 500);
                             }, 500);
                         } else {
                             throw new Error('Could not find the "Add Note" button on the page.');
@@ -3131,6 +3162,47 @@
     //      regardless, so a failure looked identical to a success.
     // This version waits for readiness, retries, verifies, and when it does
     // give up it says so loudly and leaves the tab open with the draft.
+
+    // ===================================================================
+    // AUTOMATION-TAB LIFECYCLE
+    // ===================================================================
+    // Every tm_action tab must end in one of two states: closed because the
+    // job is done, or visibly flagged because it isn't. A tab that just sits
+    // there open is the worst outcome — it looks finished and isn't.
+    //
+    // setParent:true is what returns focus to the pick-and-pack tab when an
+    // automation tab closes: Tampermonkey re-selects the opener. Without it
+    // Firefox falls through to whichever tab happens to sit next to the one
+    // that closed — usually another automation tab. Background tabs
+    // (active:false) never take focus in the first place, but they still need
+    // the flag, because closing one while it IS focused (you clicked over to
+    // check on it) should also land you back on pick-and-pack.
+    function openAutomationTab(url, options) {
+        const opts = Object.assign({ active: false }, options || {});
+        opts.setParent = true;
+        return GM_openInTab(url, opts);
+    }
+
+    // Hard stop for any automation tab. Returns a cancel function.
+    function startAutomationWatchdog(label, timeoutMs) {
+        const timer = setTimeout(() => {
+            console.error('[Automation] ' + label + ' timed out after ' + Math.round(timeoutMs / 1000) + 's.');
+            showMsgBanner(label + ' timed out — nothing was completed on this tab. Finish it by hand, then close the tab.', false);
+        }, timeoutMs);
+        return () => clearTimeout(timer);
+    }
+
+    // Close an automation tab, handing focus back to the opener. window.close()
+    // needs @grant window.close (the header has it); Firefox still refuses it
+    // in some configurations, so if we are still alive a moment later, say so
+    // rather than leaving a tab that looks stuck.
+    function finishAutomationTab(label, delayMs) {
+        console.log('[Automation] ' + label + ' — done, closing tab.');
+        setTimeout(() => {
+            try { window.close(); } catch (e) {}
+            setTimeout(() => showMsgBanner(label + ' ✔ — done. You can close this tab.', true), 1500);
+        }, typeof delayMs === 'number' ? delayMs : 600);
+    }
 
     const msgSleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     const MSG_LOG = (...args) => console.log('[Buyer-Msg]', ...args);
@@ -3420,7 +3492,7 @@
         const sent = await sendComposedMessage(ready.doc, ready.textarea);
         if (sent) {
             showMsgBanner('Thank-you message sent ✔ — closing this tab…', true);
-            setTimeout(() => { try { window.close(); } catch (e) {} }, 2500);
+            finishAutomationTab('Thank-you message sent', 2500);
         } else {
             showMsgBanner('AUTO-SEND FAILED — the draft is in the box, click Send yourself. (Tab left open on purpose.)', false);
             console.error('[Buyer-Msg] ' + label + ': send could not be confirmed for order ' + urlOrderId + '. Tab left open.');
@@ -3435,10 +3507,32 @@
         element.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
-    function waitForElement(selector, timeout = 10000) {
+    // Two accepted shapes:
+    //   waitForElement(selector, timeout)
+    //   waitForElement(selector, predicate, timeout)
+    // The predicate form used to be silently broken: the function was passed
+    // where the timeout was expected, Number(fn) is NaN, setTimeout treats that
+    // as 0, and the call resolved null on the very next tick. Any caller
+    // relying on it (the shipment-confirm fallback) never actually ran.
+    function waitForElement(selector, arg2, arg3) {
+        const predicate = typeof arg2 === 'function' ? arg2 : null;
+        const timeout = typeof arg2 === 'number' ? arg2
+                      : (typeof arg3 === 'number' ? arg3 : 10000);
         return new Promise(resolve => {
+            const find = () => {
+                if (!predicate) return document.querySelector(selector);
+                // With a predicate, scan every match — the one we want is not
+                // necessarily the first.
+                const all = Array.from(document.querySelectorAll(selector));
+                for (const el of all) {
+                    let ok = false;
+                    try { ok = !!predicate(el); } catch (e) { ok = false; }
+                    if (ok) return el;
+                }
+                return null;
+            };
             const interval = setInterval(() => {
-                const element = document.querySelector(selector);
+                const element = find();
                 if (element) {
                     clearInterval(interval);
                     clearTimeout(timer);

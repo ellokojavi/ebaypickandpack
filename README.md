@@ -106,6 +106,7 @@ Edit the `USER_CONFIG` object near the top of the script to customize local pref
 | `defaultTrackingNumber` | pre-filled value | Default tracking number pre-filled in the tracking input |
 | `enableDarkModeByDefault` | `true` | Start in dark mode 🌙 |
 | `enableQuotesInMessages` | `true` | Append a random quote to outgoing thank-you messages 💬 |
+| `automationTabTimeoutSeconds` | `45` | How long a background automation tab may run before it flags itself instead of closing ⏱️ |
 | `orderColors` | 40-color palette | Colors used for multi-item order card backgrounds 🌈 |
 | `headerLinks` | Seller Hub, Orders, etc. | Quick-nav links rendered in the page header 🔗 |
 

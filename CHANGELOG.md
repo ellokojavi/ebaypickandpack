@@ -1,5 +1,31 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.17
+- Automation tabs (mark-as-shipped, note, tracking, message) now reliably close
+  when their job is done and hand focus back to the pick-and-pack tab. Every
+  `GM_openInTab` call goes through a new `openAutomationTab()` helper that sets
+  Tampermonkey's `setParent: true`, which re-selects the opener tab on close;
+  without it Firefox falls through to whichever tab happens to sit next to the
+  one that closed — usually another automation tab.
+- Fixed the shipment-confirmation tab hanging open forever. The "click the
+  Confirm button" fallback on `/om/shipment/update` was calling
+  `waitForElement(selector, predicate, timeout)`, but the function only ever
+  took `(selector, timeout)`. The predicate landed in the timeout slot,
+  `Number(fn)` is `NaN`, `setTimeout` treats that as `0`, and the call resolved
+  `null` on the very next tick — so that fallback had never once run. If eBay
+  answered with a confirmation page instead of a raw `"ack":"SUCCESS"` JSON
+  body, nothing was clicked and the tab sat there looking finished.
+- `waitForElement` now genuinely supports the `(selector, predicate, timeout)`
+  form, and with a predicate it scans every match rather than testing only the
+  first one `querySelector` happens to return.
+- Added a per-tab watchdog (`USER_CONFIG.automationTabTimeoutSeconds`, default
+  45s). If a flow hasn't finished in time the tab flags itself with a red
+  banner instead of sitting there silently — a zombie tab that looks done is
+  worse than a visible failure.
+- A `ship` tab that finds no Mark-as-shipped action (the order was already
+  shipped) now records the confirmation and closes, instead of waiting out the
+  full timeout first.
+
 ## v4.16
 - Fixed the thank-you/canned message automation intermittently leaving the
   draft in the box without ever sending it. Four timing bugs stacked up: the
