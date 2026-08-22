@@ -1,5 +1,55 @@
 # Changelog — Altheastix eBay Order Manager
 
+## 2026-08-22 — companion userscripts
+
+Two standalone scripts added to the repo, documented in
+`docs/companion-userscripts.md`. Neither touches `userscript.js`.
+
+### `offer-msg-picker.user.js` (eBay Send Offer modal)
+- The 10 marketing templates now carry a `{PCT}` placeholder instead of a
+  hard-coded "10%", filled from the discount actually set in the offer form.
+  Detection tries, in order: a percent-ish form field (normalising `0.15` to
+  `15`, skipping dollar values), visible text like "15% off" / "Save 20%", a
+  looser discount field, then the spread between the prices shown. An editable
+  % box overrides it, and the status line says whether the number is auto or
+  manual — so a message can never promise a discount the offer does not send.
+- Fixed losing focus after every character typed in the offer message box. The
+  picker was prepended *inside* eBay's React-managed message container, which
+  re-renders on every keystroke (the character counter) and re-created the
+  textarea each time. It now mounts as a sibling of that container, and writes
+  templates through the native `value` setter descriptor before dispatching
+  `input`, so React's value tracker actually sees the change.
+
+### `print-address-gmail.user.js` (Gmail order emails)
+- Rewritten. The original required `document.querySelector('address')`, and
+  Gmail's sanitiser does not preserve `<address>` in the rendered message, so
+  the button never appeared and everything downstream was dead code. The
+  address is now found by anchoring on the element whose own text is the label
+  ("Shipping address", "Ship to", …) and reading outward from it — same cell,
+  neighbouring cell, same column one row down, then wider ancestors. Reading
+  the message as one flat list of lines is not enough: `innerText` separates
+  same-row table cells with tabs, and Etsy puts "Payment method" and "Shipping
+  address" in one row.
+- Panel is rebuilt per open message instead of once per Gmail session (the old
+  `getElementById` guard meant the first email's address was reused forever),
+  and is never rebuilt while you are typing in its edit fields.
+- Only one panel per message: Gmail nests `div.ii.gt` around `div.a3s` and
+  matching both classes injected the controls twice.
+- Printing now happens in the Gmail tab itself — a hidden envelope node plus a
+  `media="print"` stylesheet that hides everything else, `window.print()`, and
+  cleanup on `afterprint`. Output is a single 684 × 297 pt page. Three earlier
+  approaches failed on Firefox and are recorded in the docs: printing a hidden
+  iframe hangs the preview on "Preparing Preview" forever; `window.open('') +
+  document.write` opens a blank window because the write loses the race against
+  the initial about:blank load; and `print()` being async means anything torn
+  down on a timer cancels the job.
+- No `innerHTML` anywhere — Gmail enforces Trusted Types
+  (`require-trusted-types-for 'script'`), which made the print handler throw
+  "Sink type mismatch violation blocked by CSP" and do nothing. Nodes are built
+  with `createElement`/`textContent`, and the print stylesheet falls back to a
+  constructible `CSSStyleSheet` if a nonce-based `style-src` refuses a `<style>`
+  element.
+
 ## v4.17
 - Automation tabs (mark-as-shipped, note, tracking, message) now reliably close
   when their job is done and hand focus back to the pick-and-pack tab. Every
