@@ -154,6 +154,17 @@ If the config file fails to load, the script falls back to built-in defaults and
 
 ---
 
+## 🧩 Companion Userscripts
+
+Two standalone scripts live in this repo alongside the main userscript. Each installs on its own and covers a job that happens outside the bulk shipping page — full write-up in **[docs/companion-userscripts.md](docs/companion-userscripts.md)**.
+
+| Script | Runs on | What it does |
+|--------|---------|--------------|
+| `offer-msg-picker.user.js` | eBay Active Listings → **Send offer** modal | Dropdown of 10 marketing message templates, with the discount % read from the offer form and filled into the text (never a hard-coded 10%). An editable % box overrides it, and the message updates live when the discount changes. Mounts outside eBay's React nodes so typing in the message box keeps focus ⌨️ |
+| `print-address-gmail.user.js` | Gmail (`mail.google.com`) | Adds a **🖨 Print address** button to Etsy/eBay order emails and prints a #10 envelope with the buyer's address and the Altheastix return address. Parses the address out of the rendered email (Gmail strips `<address>` tags), offers an edit panel, and prints from the Gmail tab itself — no extra window to close ✉️ |
+
+---
+
 ## 🔄 Auto-Sync
 
 This repo is connected to a local folder via a launchd watcher (`autopush.sh` + `com.altheastix.autopush.plist`). Any save to `userscript.js` or `altheastix-ebay-config.js` triggers an automatic `git commit` and `git push` — no manual uploads needed. The watcher also stages `CHANGELOG.md` and `README.md` so the changelog and docs ride along in the same commit. 🪄
