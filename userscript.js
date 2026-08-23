@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260823-v4.21-batch-ship-failure-channel
+// @version      20260823-v4.22-ship-button-recovery
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -1534,6 +1534,11 @@
                 delete card.dataset.shipUndone;
                 delete card.dataset.shipInFlight;
                 delete card.dataset.shipAttemptAt;
+                // 'confirm' replaces the ship button with the ✓ Shipped span,
+                // exactly as a real confirmation does. Reset has to put the
+                // button back, or the card comes out of the dry run looking
+                // untouched while being permanently unshippable.
+                ensureShipButton(card);
                 repaintSkuPanel();
             } else {
                 console.warn("[Altheastix][ship] kind must be 'fail' | 'confirm' | 'pending' | 'reset'");
@@ -1594,6 +1599,31 @@
             orderCard.querySelectorAll(`.${CONFIG.classNames.shipFailedBanner}`).forEach(el => el.remove());
         }
 
+        // Returns the card's Mark as Shipped button, rebuilding it if it has
+        // gone missing. It legitimately disappears in two ways: a confirmation
+        // replaces it with the ✓ Shipped span, and cleanupCardInjections strips
+        // it during an eBay re-render. Without this, a card that reaches the
+        // failed state with no button gets a Retry that silently does nothing.
+        function ensureShipButton(card) {
+            if (!card) return null;
+            const existing = card.querySelector(`.${CONFIG.classNames.markAsShippedBtn}`);
+            if (existing) return existing;
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = CONFIG.classNames.markAsShippedBtn;
+            btn.dataset.orderId = card.dataset.orderId || '';
+            btn.setAttribute('data-order-item-id', card.id);
+            btn.textContent = card.querySelector('.thank-you-checkbox')?.checked
+                ? 'Mark as Shipped & Msg' : 'Mark as Shipped';
+            const shippedLabel = card.querySelector(`.${CONFIG.classNames.shippedLabel}`);
+            if (shippedLabel) { shippedLabel.replaceWith(btn); return btn; }
+            const msgContainer = card.querySelector(`.${CONFIG.classNames.messageContainer}`);
+            if (msgContainer) { msgContainer.insertAdjacentElement('afterend', btn); return btn; }
+            const addressActions = card.querySelector(CONFIG.selectors.addressActions);
+            if (addressActions) { addressActions.insertAdjacentElement('afterend', btn); return btn; }
+            return null; // no sensible anchor — caller must cope
+        }
+
         function markCardShipFailed(orderCard, why) {
             if (!orderCard) return;
             // A confirmation that landed first always wins.
@@ -1605,7 +1635,7 @@
             orderCard.querySelector(`.${CONFIG.classNames.pendingOverlay}`)?.remove();
             orderCard.classList.add(CONFIG.classNames.orderShipFailed);
 
-            const shipBtn = orderCard.querySelector(`.${CONFIG.classNames.markAsShippedBtn}`);
+            const shipBtn = ensureShipButton(orderCard);
             if (shipBtn) {
                 shipBtn.disabled = false;
                 shipBtn.classList.remove(CONFIG.classNames.markAsShippedWaiting);
@@ -1632,6 +1662,11 @@
             if (shipQueue.running) {
                 retryBtn.disabled = true;
                 retryBtn.title = 'A batch is running — retry when it finishes';
+            } else if (!shipBtn) {
+                // Nowhere to hang a ship request. Say so rather than offering a
+                // button that does nothing; Open is the working escape hatch.
+                retryBtn.disabled = true;
+                retryBtn.title = 'This card lost its ship control — reload the page, or use Open to finish it on eBay';
             }
             retryBtn.addEventListener('click', async (e) => {
                 e.preventDefault();
@@ -1644,8 +1679,13 @@
                     SHIPDBG('retry-click:blocked-during-batch', { card: orderCard.id });
                     return;
                 }
-                const btn = orderCard.querySelector(`.${CONFIG.classNames.markAsShippedBtn}`);
-                if (btn) await runShipForCard(orderCard, btn);
+                const btn = ensureShipButton(orderCard);
+                if (btn) {
+                    await runShipForCard(orderCard, btn);
+                } else {
+                    SHIPDBG('retry-click:no-ship-button', { card: orderCard.id });
+                    console.warn('[Ship] Retry has nothing to click on ' + orderCard.id + ' — reload the page.');
+                }
             });
 
             const openLink = document.createElement('a');
@@ -1876,7 +1916,9 @@
                     renderShipDock();
                     card.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-                    const btn = card.querySelector(`.${CONFIG.classNames.markAsShippedBtn}`);
+                    // Rebuild rather than fail: a card can lose its button to an
+                    // eBay re-render between selection and its turn in the queue.
+                    const btn = ensureShipButton(card);
                     if (!btn) {
                         shipQueue.failed++;
                         markCardShipFailed(card, 'The card lost its Mark as Shipped button before the batch reached it.');
