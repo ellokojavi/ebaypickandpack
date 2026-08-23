@@ -1,5 +1,21 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.22
+- A card could end up permanently unshippable with nothing on screen to say so.
+  Both a confirmation and `cleanupCardInjections` legitimately remove the Mark
+  as Shipped button — the first replaces it with the ✓ Shipped span, the second
+  strips it during an eBay re-render — and nothing ever put it back. New
+  `ensureShipButton()` rebuilds it from the card's own `data-order-id`, and the
+  three recovery paths now use it: the failed banner's Retry, the batch queue
+  when a card loses its button between selection and its turn, and the dry-run
+  simulator's `reset`. Caught by the v4.21 dry run: after
+  `simulate('confirm')` then `simulate('reset')`, the card read `state=idle`
+  but `shippable=0`.
+- The failed banner's Retry is no longer ever a silent no-op. If the button
+  genuinely cannot be rebuilt (no anchor in the card), Retry renders disabled
+  with an explanation instead of looking clickable and doing nothing — the
+  Open link stays as the working escape hatch.
+
 ## v4.21
 - Mark as Shipped can now fail visibly. It was the only automation with no
   failure channel at all: the watchdog bannered its own background tab and
