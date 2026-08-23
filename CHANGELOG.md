@@ -50,6 +50,15 @@ Two standalone scripts added to the repo, documented in
   constructible `CSSStyleSheet` if a nonce-based `style-src` refuses a `<style>`
   element.
 
+## v4.19
+- The "Empty Message" option no longer claims it inserted a draft. It queues an
+  empty string deliberately — the point is just to open the Contact-buyer pane
+  and type by hand — so the automation now opens the pane, focuses the box and
+  says nothing, instead of painting a green "Draft inserted — review it, then
+  click Send." banner over an empty composer. Failure banners still fire for an
+  empty message (the pane genuinely not opening is still worth knowing about),
+  minus the "draft below" fallback box, which had nothing to show.
+
 ## v4.18
 - Fixed the canned "coming late" messages never pasting or sending: the order
   tab opened, the Contact-buyer pane never appeared, and nothing was reported
