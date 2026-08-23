@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260823-v4.18-manual-message-tdz-fix
+// @version      20260823-v4.19-empty-message-no-banner
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -3489,15 +3489,29 @@
             return;
         }
 
+        // The "Empty Message" option queues an empty string on purpose: it just
+        // wants the Contact-buyer pane opened so the message can be typed by hand.
+        // Nothing to paste, nothing to confirm — so no green banner either.
+        const hasText = message.trim() !== '';
+
         const composerDoc = await openMessageBuyerPanel();
         if (!composerDoc) {
-            showMsgBanner('Auto-message failed: the "Message buyer" panel never opened. Draft below — send it by hand.', false, message);
+            showMsgBanner('Auto-message failed: the "Message buyer" panel never opened.' +
+                (hasText ? ' Draft below — send it by hand.' : ''), false, hasText ? message : null);
             return;
         }
 
         const ready = await waitForComposerReady();
         if (!ready) {
-            showMsgBanner('Auto-message failed: the message box never finished loading. Draft below — send it by hand.', false, message);
+            showMsgBanner('Auto-message failed: the message box never finished loading.' +
+                (hasText ? ' Draft below — send it by hand.' : ''), false, hasText ? message : null);
+            return;
+        }
+
+        if (!hasText) {
+            // Empty draft: leave the composer focused and untouched, say nothing.
+            MSG_LOG(label + ': empty message — pane opened, nothing inserted.');
+            try { ready.textarea.focus({ preventScroll: true }); } catch (e) {}
             return;
         }
 
