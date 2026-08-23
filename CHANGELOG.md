@@ -50,6 +50,16 @@ Two standalone scripts added to the repo, documented in
   constructible `CSSStyleSheet` if a nonce-based `style-src` refuses a `<style>`
   element.
 
+## v4.20
+- Rewrote the two "late order" buyer messages (Late + Gift, Late no gift) for
+  clarity. Both now share one skeleton and differ by a single clause, so they
+  can't drift apart: the gift sentence appears only in the Late + Gift draft.
+  "We'll ship ASAP and personally let you know the moment it goes out" is now in
+  both, the refund offer reads as a real choice rather than an afterthought, and
+  the P.S. explains why eBay's own shipment notice will arrive early (the order
+  is marked shipped) instead of just telling the buyer to ignore messages.
+- The Preorder Sticker draft is unchanged.
+
 ## v4.19
 - The "Empty Message" option no longer claims it inserted a draft. It queues an
   empty string deliberately — the point is just to open the Contact-buyer pane
