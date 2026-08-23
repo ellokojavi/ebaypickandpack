@@ -67,6 +67,9 @@ Every order's shipping address is automatically linted against structural rules:
 
 ### 🤖 Order Automation
 - **Mark as Shipped** with optional auto-notes and thank-you messages — the button reads **"Mark as Shipped & Msg"** when a thank-you message will go out with the shipment, and **"Mark as Shipped"** when it won't
+- **Three honest ship states** 🚦 — a card is *pending* (amber spinner, "marked as shipped — confirming…"), *confirmed* (green **✓ Shipped**), or *failed* (red banner with **Retry**, **Open** and dismiss). A shipment that never comes back from eBay can no longer sit looking like a success: the automation tab reports its own timeout, and the pick-and-pack page runs an independent deadline that still fires if the tab was closed or never loaded. A confirmation arriving late always wins, so a merely-slow eBay resolves to shipped. The favicon/tab counter now counts only *confirmed* shipments
+- **Ship N Selected Orders** 🚚 — batch shipping driven by the same checkboxes as *Print N Selected*. Orders run **one at a time**, each waiting for a real outcome before the next begins (the thank-you message tab takes focus, so several at once would fight over the browser). A pre-flight dialog shows how many orders, how many messages and roughly how long before anything happens, and a progress dock tracks shipped / failed / skipped with **Stop after this one** and **Retry N failed**. The button appears only when orders are checked — there is no "Ship All". Turn the global **thank you msg** toggle off to keep every tab in the background and the browser usable during a run
+- **Retry is safe** — the "will ship" note and the thank-you message are sent once per order and guarded, so retrying a failed *shipment* never sends the buyer a duplicate message
 - **Today / Tomorrow ship control** — an explicit segmented toggle (per order *and* globally) that sets whether the buyer is told the order ships same-day or next-day. "Tomorrow" also adds the internal "Will be shipped on `<date>`" note. Each card shows a live ship-date preview (e.g. "Fri, Jun 27") 📅
 - **"Send thank you msg" master switch** — the top-level toggle for messaging; when off, the auto-send and ship-date controls are greyed out since no message will be sent ✉️
 - **Add Tracking** — supports both legacy and new eBay tracking systems (v1 + v2) 📬. On the v2 flow the tracking view is filled *and* Save is pressed automatically (auto-continuing past benign carrier/insurance warnings, but pausing on an invalid-number warning). An **"Auto-press Save on eBay"** checkbox in the tracking tooltip (checked by default) lets you turn the auto-submit off and fall back to fill-only
@@ -137,6 +140,25 @@ window.AltheastixConfig = {
 ```
 
 If the config file fails to load, the script falls back to built-in defaults and logs a warning in the browser console. 🛟
+
+---
+
+## 🔧 Console Diagnostics
+
+Two helpers are exposed on the pick-and-pack page for checking what the shipping
+logic is actually doing. Open the browser console on the bulk shipping page and run:
+
+| Command | What it does |
+|---------|--------------|
+| `altheastixShipReport()` | Prints the batch queue state, every order card's ship state (`idle` / `pending` / `confirmed` / `failed`) and a rolling 300-entry event log |
+| `altheastixShipReport(true)` | Same, and copies the whole report to the clipboard for pasting elsewhere |
+| `altheastixShipSimulate('fail', 'order-item-3')` | Drives card 3 into the failed state — red banner, Retry button, counter update — **without contacting eBay** |
+| `altheastixShipSimulate('confirm', 'order-item-3')` | Drives card 3 into the confirmed state |
+| `altheastixShipSimulate('pending', 'order-item-3')` | Shows the "queued for batch shipping" badge |
+| `altheastixShipSimulate('reset', 'order-item-3')` | Returns card 3 to its untouched state |
+
+The simulator only manipulates the page's own state machine — it never opens an
+automation tab, marks anything shipped on eBay, or messages a buyer. 🧪
 
 ---
 
