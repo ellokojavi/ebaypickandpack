@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260822-v4.17-automation-tab-close-and-focus
+// @version      20260823-v4.18-manual-message-tdz-fix
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -3119,7 +3119,14 @@
                     }
                 })();
             }
-        })();
+        })().catch(err => {
+            // An exception in the dispatcher used to disappear into an
+            // unhandled promise rejection and the tab just sat there looking
+            // idle. Surface it the same way a failed send is surfaced.
+            console.error('[Automation] tm_action handler crashed:', err);
+            showMsgBanner('Automation error: ' + ((err && err.message) || err) +
+                ' — nothing was completed on this tab. Finish it by hand.', false);
+        });
     }
 
     // ===================================================================
@@ -3204,8 +3211,21 @@
         }, typeof delayMs === 'number' ? delayMs : 600);
     }
 
-    const msgSleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-    const MSG_LOG = (...args) => console.log('[Buyer-Msg]', ...args);
+    // Function declarations, NOT const arrows — deliberately.
+    //
+    // The tm_action dispatcher above reaches the manual_message branch
+    // SYNCHRONOUSLY: nothing in that path awaits before it calls
+    // runBuyerMessageAutomation(), whose first statement is MSG_LOG(...).
+    // Top-level execution of this file has not reached this line yet at that
+    // moment, so a `const` here is still in its temporal dead zone and the
+    // call threw "can't access lexical declaration 'MSG_LOG' before
+    // initialization", rejecting the dispatcher promise before the message
+    // panel was ever touched — no paste, no send, no banner, just a console
+    // error. The auto_message branch hid the bug for two days: it awaits
+    // GM_getValue() first, and that yield is enough for these to initialize.
+    // Function declarations hoist, so the order stops mattering.
+    function msgSleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+    function MSG_LOG(...args) { console.log('[Buyer-Msg]', ...args); }
 
     // Message payloads are stored as a MAP keyed by order id. The old shape was
     // a single {orderId, message} object: two message tabs opened close together
