@@ -1,5 +1,36 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.23
+- A buyer message that never went out is now visible on the order card. v4.21
+  gave shipping three honest states but left messaging with the same bug it
+  removed: the message tab bannered its own failure, the card went green
+  ✓ Shipped, and nothing recorded that the buyer got nothing. Found in a real
+  10-order batch where one order's composer never opened. There is now an
+  `ebay_message_result` channel, and a failed message puts an amber
+  "✉ Message not sent" pill on the card with **Retry** and **Open**.
+- Queued messages survive a failed attempt. `takeBuyerMessage()` read AND
+  deleted the draft as its first action — before the composer was even opened —
+  so a failure discarded the message and a reload found nothing queued. Split
+  into `peekBuyerMessage()` / `consumeBuyerMessage()`, with the delete moved to
+  the moment the text actually lands in the box. Everything before that point is
+  now retryable; everything after it would double-paste, so it isn't.
+- A message tab whose composer never opens reloads itself once and tries again
+  (`tm_msg_retry`), which is the only thing that reliably fixes an order page
+  that rendered without wiring up its Message buyer button — clicking harder
+  does not, and the existing code already re-clicked every 1.5s for 20s. Skipped
+  for manual messages, where the seller is present and a surprise reload is
+  worse than being told.
+- Retry knows which draft it is retrying. Auto and manual messages live in
+  different storage keys, so the result payload carries its action; an unknown
+  action renders as non-retryable rather than defaulting to the auto path. Only
+  offering Retry where it can actually work, and never offering it where the
+  draft was already consumed.
+- Batch time estimate corrected from 20s to 30s per order. Measured across two
+  real batches (12 orders): eBay confirms in 23–31s, and the inter-order pause
+  and tab teardown bring wall-clock to ~29s each. The old figure under-promised
+  a 10-order run by about 40%. The 70s confirmation deadline is unchanged — at
+  2.3× the slowest observed confirmation it is correctly calibrated.
+
 ## v4.22
 - A card could end up permanently unshippable with nothing on screen to say so.
   Both a confirmation and `cleanupCardInjections` legitimately remove the Mark

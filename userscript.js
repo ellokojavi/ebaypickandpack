@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260823-v4.22-ship-button-recovery
+// @version      20260823-v4.23-message-outcome-channel
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -42,6 +42,20 @@
     // wrote nothing, so a card whose ship tab died sat forever showing a green
     // check. Notes have had `status: 'error'` for ages; ship now matches.
     const SHIP_FAILED_KEY = 'ebay_order_ship_failed';
+    // How a buyer message actually ended up: sent, left as a draft, or failed.
+    const MESSAGE_RESULT_KEY = 'ebay_message_result';
+    // A message tab that cannot open eBay's composer reloads itself this many
+    // times before giving up. Kept at 1: the tab is opened in the FOREGROUND so
+    // paste/auto-send has focus, and during a batch a tab that retries for too
+    // long outlives its own order and starts fighting the next one for focus.
+    const MESSAGE_PANEL_MAX_RETRIES = 1;
+    // Captured at load, NOT read later: the reload URL is deliberately rebuilt
+    // from held values because eBay's SPA may rewrite location.search, and the
+    // counter that bounds the reload loop must not be read from that same
+    // untrusted source — if it vanished mid-page the guard would fail open and
+    // the tab would reload forever.
+    const MSG_RETRY_AT_LOAD = Math.max(0,
+        parseInt(new URLSearchParams(window.location.search).get('tm_msg_retry') || '0', 10) || 0);
     const TRACKING_ADD_KEY = 'ebay_tracking_to_add';
     const TRACKING_ADD_KEY_V2 = 'ebay_tracking_to_add_v2';
     const NOTE_ADD_KEY = 'ebay_note_to_add';
@@ -114,6 +128,7 @@
                 addressContainer: 'en-US', editAddressBtn: 'edit-address-btn', cancelAddressBtn: 'cancel-address-btn', copyAddressBtn: 'copy-address-btn', addressEditInput: 'address-edit-input', cancelWrapper: 'cancel-wrapper', addressFullname: 'print__address__fullname', itemContainer: 'item', shippingInfoBlock: 'shipping-info-block', buyerNoteCallout: 'buyer-note-callout', quantityMulti: 'quantity-multi', markAsShippedBtn: 'mark-as-shipped-btn', isEditingAddress: 'is-editing-address', highlightManila: 'order-highlight-manila', highlightLg: 'order-highlight-lg', highlightMultiItem: 'order-highlight-multi-item', borderLg: 'order-border-lg', borderManila: 'order-border-manila', highlightYellow: 'highlight-yellow', skuItem: 'sku-item', skuGroupSeparator: 'sku-group-separator', skuLg: 'sku-lg', skuManila: 'sku-manila', skuMultiQty: 'sku-multi-qty', multiItemSkuOrder: 'order-multi-item', darkModeSwitch: 'dark-mode-switch', darkModeSlider: 'slider', zoomOverlay: 'zoomed-image-overlay', zoomContainer: 'zoomed-image-container', zoomImage: 'zoomed-image', zoomCloseButton: 'close-zoom-button',
                 printEnvelopeBtn: 'print-envelope-btn', markAsShippedWaiting: 'waiting-confirmation', orderShipped: 'shipped-state', shippedLabel: 'shipped-label', orderPendingShipment: 'order-pending-shipment', pendingOverlay: 'pending-overlay', pendingOverlayContent: 'pending-overlay-content', processingIcon: 'processing-icon', skuShipped: 'sku-shipped', addTrackingLink: 'add-tracking-link', trackingLinkSubmitted: 'tracking-link-submitted', reviseLink: 'revise-link', addNoteLink: 'add-note-link', noteLinkSubmitted: 'note-link-submitted',
                 orderShipFailed: 'ship-failed-state', shipFailedBanner: 'ship-failed-banner', shipQueuedBadge: 'ship-queued-badge', shipSelectedBtn: 'ship-selected-btn',
+                msgFailedPill: 'msg-failed-pill',
                 messageContainer: 'message-container', cannedMessageSelect: 'canned-message-select', sendCannedMessageBtn: 'send-canned-message-btn', buyLabelLink: 'buy-label-link',
                 shipsLabelPill: 'ships-label-pill', shipsLabelActive: 'ships-label-active', selectNonLabelBtn: 'select-non-label-btn',
                 addrWarningBadge: 'addr-warning-badge', addrWarningTooltip: 'addr-warning-tooltip',
@@ -705,6 +720,43 @@
                     color: ${isDarkMode ? '#fca5a5' : '#991b1b'};
                 }
 
+                /* --- Message outcome ---
+                   An order can ship perfectly and still leave the buyer with
+                   nothing, if eBay's composer never opened. The card says so
+                   rather than showing an unqualified green tick. */
+                .${CONFIG.classNames.msgFailedPill} {
+                    display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+                    width: 100%; margin-top: 8px; padding: 7px 10px; border-radius: 6px;
+                    font-size: 12px; line-height: 1.4;
+                    background: ${isDarkMode ? 'rgba(255,179,71,0.12)' : '#fffbeb'};
+                    border: 1px solid ${isDarkMode ? '#c97d20' : '#fcd34d'};
+                    color: ${isDarkMode ? '#FFD580' : '#78350f'};
+                }
+                .${CONFIG.classNames.msgFailedPill} .msg-failed-text { flex: 1 1 130px; min-width: 0; font-weight: 600; }
+                .${CONFIG.classNames.msgFailedPill} .msg-failed-why {
+                    display: block; font-size: 11px; font-weight: 400; opacity: 0.85;
+                }
+                .${CONFIG.classNames.msgFailedPill} button {
+                    font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 5px;
+                    cursor: pointer; white-space: nowrap; border: 1px solid transparent;
+                    background: ${isDarkMode ? '#b45309' : '#d97706'}; color: #fff;
+                }
+                .${CONFIG.classNames.msgFailedPill} button:not(.msg-dismiss-btn):not([disabled]):hover {
+                    background: ${isDarkMode ? '#d97706' : '#b45309'};
+                }
+                .${CONFIG.classNames.msgFailedPill} button[disabled] {
+                    opacity: 0.55; cursor: not-allowed;
+                }
+                .${CONFIG.classNames.msgFailedPill} .msg-open-link {
+                    font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 5px;
+                    text-decoration: none; white-space: nowrap; color: inherit;
+                    border: 1px solid ${isDarkMode ? '#c97d20' : '#fcd34d'};
+                }
+                .${CONFIG.classNames.msgFailedPill} .msg-dismiss-btn {
+                    background: transparent; color: inherit; border: none; opacity: 0.7; font-weight: 400;
+                }
+                .${CONFIG.classNames.msgFailedPill} .msg-dismiss-btn:hover { opacity: 1; }
+
                 /* --- Batch pre-flight confirm --- */
                 .ship-confirm-list {
                     margin: 0; padding: 10px 12px; border-radius: 6px; font-size: 13px;
@@ -1079,7 +1131,7 @@
                 cn.addTrackingLink, cn.reviseLink, cn.addrWarningBadge,
                 cn.addrOkBadge, cn.messageContainer, cn.markAsShippedBtn,
                 cn.printEnvelopeBtn, cn.buyLabelLink, cn.shippedLabel,
-                cn.shipFailedBanner, cn.shipQueuedBadge
+                cn.shipFailedBanner, cn.shipQueuedBadge, cn.msgFailedPill
             ].map(c => '.' + c).join(', ');
             orderItem.querySelectorAll(staleSelectors).forEach(el => el.remove());
             // The pending overlay is handled separately: an order that is
@@ -1476,7 +1528,8 @@
                     'ids=' + (c.dataset.orderId || '-'),
                     'confirmed=' + (c.dataset.confirmedIds || '-'),
                     'note=' + (c.dataset.shipNoteSent || '0'),
-                    'msg=' + (c.dataset.shipMsgSent || '0'),
+                    'msgQueued=' + (c.dataset.shipMsgSent || '0'),
+                    'msgOutcome=' + (c.dataset.msgOutcome || '-'),
                     'undone=' + (c.dataset.shipUndone || '0'),
                     'checked=' + (c.querySelector(CONFIG.selectors.checkbox)?.checked ? '1' : '0'),
                     'shippable=' + (isCardShippable(c) ? '1' : '0')
@@ -1534,6 +1587,11 @@
                 delete card.dataset.shipUndone;
                 delete card.dataset.shipInFlight;
                 delete card.dataset.shipAttemptAt;
+                delete card.dataset.msgOutcome;
+                delete card.dataset.msgFailedReason;
+                delete card.dataset.msgFailedAction;
+                delete card.dataset.msgFailedRetryable;
+                card.querySelectorAll(`.${CONFIG.classNames.msgFailedPill}`).forEach(el => el.remove());
                 // 'confirm' replaces the ship button with the ✓ Shipped span,
                 // exactly as a real confirmation does. Reset has to put the
                 // button back, or the card comes out of the dry run looking
@@ -1723,6 +1781,128 @@
             syncPendingBadge();
             repaintSkuPanel();
             console.warn('[Ship] Card ' + orderCard.id + ' failed: ' + (why || 'unknown'));
+        }
+
+        // The message failed but the ORDER still shipped, so this is a pill on an
+        // otherwise-good card, not the red ship-failure banner. Retry just
+        // reopens the message tab: the text is still sitting in GM storage,
+        // because a message is only consumed once it reaches the composer.
+        function markCardMessageFailed(orderCard, payload) {
+            if (!orderCard) return;
+            const p = payload || {};
+            const why = p.reason || 'The buyer message did not go out.';
+            // Stashed so the pill can be rebuilt after an eBay re-render wipes
+            // it — otherwise the card silently returns to an unqualified green
+            // tick and the only record of the failure is gone.
+            orderCard.dataset.msgOutcome = 'failed';
+            orderCard.dataset.msgFailedReason = why;
+            orderCard.dataset.msgFailedAction = p.action || '';
+            orderCard.dataset.msgFailedRetryable = p.retryable ? '1' : '0';
+            orderCard.querySelectorAll(`.${CONFIG.classNames.msgFailedPill}`).forEach(el => el.remove());
+            const firstOrderId = (orderCard.dataset.orderId || '').split(',')[0];
+
+            const pill = document.createElement('div');
+            pill.className = CONFIG.classNames.msgFailedPill;
+
+            const text = document.createElement('span');
+            text.className = 'msg-failed-text';
+            text.textContent = '✉ Message not sent';
+            const whyEl = document.createElement('span');
+            whyEl.className = 'msg-failed-why';
+            whyEl.textContent = why;
+            text.appendChild(whyEl);
+
+            // Retry only where it can actually work. Once the draft has been
+            // pasted the queued message is consumed, so reopening the tab would
+            // find nothing and stop silently — Open is the honest control there.
+            // Open is ALWAYS present, Retry is additional. During a batch the
+            // Retry starts disabled, and an auto-message failure almost always
+            // lands mid-batch — so an either/or would leave the pill with no
+            // working control in precisely its most common case.
+            const openLink = document.createElement('a');
+            openLink.className = 'msg-open-link';
+            openLink.textContent = 'Open';
+            openLink.href = firstOrderId
+                ? `https://www.ebay.com/mesh/ord/details?orderid=${firstOrderId}`
+                : 'https://www.ebay.com/sh/ord';
+            openLink.target = '_blank';
+            openLink.rel = 'noopener';
+            openLink.title = 'Open the order on eBay to send the message by hand';
+
+            // Retry only where it can work AND where we know which draft to
+            // reopen. An unknown action must never fall through to auto_message:
+            // that would peek the thank-you draft and, with auto-send on, mail
+            // the buyer something the seller never chose.
+            const knownAction = p.action === 'auto_message' || p.action === 'manual_message';
+            let retryBtn = null;
+            if (p.retryable && firstOrderId && knownAction) {
+                retryBtn = document.createElement('button');
+                retryBtn.type = 'button';
+                retryBtn.textContent = 'Retry message';
+                retryBtn.title = 'Reopen the message tab — the draft is still queued';
+                if (shipQueue.running) {
+                    retryBtn.disabled = true;
+                    retryBtn.title = 'A batch is running — retry when it finishes';
+                }
+                retryBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    // The message tab opens in the FOREGROUND; clicking this
+                    // mid-batch would yank focus off a live send.
+                    if (shipQueue.running) {
+                        SHIPDBG('message:retry-blocked-during-batch', { card: orderCard.id });
+                        return;
+                    }
+                    // Validate BEFORE disabling, so a bad action can never leave
+                    // a dead button as the card's only control.
+                    const act = orderCard.dataset.msgFailedAction;
+                    if (act !== 'auto_message' && act !== 'manual_message') {
+                        SHIPDBG('message:retry-unknown-action', { card: orderCard.id, action: act });
+                        return;
+                    }
+                    retryBtn.disabled = true;
+                    retryBtn.textContent = 'Retrying…';
+                    SHIPDBG('message:retry', { card: orderCard.id, orderId: firstOrderId, action: act });
+                    // The pill stays until a result comes back and replaces it —
+                    // clearing it on click would leave a clean-looking card if
+                    // the retry also fails.
+                    openAutomationTab(`https://www.ebay.com/mesh/ord/details?orderid=${firstOrderId}&tm_action=${act}`, { active: true });
+                    // If no result ever arrives — the seller closes the tab, or
+                    // it dies outside the composer waits — re-arm rather than
+                    // leaving a dead "Retrying…" button as the only control.
+                    setTimeout(() => {
+                        if (retryBtn.isConnected && retryBtn.textContent === 'Retrying…') {
+                            retryBtn.disabled = false;
+                            retryBtn.textContent = 'Retry message';
+                        }
+                    }, 90000);
+                });
+            }
+
+            const dismissBtn = document.createElement('button');
+            dismissBtn.type = 'button';
+            dismissBtn.className = 'msg-dismiss-btn';
+            dismissBtn.textContent = '✕';
+            dismissBtn.title = 'Dismiss';
+            dismissBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                pill.remove();
+                // Clear the stash too, or the pill resurrects on the next
+                // eBay re-render.
+                delete orderCard.dataset.msgOutcome;
+                delete orderCard.dataset.msgFailedReason;
+                delete orderCard.dataset.msgFailedAction;
+                delete orderCard.dataset.msgFailedRetryable;
+            });
+
+            if (retryBtn) pill.append(text, retryBtn, openLink, dismissBtn);
+            else pill.append(text, openLink, dismissBtn);
+            const anchor = orderCard.querySelector(`.${CONFIG.classNames.shippedLabel}`)
+                || orderCard.querySelector(`.${CONFIG.classNames.markAsShippedBtn}`);
+            if (anchor) anchor.insertAdjacentElement('afterend', pill);
+            else (orderCard.querySelector(CONFIG.selectors.tcellItem) || orderCard).appendChild(pill);
+            SHIPDBG('message:failed', { card: orderCard.id, reason: why });
         }
 
         // Deliberately the SAME matcher processShipmentConfirmation uses. The
@@ -1960,6 +2140,18 @@
                 queueCards.forEach(c => markCardQueued(c, false));
                 shipQueue.running = false;
                 shipQueue.current = shipQueue.total;
+                // Re-enable the Retry controls that were disabled because a
+                // batch was running. Without this they stay dead for the rest
+                // of the session — and a message failure raised DURING a batch
+                // is the ordinary case, not the edge case.
+                document.querySelectorAll(
+                    `.${CONFIG.classNames.msgFailedPill} button[disabled], .${CONFIG.classNames.shipFailedBanner} .ship-retry-btn[disabled]`
+                ).forEach(b => {
+                    if (b.classList.contains('msg-dismiss-btn')) return;
+                    if (b.textContent === 'Retrying…') return;
+                    b.disabled = false;
+                    b.title = '';
+                });
                 const stopped = shipQueue.stopRequested;
                 renderShipDock(stopped
                     ? `Stopped — ${shipQueue.done} shipped, ${shipQueue.failed} failed`
@@ -1992,7 +2184,11 @@
         function confirmShipBatch(cards) {
             const withMsg = cards.filter(c => c.querySelector('.thank-you-checkbox')?.checked).length;
             const withNote = cards.filter(c => c.querySelector('.ship-tomorrow-checkbox')?.checked).length;
-            const mins = Math.max(1, Math.round((cards.length * 20) / 60));
+            // 30s/order, not 20: measured across two real batches (12 orders,
+            // 2026-08-23) the wall-clock cost was ~29s each — eBay confirms in
+            // 23–31s and the inter-order pause and tab teardown add the rest.
+            // The old 20s estimate under-promised a 10-order run by ~40%.
+            const mins = Math.max(1, Math.round((cards.length * 30) / 60));
 
             const overlay = document.createElement('div');
             overlay.className = 'canned-modal-overlay';
@@ -3556,8 +3752,39 @@
                     await GM_setValue(SHIP_FAILED_KEY, null);
                 }
             }, CONFIG.timing.pollingInterval);
+            // Message outcomes, same listener + poller pair as the ship keys.
+            const processMessageResult = async (payload) => {
+                if (!payload?.orderId) return;
+                const card = findCardByOrderId(payload.orderId);
+                if (!card) return;
+                if (payload.status === 'failed') {
+                    markCardMessageFailed(card, payload);
+                } else {
+                    card.dataset.msgOutcome = payload.status || 'sent';
+                    delete card.dataset.msgFailedReason;
+                    delete card.dataset.msgFailedAction;
+                    delete card.dataset.msgFailedRetryable;
+                    card.querySelectorAll(`.${CONFIG.classNames.msgFailedPill}`).forEach(el => el.remove());
+                    SHIPDBG('message:' + (payload.status || 'sent'), { card: card.id, orderId: payload.orderId });
+                }
+            };
+            GM_addValueChangeListener(MESSAGE_RESULT_KEY, async (name, oldValue, newValue) => {
+                if (newValue?.orderId) {
+                    await processMessageResult(newValue);
+                    await GM_setValue(MESSAGE_RESULT_KEY, null);
+                }
+            });
+            setInterval(async () => {
+                const result = await GM_getValue(MESSAGE_RESULT_KEY, null);
+                if (result?.orderId) {
+                    await processMessageResult(result);
+                    await GM_setValue(MESSAGE_RESULT_KEY, null);
+                }
+            }, CONFIG.timing.pollingInterval);
+
             // Clear anything stale left by a previous session.
             GM_setValue(SHIP_FAILED_KEY, null);
+            GM_setValue(MESSAGE_RESULT_KEY, null);
 
             // --- Combined-card re-render watchdog ---
             // eBay recalculates shipping for combined orders asynchronously and
@@ -3582,6 +3809,18 @@
                     console.debug(`[Tampermonkey][ORDERS] Card index=${index} was re-rendered by eBay — re-processing`);
                     processOrderCard(card, index);
                     checkAndFinalizeCardState(card); // restore ✓ Shipped state if already confirmed
+                    // cleanupCardInjections strips the message-failure pill, and
+                    // nothing else would ever put it back — the card would go
+                    // back to an unqualified green tick with the buyer still
+                    // un-messaged. Rebuild it from the stash.
+                    if (card.dataset.msgOutcome === 'failed' &&
+                        !card.querySelector(`.${CONFIG.classNames.msgFailedPill}`)) {
+                        markCardMessageFailed(card, {
+                            reason: card.dataset.msgFailedReason,
+                            action: card.dataset.msgFailedAction,
+                            retryable: card.dataset.msgFailedRetryable === '1'
+                        });
+                    }
                     reprocessed++;
                 });
                 if (reprocessed > 0) {
@@ -4001,6 +4240,7 @@
                     storageKey: MANUAL_MESSAGE_SEND_KEY,
                     orderId: urlOrderId,
                     autoSend: false,
+                    action: 'manual_message',
                     label: 'Manual-Message'
                 });
             }
@@ -4016,6 +4256,7 @@
                     storageKey: MESSAGE_SEND_KEY,
                     orderId: urlOrderId,
                     autoSend: autoSendEnabled,
+                    action: 'auto_message',
                     label: 'Auto-Message'
                 });
             }
@@ -4213,17 +4454,35 @@
         await GM_setValue(storageKey, store);
     }
 
-    async function takeBuyerMessage(storageKey, orderId) {
+    // Reading and deleting used to be one operation, and the delete happened
+    // BEFORE the composer was even opened. So when the "Message buyer" panel
+    // failed to open, the message was already gone from storage: reloading the
+    // tab found nothing queued and gave up silently. Split in two, the message
+    // survives every failure that happens before the text is actually in the
+    // box, which is what makes a retry — by reload or by hand — possible at all.
+    async function peekBuyerMessage(storageKey, orderId) {
         const store = await GM_getValue(storageKey);
         if (!store || typeof store !== 'object') return null;
         // Legacy single-payload shape, still possible right after an update.
         if (typeof store.orderId === 'string') {
             if (store.orderId !== orderId) return null;
-            await GM_setValue(storageKey, {});
             return typeof store.message === 'string' ? store.message : null;
         }
         const entry = store[orderId];
         if (!entry) return null;
+        return typeof entry.message === 'string' ? entry.message : null;
+    }
+
+    // Called only once the message has landed in the composer. Past that point
+    // a re-run would double-paste (and, with auto-send on, double-send), so
+    // that is the correct place to give up the ability to retry.
+    async function consumeBuyerMessage(storageKey, orderId) {
+        const store = await GM_getValue(storageKey);
+        if (!store || typeof store !== 'object') return;
+        if (typeof store.orderId === 'string') {
+            if (store.orderId === orderId) await GM_setValue(storageKey, {});
+            return;
+        }
         delete store[orderId];
         // Drop stale entries so the map can't grow without bound.
         const cutoff = Date.now() - 6 * 60 * 60 * 1000;
@@ -4231,7 +4490,32 @@
             if (!store[k] || (store[k].queuedAt || 0) < cutoff) delete store[k];
         });
         await GM_setValue(storageKey, store);
-        return typeof entry.message === 'string' ? entry.message : null;
+    }
+
+    // Tells the pick-and-pack tab how the message actually ended up. Without
+    // this a card could read a confident green "✓ Shipped" while the buyer got
+    // nothing — the same failure-that-looks-like-success the ship path had.
+    // `action` matters: auto and manual messages live in DIFFERENT storage keys,
+    // so a retry must reopen the same one it came from. Retrying a manual
+    // message as `auto_message` would peek the thank-you draft instead and, with
+    // auto-send on, quietly send the buyer a message the seller never chose.
+    // `retryable` is false once the text has already been consumed — offering a
+    // Retry that cannot work is worse than offering none.
+    async function reportMessageResult(orderId, status, reason, opts) {
+        if (!orderId) return;
+        const o = opts || {};
+        try {
+            await GM_setValue(MESSAGE_RESULT_KEY, {
+                orderId: orderId,
+                status: status,
+                reason: reason || '',
+                // No default: an absent action must render as non-retryable
+                // rather than resolving to the auto thank-you path.
+                action: o.action || '',
+                retryable: !!o.retryable,
+                timestamp: Date.now()
+            });
+        } catch (e) { console.error('[Buyer-Msg] Could not report result:', e); }
     }
 
     // Fixed banner at the top of the order-details tab so a failure is
@@ -4458,9 +4742,17 @@
         const label = options.label || 'Buyer-Msg';
         MSG_LOG(label + ': starting for order ' + urlOrderId + ' (autoSend=' + autoSend + ')');
 
-        const message = await takeBuyerMessage(storageKey, urlOrderId);
+        // Peek — do NOT consume. The message stays in storage until it is
+        // actually in the composer, so a reload can pick it up again.
+        const message = await peekBuyerMessage(storageKey, urlOrderId);
         if (message === null) {
             console.warn('[Buyer-Msg] ' + label + ': nothing queued for order ' + urlOrderId + ' — stopping.');
+            // This used to be the one exit that reported nothing at all, which
+            // left a retry's "Retrying…" button stuck forever. Nothing to
+            // consume here, and nothing to retry — so report it as final.
+            await reportMessageResult(urlOrderId, 'failed',
+                'Nothing was queued for this order — send the message by hand.',
+                { action: options.action, retryable: false });
             return;
         }
 
@@ -4469,8 +4761,42 @@
         // Nothing to paste, nothing to confirm — so no green banner either.
         const hasText = message.trim() !== '';
 
+        // One self-reload before giving up. eBay's order page sometimes renders
+        // without ever wiring up the Message buyer button, and a fresh load is
+        // the only thing that reliably fixes it — clicking harder does not
+        // (openMessageBuyerPanel already re-clicks every 1.5s for 20s).
+        // Math.max(0, …) so a hand-edited negative tm_msg_retry can't slip under
+        // the bound and reload repeatedly.
+        const msgRetry = MSG_RETRY_AT_LOAD;
+        const retryByReload = (why) => {
+            if (msgRetry >= MESSAGE_PANEL_MAX_RETRIES) return false;
+            // Only worth doing unattended. On a manual message the seller is
+            // sitting right there — a surprise reload plus another 20s wait is
+            // worse than just telling them, and they can click again themselves.
+            if (!autoSend) return false;
+            // Rebuild the URL from values held since page load rather than
+            // re-reading location.search, which eBay's SPA may have rewritten
+            // by now. Losing tm_action to a replaceState would reload into a
+            // plain order page that does nothing and reports nothing.
+            // Literal base, not window.location.href: if the SPA has pushed a
+            // different path, reloading it could land somewhere the script's
+            // @match doesn't cover — the tab would then do nothing and report
+            // nothing, which is the exact failure this release exists to kill.
+            if (options.action !== 'auto_message' && options.action !== 'manual_message') return false;
+            const retryUrl = new URL('https://www.ebay.com/mesh/ord/details');
+            retryUrl.searchParams.set('orderid', urlOrderId);
+            retryUrl.searchParams.set('tm_action', options.action);
+            retryUrl.searchParams.set('tm_msg_retry', String(msgRetry + 1));
+            MSG_LOG(label + ': ' + why + ' — reloading this tab to try once more (attempt ' + (msgRetry + 2) + ').');
+            showMsgBanner('Composer did not open — reloading to try once more…', false);
+            window.location.href = retryUrl.toString();
+            return true;
+        };
+
         const composerDoc = await openMessageBuyerPanel();
         if (!composerDoc) {
+            if (retryByReload('panel never opened')) return;
+            await reportMessageResult(urlOrderId, 'failed', 'The "Message buyer" panel never opened.', { action: options.action, retryable: true });
             showMsgBanner('Auto-message failed: the "Message buyer" panel never opened.' +
                 (hasText ? ' Draft below — send it by hand.' : ''), false, hasText ? message : null);
             return;
@@ -4478,6 +4804,8 @@
 
         const ready = await waitForComposerReady();
         if (!ready) {
+            if (retryByReload('composer never finished loading')) return;
+            await reportMessageResult(urlOrderId, 'failed', 'The message box never finished loading.', { action: options.action, retryable: true });
             showMsgBanner('Auto-message failed: the message box never finished loading.' +
                 (hasText ? ' Draft below — send it by hand.' : ''), false, hasText ? message : null);
             return;
@@ -4486,23 +4814,33 @@
         if (!hasText) {
             // Empty draft: leave the composer focused and untouched, say nothing.
             MSG_LOG(label + ': empty message — pane opened, nothing inserted.');
+            await consumeBuyerMessage(storageKey, urlOrderId);
             try { ready.textarea.focus({ preventScroll: true }); } catch (e) {}
             return;
         }
 
         insertComposerText(ready.textarea, message);
+        // The text has landed. Past this point a re-run would double-paste, so
+        // this is where the retry window closes.
+        await consumeBuyerMessage(storageKey, urlOrderId);
         MSG_LOG(label + ': draft inserted (' + message.length + ' chars).');
 
         if (!autoSend) {
+            await reportMessageResult(urlOrderId, 'drafted', 'Draft left in the box for manual review.', { action: options.action });
             showMsgBanner('Draft inserted — review it, then click Send.', true);
             return;
         }
 
         const sent = await sendComposedMessage(ready.doc, ready.textarea);
         if (sent) {
+            await reportMessageResult(urlOrderId, 'sent', '', { action: options.action });
             showMsgBanner('Thank-you message sent ✔ — closing this tab…', true);
             finishAutomationTab('Thank-you message sent', 2500);
         } else {
+            // The draft IS in the box — this tab stays open so it can be sent by
+            // hand. The card is told anyway, because during a batch nobody is
+            // watching this tab and the order would otherwise read as complete.
+            await reportMessageResult(urlOrderId, 'failed', 'The draft was pasted but the Send click was not confirmed. The message tab is still open — send it there.', { action: options.action, retryable: false });
             showMsgBanner('AUTO-SEND FAILED — the draft is in the box, click Send yourself. (Tab left open on purpose.)', false);
             console.error('[Buyer-Msg] ' + label + ': send could not be confirmed for order ' + urlOrderId + '. Tab left open.');
         }
