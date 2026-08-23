@@ -1,5 +1,45 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.21
+- Mark as Shipped can now fail visibly. It was the only automation with no
+  failure channel at all: the watchdog bannered its own background tab and
+  wrote nothing back, so a card whose ship tab died sat forever showing a green
+  ✔ over the words "Marked as Shipped" while the favicon counter dropped as if
+  the order had gone out. There are now three card states — pending (amber
+  spinner, "confirming…"), confirmed (green ✓ Shipped), and failed (red banner
+  with Retry / Open / Dismiss) — and two independent ways to reach the third: a
+  new `ebay_order_ship_failed` key written by the tab's watchdog, and a deadline
+  timer on the pick-and-pack page that cannot be defeated by a tab that is gone.
+  A confirmation arriving late always beats a failure, so a merely-slow eBay
+  still resolves to shipped.
+- `isOrderCardDone()` counts only confirmed shipments. It used to also count the
+  pending overlay, which meant a silent failure made the tab look *more*
+  finished than it was.
+- New **Ship N Selected Orders** batch, driven by the same checkboxes that
+  already drive Print N Selected. It runs strictly one order at a time, waiting
+  for a real outcome rather than a fixed sleep — the thank-you message tab is
+  deliberately opened in the foreground so paste/auto-send has focus, and
+  several at once would fight over the browser. Serialising also sidesteps the
+  single-slot `ebay_order_shipped_confirmed`, which two simultaneous ship tabs
+  could clobber. A pre-flight dialog states the order count, the message count
+  and the rough duration before anything starts; a progress dock shows
+  shipped/failed/skipped with Stop and Retry-failed. The button only appears
+  when something is checked — there is deliberately no "Ship All".
+- Retry is safe to press. The note and the thank-you message are one-shot side
+  effects guarded by `shipNoteSent` / `shipMsgSent` flags, so retrying a failed
+  *shipment* can never send the buyer a second thank-you.
+- The per-card ship logic moved into `runShipForCard()` and both the button and
+  the batch call it, so the two paths cannot drift.
+- Console diagnostics: `altheastixShipReport()` dumps queue state, every card's
+  ship state and a 300-entry event log (`altheastixShipReport(true)` also copies
+  it to the clipboard), and `altheastixShipSimulate('fail'|'confirm'|'pending'|
+  'reset', 'order-item-N')` drives the card state machine directly so the three
+  states can be exercised without touching a real order.
+- Known gap, unchanged: on `/mesh/ord/details`, a `MARK_SHIPPED` link that never
+  appears within 12s is still treated as "already shipped" and reported as a
+  success. Distinguishing a slow page from a genuinely shipped order needs a
+  positive signal from eBay's DOM that hasn't been identified yet.
+
 ## 2026-08-22 — companion userscripts
 
 Two standalone scripts added to the repo, documented in

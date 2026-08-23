@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260823-v4.20-late-message-rewrite
+// @version      20260823-v4.21-batch-ship-failure-channel
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -13,6 +13,7 @@
 // @match        https://www.ebay.com/ship/single/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=ebay.com
 // @grant        GM_setClipboard
+// @grant        unsafeWindow
 // @grant        GM_addStyle
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -36,6 +37,11 @@
     // GLOBAL CONSTANTS & STORAGE KEYS
     // ===================================================================
     const CONFIRMED_SHIP_KEY = 'ebay_order_shipped_confirmed';
+    // Counterpart to CONFIRMED_SHIP_KEY. Ship used to be the only automation
+    // with no failure channel at all: the watchdog bannered its own tab and
+    // wrote nothing, so a card whose ship tab died sat forever showing a green
+    // check. Notes have had `status: 'error'` for ages; ship now matches.
+    const SHIP_FAILED_KEY = 'ebay_order_ship_failed';
     const TRACKING_ADD_KEY = 'ebay_tracking_to_add';
     const TRACKING_ADD_KEY_V2 = 'ebay_tracking_to_add_v2';
     const NOTE_ADD_KEY = 'ebay_note_to_add';
@@ -107,6 +113,7 @@
             classNames: {
                 addressContainer: 'en-US', editAddressBtn: 'edit-address-btn', cancelAddressBtn: 'cancel-address-btn', copyAddressBtn: 'copy-address-btn', addressEditInput: 'address-edit-input', cancelWrapper: 'cancel-wrapper', addressFullname: 'print__address__fullname', itemContainer: 'item', shippingInfoBlock: 'shipping-info-block', buyerNoteCallout: 'buyer-note-callout', quantityMulti: 'quantity-multi', markAsShippedBtn: 'mark-as-shipped-btn', isEditingAddress: 'is-editing-address', highlightManila: 'order-highlight-manila', highlightLg: 'order-highlight-lg', highlightMultiItem: 'order-highlight-multi-item', borderLg: 'order-border-lg', borderManila: 'order-border-manila', highlightYellow: 'highlight-yellow', skuItem: 'sku-item', skuGroupSeparator: 'sku-group-separator', skuLg: 'sku-lg', skuManila: 'sku-manila', skuMultiQty: 'sku-multi-qty', multiItemSkuOrder: 'order-multi-item', darkModeSwitch: 'dark-mode-switch', darkModeSlider: 'slider', zoomOverlay: 'zoomed-image-overlay', zoomContainer: 'zoomed-image-container', zoomImage: 'zoomed-image', zoomCloseButton: 'close-zoom-button',
                 printEnvelopeBtn: 'print-envelope-btn', markAsShippedWaiting: 'waiting-confirmation', orderShipped: 'shipped-state', shippedLabel: 'shipped-label', orderPendingShipment: 'order-pending-shipment', pendingOverlay: 'pending-overlay', pendingOverlayContent: 'pending-overlay-content', processingIcon: 'processing-icon', skuShipped: 'sku-shipped', addTrackingLink: 'add-tracking-link', trackingLinkSubmitted: 'tracking-link-submitted', reviseLink: 'revise-link', addNoteLink: 'add-note-link', noteLinkSubmitted: 'note-link-submitted',
+                orderShipFailed: 'ship-failed-state', shipFailedBanner: 'ship-failed-banner', shipQueuedBadge: 'ship-queued-badge', shipSelectedBtn: 'ship-selected-btn',
                 messageContainer: 'message-container', cannedMessageSelect: 'canned-message-select', sendCannedMessageBtn: 'send-canned-message-btn', buyLabelLink: 'buy-label-link',
                 shipsLabelPill: 'ships-label-pill', shipsLabelActive: 'ships-label-active', selectNonLabelBtn: 'select-non-label-btn',
                 addrWarningBadge: 'addr-warning-badge', addrWarningTooltip: 'addr-warning-tooltip',
@@ -574,6 +581,146 @@
                 .canned-modal-preview-status a {
                     color: inherit; text-decoration: underline; cursor: pointer;
                 }
+
+                /* --- Ship states: requested / confirmed / failed ---
+                   The pending overlay used to draw a green ✔ and the words
+                   "Marked as Shipped" the instant you clicked, which is
+                   indistinguishable from a real confirmation. It is now an
+                   amber spinner that says what it is actually doing. */
+                @keyframes altheastix-spin { to { transform: rotate(360deg); } }
+                .${CONFIG.classNames.processingIcon} {
+                    background-color: ${isDarkMode ? '#b45309' : '#d97706'};
+                    border: 3px solid rgba(255,255,255,0.3);
+                    border-top-color: #fff;
+                    font-size: 0 !important;
+                    animation: altheastix-spin 900ms linear infinite;
+                }
+                @media (prefers-reduced-motion: reduce) {
+                    .${CONFIG.classNames.processingIcon} { animation: none; }
+                }
+                .${CONFIG.classNames.pendingOverlay} .pending-sub {
+                    font-size: 11px; font-weight: 400; opacity: 0.75;
+                    font-variant-numeric: tabular-nums;
+                }
+                ${CONFIG.selectors.orderItem}.${CONFIG.classNames.orderShipFailed} {
+                    border-left: 5px solid ${isDarkMode ? '#f87171' : '#dc2626'};
+                }
+                .${CONFIG.classNames.shipFailedBanner} {
+                    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+                    width: 100%; margin-top: 10px; padding: 9px 12px; border-radius: 6px;
+                    font-size: 13px; line-height: 1.4;
+                    background: ${isDarkMode ? 'rgba(248,113,113,0.12)' : '#fef2f2'};
+                    border: 1px solid ${isDarkMode ? '#7f3a3a' : '#fecaca'};
+                    color: ${isDarkMode ? '#fca5a5' : '#991b1b'};
+                }
+                .${CONFIG.classNames.shipFailedBanner} .ship-failed-text { flex: 1 1 160px; min-width: 0; }
+                .${CONFIG.classNames.shipFailedBanner} .ship-failed-why {
+                    display: block; font-size: 11px; opacity: 0.8; font-weight: 400;
+                }
+                .${CONFIG.classNames.shipFailedBanner} button,
+                .${CONFIG.classNames.shipFailedBanner} a {
+                    font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 5px;
+                    cursor: pointer; text-decoration: none; white-space: nowrap; border: 1px solid transparent;
+                }
+                .${CONFIG.classNames.shipFailedBanner} .ship-retry-btn {
+                    background: ${isDarkMode ? '#b91c1c' : '#dc2626'}; color: #fff;
+                }
+                .${CONFIG.classNames.shipFailedBanner} .ship-retry-btn:hover {
+                    background: ${isDarkMode ? '#dc2626' : '#b91c1c'};
+                }
+                .${CONFIG.classNames.shipFailedBanner} .ship-open-link {
+                    background: transparent; color: inherit;
+                    border-color: ${isDarkMode ? '#7f3a3a' : '#fecaca'};
+                }
+                .${CONFIG.classNames.shipFailedBanner} .ship-dismiss-btn {
+                    background: transparent; color: inherit; opacity: 0.7; border: none;
+                }
+                .${CONFIG.classNames.shipFailedBanner} .ship-dismiss-btn:hover { opacity: 1; }
+                .${CONFIG.classNames.shipQueuedBadge} {
+                    display: block; width: 100%; margin-top: 10px; padding: 8px 12px;
+                    font-size: 13px; font-weight: 700; text-align: center; border-radius: 6px;
+                    background: ${isDarkMode ? '#3a3a3a' : '#f1f5f9'};
+                    color: ${isDarkMode ? '#aaa' : '#64748b'};
+                    border: 1px dashed ${isDarkMode ? '#555' : '#cbd5e1'};
+                }
+
+                /* --- Batch ship: panel button + progress dock --- */
+                .${CONFIG.classNames.shipSelectedBtn} {
+                    display: block; width: 100%; margin-top: 8px; padding: 8px 12px;
+                    font-size: 14px; font-weight: 700; text-align: center; cursor: pointer;
+                    border-radius: 4px; transition: all 150ms ease-in-out;
+                    color: #fff; border: 2px solid transparent;
+                    background: ${isDarkMode ? '#3665f3' : '#0070d2'};
+                }
+                .${CONFIG.classNames.shipSelectedBtn}:hover {
+                    background: ${isDarkMode ? '#5a82f5' : '#005fb8'};
+                }
+                .${CONFIG.classNames.shipSelectedBtn}[disabled] {
+                    background: ${isDarkMode ? '#555' : '#ccc'};
+                    color: ${isDarkMode ? '#999' : '#666'}; cursor: not-allowed;
+                }
+                #altheastix-ship-dock {
+                    position: fixed; bottom: 20px; width: 360px; z-index: 1002;
+                    background: ${isDarkMode ? '#2a2a2a' : '#fdfdfd'};
+                    border: 1px solid ${isDarkMode ? '#444' : '#ddd'};
+                    border-radius: 12px; padding: 12px 15px;
+                    box-shadow: 0 4px 16px rgba(0,0,0,0.22);
+                    font-size: 13px; color: ${isDarkMode ? '#e0e0e0' : '#222'};
+                    display: none;
+                }
+                #altheastix-ship-dock.visible { display: block; }
+                #altheastix-ship-dock .dock-title {
+                    font-weight: 700; font-size: 13px; display: flex;
+                    align-items: center; justify-content: space-between; gap: 8px;
+                }
+                #altheastix-ship-dock .dock-counts {
+                    margin-top: 6px; font-size: 12px; font-variant-numeric: tabular-nums;
+                    color: ${isDarkMode ? '#aaa' : '#666'};
+                }
+                #altheastix-ship-dock .dock-counts .ok   { color: ${isDarkMode ? '#7fc79e' : '#2e7d32'}; font-weight: 700; }
+                #altheastix-ship-dock .dock-counts .bad  { color: ${isDarkMode ? '#fca5a5' : '#dc2626'}; font-weight: 700; }
+                #altheastix-ship-dock .dock-bar {
+                    margin-top: 8px; height: 6px; border-radius: 3px; overflow: hidden;
+                    background: ${isDarkMode ? '#3a3a3a' : '#e8eaed'};
+                }
+                #altheastix-ship-dock .dock-bar-fill {
+                    height: 100%; width: 0%; border-radius: 3px;
+                    background: ${isDarkMode ? '#3665f3' : '#0070d2'};
+                    transition: width 250ms ease;
+                }
+                #altheastix-ship-dock .dock-actions {
+                    margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;
+                }
+                #altheastix-ship-dock .dock-actions button {
+                    font-size: 12px; font-weight: 700; padding: 5px 11px; border-radius: 5px;
+                    cursor: pointer; border: 1px solid ${isDarkMode ? '#555' : '#ccc'};
+                    background: ${isDarkMode ? '#3a3a3a' : '#fff'};
+                    color: ${isDarkMode ? '#e0e0e0' : '#272C34'};
+                }
+                #altheastix-ship-dock .dock-actions button:hover {
+                    background: ${isDarkMode ? '#4a4a4a' : '#f0f0f0'};
+                }
+                #altheastix-ship-dock .dock-actions .dock-stop {
+                    border-color: ${isDarkMode ? '#7f3a3a' : '#fecaca'};
+                    color: ${isDarkMode ? '#fca5a5' : '#991b1b'};
+                }
+
+                /* --- Batch pre-flight confirm --- */
+                .ship-confirm-list {
+                    margin: 0; padding: 10px 12px; border-radius: 6px; font-size: 13px;
+                    line-height: 1.6; list-style: none;
+                    background: ${isDarkMode ? '#1f1f1f' : '#f6f7f8'};
+                    border: 1px solid ${isDarkMode ? '#444' : '#e0e0e0'};
+                }
+                .ship-confirm-list li { display: flex; justify-content: space-between; gap: 12px; }
+                .ship-confirm-list li b { font-variant-numeric: tabular-nums; }
+                .ship-confirm-warn {
+                    margin: 0; font-size: 12px; line-height: 1.5;
+                    color: ${isDarkMode ? '#FFD580' : '#78350f'};
+                    background: ${isDarkMode ? 'rgba(255,179,71,0.1)' : '#fef3c7'};
+                    border: 1px solid ${isDarkMode ? '#c97d20' : '#f59e0b'};
+                    border-radius: 6px; padding: 8px 10px;
+                }
             `;
         }
 
@@ -597,6 +744,8 @@
             if (scrollTopBtn) {
                 scrollTopBtn.style.left = `${ordersContainer.getBoundingClientRect().right + 8}px`;
             }
+            const shipDockEl = document.getElementById('altheastix-ship-dock');
+            if (shipDockEl) shipDockEl.style.left = `${leftPos}px`;
         }
 
         function injectRadicalStyles() {
@@ -679,6 +828,12 @@
             scrollTopBtn.textContent = '↑';
             scrollTopBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
             document.body.appendChild(scrollTopBtn);
+            // Batch-ship progress dock. Lives on <body> rather than inside the
+            // SKU panel because PrintSKUTable rebuilds that panel wholesale on
+            // every refresh, which would wipe a running queue's UI.
+            const shipDockEl = document.createElement('div');
+            shipDockEl.id = 'altheastix-ship-dock';
+            document.body.appendChild(shipDockEl);
             injectRadicalStyles();
             const ebayLogo = document.querySelector(CONFIG.selectors.headerLogo);
             const topHeader = document.querySelector(CONFIG.selectors.headerTop);
@@ -924,9 +1079,24 @@
                 cn.addTrackingLink, cn.reviseLink, cn.addrWarningBadge,
                 cn.addrOkBadge, cn.messageContainer, cn.markAsShippedBtn,
                 cn.printEnvelopeBtn, cn.buyLabelLink, cn.shippedLabel,
-                cn.pendingOverlay
+                cn.shipFailedBanner, cn.shipQueuedBadge
             ].map(c => '.' + c).join(', ');
             orderItem.querySelectorAll(staleSelectors).forEach(el => el.remove());
+            // The pending overlay is handled separately: an order that is
+            // still in flight must KEEP its overlay through an eBay re-render.
+            // Stripping it used to disarm the deadline timer (which bails when
+            // the overlay is gone) and read as a cancellation to the batch
+            // queue, leaving a genuinely in-flight order with no overlay, no
+            // banner and no timer — stuck and statusless.
+            if (orderItem.dataset.shipInFlight !== '1') {
+                orderItem.querySelectorAll('.' + cn.pendingOverlay).forEach(el => el.remove());
+            }
+            // The failed banner has just been stripped, so drop the matching
+            // class too rather than leaving a red border with nothing in it.
+            // checkAndFinalizeCardState re-applies confirmed state after a
+            // re-render; a failure is not worth resurrecting, and the card
+            // returns to a normal, re-clickable state.
+            orderItem.classList.remove(cn.orderShipFailed);
             orderItem.querySelectorAll('.ship-when-wrap').forEach(el => el.remove());
             orderItem.querySelectorAll('.thank-you-checkbox').forEach(el => el.parentElement?.remove());
         }
@@ -1248,6 +1418,825 @@
             }
         }
 
+        // ===================================================================
+        // SHIP OUTCOME TRACKING
+        // ===================================================================
+        // A ship request used to have exactly one possible ending on this
+        // page: confirmation. If the automation tab died, was closed, never
+        // loaded, or hit its own watchdog, nothing was ever written back and
+        // the card sat forever showing a green check over the words "Marked as
+        // Shipped". It now has three endings — pending, confirmed, failed —
+        // and two independent ways to reach the third:
+        //
+        //   1. SHIP_FAILED_KEY, written by the automation tab's watchdog.
+        //      Fast and specific, but useless if the tab never got far enough
+        //      to arm a watchdog.
+        //   2. A deadline timer here on the main page. Slower, but it cannot
+        //      be defeated by a tab that is gone.
+        //
+        // Whichever lands first wins; a confirmation arriving late always
+        // beats a failure, so a merely-slow eBay resolves to shipped.
+
+        const shipDeadlineTimers = new Map();
+
+        // --- Ship diagnostics ---
+        // Every state transition in the ship lifecycle logs here, and the last
+        // 300 entries are kept so a whole batch can be dumped in one go:
+        //   altheastixShipReport()      → copyable text summary
+        //   altheastixShipReport(true)  → also copies it to the clipboard
+        // Function declarations, not const arrows: this file has been bitten
+        // before by a helper still in its TDZ when an early caller reached it.
+        const shipLogBuffer = [];
+        function SHIPDBG(event, data) {
+            const stamp = new Date().toLocaleTimeString('en-US', { hour12: false });
+            const entry = { t: stamp, event: event, data: data === undefined ? null : data };
+            shipLogBuffer.push(entry);
+            if (shipLogBuffer.length > 300) shipLogBuffer.shift();
+            console.log(`[Altheastix][ship] ${stamp} ${event}`, data === undefined ? '' : data);
+        }
+        function shipCardState(card) {
+            if (!card) return 'no-card';
+            if (card.classList.contains(CONFIG.classNames.orderShipped)) return 'confirmed';
+            if (card.classList.contains(CONFIG.classNames.orderShipFailed)) return 'failed';
+            if (card.querySelector(`.${CONFIG.classNames.pendingOverlay}`)) return 'pending';
+            return 'idle';
+        }
+        function altheastixShipReport(copy) {
+            const cards = Array.from(document.querySelectorAll(CONFIG.selectors.orderItem));
+            const lines = [];
+            lines.push('=== Altheastix ship report ===');
+            lines.push(`version: ${(typeof GM_info !== 'undefined' && GM_info?.script?.version) || 'unknown'}`);
+            lines.push(`queue: running=${shipQueue.running} total=${shipQueue.total} current=${shipQueue.current} done=${shipQueue.done} failed=${shipQueue.failed} skipped=${shipQueue.skipped} stopRequested=${shipQueue.stopRequested}`);
+            lines.push(`deadline timers armed: ${shipDeadlineTimers.size} [${Array.from(shipDeadlineTimers.keys()).join(', ')}]`);
+            lines.push(`--- cards (${cards.length}) ---`);
+            cards.forEach(c => {
+                lines.push([
+                    c.id,
+                    'state=' + shipCardState(c),
+                    'ids=' + (c.dataset.orderId || '-'),
+                    'confirmed=' + (c.dataset.confirmedIds || '-'),
+                    'note=' + (c.dataset.shipNoteSent || '0'),
+                    'msg=' + (c.dataset.shipMsgSent || '0'),
+                    'undone=' + (c.dataset.shipUndone || '0'),
+                    'checked=' + (c.querySelector(CONFIG.selectors.checkbox)?.checked ? '1' : '0'),
+                    'shippable=' + (isCardShippable(c) ? '1' : '0')
+                ].join(' '));
+            });
+            lines.push(`--- log (${shipLogBuffer.length}) ---`);
+            shipLogBuffer.forEach(e => {
+                lines.push(`${e.t} ${e.event}${e.data !== null ? ' ' + JSON.stringify(e.data) : ''}`);
+            });
+            const text = lines.join('\n');
+            console.log(text);
+            if (copy) { try { GM_setClipboard(text); console.log('[Altheastix][ship] report copied to clipboard.'); } catch (e) {} }
+            return text;
+        }
+        // Dry-run harness. Drives the card state machine directly so the three
+        // visual states, the retry button, the badge counter and the batch
+        // bookkeeping can all be exercised without opening a single automation
+        // tab or touching a real order on eBay.
+        //   altheastixShipSimulate('fail', 'order-item-3')
+        //   altheastixShipSimulate('confirm', 'order-item-3')
+        //   altheastixShipSimulate('pending', 'order-item-3')
+        //   altheastixShipSimulate('reset', 'order-item-3')
+        function altheastixShipSimulate(kind, cardId) {
+            const card = document.getElementById(cardId);
+            if (!card) { console.warn('[Altheastix][ship] no card with id ' + cardId); return; }
+            SHIPDBG('simulate', { kind: kind, card: cardId });
+            if (kind === 'fail') {
+                markCardShipFailed(card, 'Simulated failure (dry run — nothing was sent to eBay).');
+            } else if (kind === 'confirm') {
+                card.dataset.confirmedIds = card.dataset.orderId || '';
+                clearShipDeadline(card);
+                clearShipFailedState(card);
+                markCardQueued(card, false);
+                card.querySelector(`.${CONFIG.classNames.pendingOverlay}`)?.remove();
+                card.classList.add(CONFIG.classNames.orderShipped);
+                const btn = card.querySelector(`.${CONFIG.classNames.markAsShippedBtn}`);
+                if (btn) {
+                    const lbl = document.createElement('span');
+                    lbl.className = CONFIG.classNames.shippedLabel;
+                    lbl.innerHTML = '✓ Shipped';
+                    btn.replaceWith(lbl);
+                }
+                repaintSkuPanel();
+            } else if (kind === 'pending') {
+                markCardQueued(card, true);
+            } else if (kind === 'reset') {
+                clearShipDeadline(card);
+                clearShipFailedState(card);
+                markCardQueued(card, false);
+                card.querySelector(`.${CONFIG.classNames.pendingOverlay}`)?.remove();
+                card.classList.remove(CONFIG.classNames.orderShipped);
+                delete card.dataset.confirmedIds;
+                delete card.dataset.shipNoteSent;
+                delete card.dataset.shipMsgSent;
+                delete card.dataset.shipUndone;
+                delete card.dataset.shipInFlight;
+                delete card.dataset.shipAttemptAt;
+                repaintSkuPanel();
+            } else {
+                console.warn("[Altheastix][ship] kind must be 'fail' | 'confirm' | 'pending' | 'reset'");
+                return;
+            }
+            syncPendingBadge();
+            console.log('[Altheastix][ship] ' + cardId + ' is now: ' + shipCardState(card));
+        }
+
+        // Reachable from the page console (userscripts run in their own scope).
+        try {
+            unsafeWindow.altheastixShipReport = altheastixShipReport;
+            unsafeWindow.altheastixShipSimulate = altheastixShipSimulate;
+        } catch (e) {
+            try {
+                window.altheastixShipReport = altheastixShipReport;
+                window.altheastixShipSimulate = altheastixShipSimulate;
+            } catch (e2) { console.warn('[Altheastix][ship] diagnostics not reachable from the page console.'); }
+        }
+
+        // The tab's own watchdog, plus room for tab startup and the second
+        // page load (/mesh/ord/details → /om/shipment/update).
+        function shipDeadlineMs() {
+            return ((USER_CONFIG.automationTabTimeoutSeconds || 45) * 1000) + 25000;
+        }
+
+        function startShipDeadline(orderCard) {
+            if (!orderCard || !orderCard.id) return;
+            clearShipDeadline(orderCard);
+            const id = orderCard.id;
+            const timer = setTimeout(() => {
+                shipDeadlineTimers.delete(id);
+                const card = document.getElementById(id);
+                if (!card) return;
+                if (card.classList.contains(CONFIG.classNames.orderShipped)) return;
+                // Read the explicit markers, never the overlay's presence — an
+                // eBay re-render can remove the overlay from a card that is
+                // genuinely still in flight, and inferring "undone" from that
+                // is what silently disarmed this backstop.
+                if (card.dataset.shipUndone === '1') return;
+                if (card.dataset.shipInFlight !== '1') return;
+                SHIPDBG('deadline:fired', { card: id, afterMs: shipDeadlineMs() });
+                markCardShipFailed(card, 'No confirmation from eBay within ' + Math.round(shipDeadlineMs() / 1000) + 's.');
+            }, shipDeadlineMs());
+            shipDeadlineTimers.set(id, timer);
+        }
+
+        function clearShipDeadline(orderCard) {
+            if (!orderCard || !orderCard.id) return;
+            const timer = shipDeadlineTimers.get(orderCard.id);
+            if (timer) { clearTimeout(timer); shipDeadlineTimers.delete(orderCard.id); }
+        }
+
+        // Wipe any failed banner/state so a retry starts from a clean card.
+        function clearShipFailedState(orderCard) {
+            if (!orderCard) return;
+            orderCard.classList.remove(CONFIG.classNames.orderShipFailed);
+            orderCard.querySelectorAll(`.${CONFIG.classNames.shipFailedBanner}`).forEach(el => el.remove());
+        }
+
+        function markCardShipFailed(orderCard, why) {
+            if (!orderCard) return;
+            // A confirmation that landed first always wins.
+            if (orderCard.classList.contains(CONFIG.classNames.orderShipped)) return;
+            if (orderCard.classList.contains(CONFIG.classNames.orderShipFailed)) return;
+            clearShipDeadline(orderCard);
+            delete orderCard.dataset.shipInFlight;
+            markCardQueued(orderCard, false);
+            orderCard.querySelector(`.${CONFIG.classNames.pendingOverlay}`)?.remove();
+            orderCard.classList.add(CONFIG.classNames.orderShipFailed);
+
+            const shipBtn = orderCard.querySelector(`.${CONFIG.classNames.markAsShippedBtn}`);
+            if (shipBtn) {
+                shipBtn.disabled = false;
+                shipBtn.classList.remove(CONFIG.classNames.markAsShippedWaiting);
+                shipBtn.textContent = orderCard.querySelector('.thank-you-checkbox')?.checked
+                    ? 'Mark as Shipped & Msg' : 'Mark as Shipped';
+            }
+
+            const firstOrderId = (orderCard.dataset.orderId || '').split(',')[0];
+            const banner = document.createElement('div');
+            banner.className = CONFIG.classNames.shipFailedBanner;
+
+            const text = document.createElement('span');
+            text.className = 'ship-failed-text';
+            text.textContent = 'Not confirmed as shipped';
+            const whyEl = document.createElement('span');
+            whyEl.className = 'ship-failed-why';
+            whyEl.textContent = why || 'The automation tab did not report back.';
+            text.appendChild(whyEl);
+
+            const retryBtn = document.createElement('button');
+            retryBtn.type = 'button';
+            retryBtn.className = 'ship-retry-btn';
+            retryBtn.textContent = 'Retry';
+            if (shipQueue.running) {
+                retryBtn.disabled = true;
+                retryBtn.title = 'A batch is running — retry when it finishes';
+            }
+            retryBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                // This listener is its own path into runShipForCard and does
+                // NOT go through the delegated handler, so it needs the same
+                // batch guard. Without it, clicking Retry on a card that fails
+                // mid-batch puts a second ship tab in flight.
+                if (shipQueue.running) {
+                    SHIPDBG('retry-click:blocked-during-batch', { card: orderCard.id });
+                    return;
+                }
+                const btn = orderCard.querySelector(`.${CONFIG.classNames.markAsShippedBtn}`);
+                if (btn) await runShipForCard(orderCard, btn);
+            });
+
+            const openLink = document.createElement('a');
+            openLink.className = 'ship-open-link';
+            openLink.textContent = 'Open';
+            openLink.href = firstOrderId
+                ? `https://www.ebay.com/mesh/ord/details?orderid=${firstOrderId}`
+                : 'https://www.ebay.com/sh/ord';
+            openLink.target = '_blank';
+            openLink.rel = 'noopener';
+            openLink.title = 'Open the order without automation, to finish it by hand';
+
+            const dismissBtn = document.createElement('button');
+            dismissBtn.type = 'button';
+            dismissBtn.className = 'ship-dismiss-btn';
+            dismissBtn.textContent = '✕';
+            dismissBtn.title = 'Dismiss';
+            dismissBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                clearShipFailedState(orderCard);
+                syncPendingBadge();
+            });
+
+            banner.append(text, retryBtn, openLink, dismissBtn);
+            // Never fall back to the card's SIBLING position: every cleanup
+            // path (dismiss, re-render, confirmation) scopes its query to
+            // inside the card, so a banner placed outside it can never be
+            // removed again and floats between cards for the rest of the day.
+            if (shipBtn) {
+                shipBtn.insertAdjacentElement('afterend', banner);
+            } else {
+                (orderCard.querySelector(CONFIG.selectors.tcellItem) || orderCard).appendChild(banner);
+            }
+            syncPendingBadge();
+            repaintSkuPanel();
+            console.warn('[Ship] Card ' + orderCard.id + ' failed: ' + (why || 'unknown'));
+        }
+
+        // Deliberately the SAME matcher processShipmentConfirmation uses. The
+        // two keys are written from two different URLs (?orderid= and
+        // ?orderId=); an asymmetric matcher here would make failures silently
+        // un-routable while confirmations kept working — and failure is the
+        // far less exercised path, so that is exactly where it would hide.
+        function findCardByOrderId(orderId) {
+            if (!orderId) return null;
+            const card = Array.from(document.querySelectorAll(CONFIG.selectors.orderItem))
+                .find(c => c.dataset.orderId?.includes(orderId)) || null;
+            if (!card) console.warn('[Ship] Failure reported for order ' + orderId + ' but no card matched it.');
+            return card;
+        }
+
+        // Resolves once the card reaches a terminal state. Polled rather than
+        // promise-plumbed so it stays correct no matter which of the several
+        // paths (listener, poller, deadline) actually resolved the card.
+        function awaitCardShipResolution(orderCard, timeoutMs) {
+            return new Promise(resolve => {
+                const started = Date.now();
+                const iv = setInterval(() => {
+                    if (!document.body.contains(orderCard)) { clearInterval(iv); resolve('gone'); return; }
+                    if (orderCard.classList.contains(CONFIG.classNames.orderShipped)) { clearInterval(iv); resolve('confirmed'); return; }
+                    if (orderCard.classList.contains(CONFIG.classNames.orderShipFailed)) { clearInterval(iv); resolve('failed'); return; }
+                    // Undo pressed mid-queue — treat as the user taking over.
+                    // This checks an explicit marker rather than the absence of
+                    // the pending overlay, because the overlay also disappears
+                    // when eBay re-renders a combined card and the re-render
+                    // watchdog reprocesses it. Reading that as "cancelled" let
+                    // the queue start the next order while this one was still
+                    // in flight — two ship tabs at once, which is precisely
+                    // what the single-slot CONFIRMED_SHIP_KEY cannot survive.
+                    if (orderCard.dataset.shipUndone === '1') { clearInterval(iv); resolve('cancelled'); return; }
+                    if (Date.now() - started > timeoutMs) { clearInterval(iv); resolve('timeout'); }
+                }, 500);
+            });
+        }
+
+        // ===================================================================
+        // BATCH SHIP QUEUE
+        // ===================================================================
+        // Strictly one order at a time, waiting on a real outcome rather than
+        // a fixed sleep. Serial is not a performance compromise here, it is
+        // the only safe option: the thank-you message tab is deliberately
+        // opened in the FOREGROUND so paste/auto-send runs with focus, and
+        // several of those at once would fight over the browser. Serialising
+        // also sidesteps the single-slot CONFIRMED_SHIP_KEY, which two
+        // simultaneous ship tabs could otherwise clobber.
+
+        const shipQueue = { running: false, stopRequested: false, total: 0, done: 0, failed: 0, skipped: 0, current: 0 };
+        // PrintSKUTable owns the "Ship N Selected" button, but skuManager is a
+        // local of main(). The queue needs to force a panel repaint when it
+        // finishes, or the button stays stuck reading "Shipping…".
+        let skuManagerRef = null;
+        function repaintSkuPanel() {
+            try { skuManagerRef?.createSKUPackingList(); } catch (e) { console.error('[Ship] panel repaint failed:', e); }
+        }
+
+        function shipDock() {
+            return document.getElementById('altheastix-ship-dock');
+        }
+
+        function renderShipDock(statusText) {
+            const dock = shipDock();
+            if (!dock) return;
+            dock.classList.add('visible');
+            updateSkuPanelPosition(); // the dock's left offset is set there
+            const settled = shipQueue.done + shipQueue.failed + shipQueue.skipped;
+            const pct = shipQueue.total ? Math.round((settled / shipQueue.total) * 100) : 0;
+            dock.innerHTML = '';
+
+            const title = document.createElement('div');
+            title.className = 'dock-title';
+            const titleText = document.createElement('span');
+            titleText.textContent = statusText || `Shipping ${shipQueue.current} of ${shipQueue.total}`;
+            title.appendChild(titleText);
+            dock.appendChild(title);
+
+            const counts = document.createElement('div');
+            counts.className = 'dock-counts';
+            const ok = document.createElement('span');
+            ok.className = 'ok';
+            ok.textContent = `${shipQueue.done} shipped`;
+            counts.append(ok, document.createTextNode(' · '));
+            if (shipQueue.failed > 0) {
+                const bad = document.createElement('span');
+                bad.className = 'bad';
+                bad.textContent = `${shipQueue.failed} failed`;
+                counts.append(bad, document.createTextNode(' · '));
+            }
+            if (shipQueue.skipped > 0) counts.append(document.createTextNode(`${shipQueue.skipped} skipped · `));
+            counts.append(document.createTextNode(`${Math.max(0, shipQueue.total - settled)} to go`));
+            dock.appendChild(counts);
+
+            const bar = document.createElement('div');
+            bar.className = 'dock-bar';
+            const fill = document.createElement('div');
+            fill.className = 'dock-bar-fill';
+            fill.style.width = pct + '%';
+            bar.appendChild(fill);
+            dock.appendChild(bar);
+
+            const actions = document.createElement('div');
+            actions.className = 'dock-actions';
+
+            if (shipQueue.running) {
+                const stop = document.createElement('button');
+                stop.type = 'button';
+                stop.className = 'dock-stop';
+                stop.textContent = 'Stop after this one';
+                stop.addEventListener('click', () => {
+                    shipQueue.stopRequested = true;
+                    renderShipDock('Stopping after the current order…');
+                });
+                actions.appendChild(stop);
+            } else {
+                if (shipQueue.failed > 0) {
+                    const retryAll = document.createElement('button');
+                    retryAll.type = 'button';
+                    retryAll.textContent = `Retry ${shipQueue.failed} failed`;
+                    retryAll.addEventListener('click', () => {
+                        const failedCards = Array.from(document.querySelectorAll(
+                            `${CONFIG.selectors.orderItem}.${CONFIG.classNames.orderShipFailed}`));
+                        if (failedCards.length) startShipQueue(failedCards);
+                    });
+                    actions.appendChild(retryAll);
+                }
+                const close = document.createElement('button');
+                close.type = 'button';
+                close.textContent = 'Close';
+                close.addEventListener('click', () => dock.classList.remove('visible'));
+                actions.appendChild(close);
+            }
+            dock.appendChild(actions);
+        }
+
+        // A card is shippable if it isn't already shipped and isn't mid-flight.
+        function isCardShippable(card) {
+            if (!card) return false;
+            if (card.classList.contains(CONFIG.classNames.orderShipped)) return false;
+            if (card.querySelector(`.${CONFIG.classNames.pendingOverlay}`)) return false;
+            return !!card.querySelector(`.${CONFIG.classNames.markAsShippedBtn}`);
+        }
+
+        function selectedShippableCards() {
+            return Array.from(document.querySelectorAll(CONFIG.selectors.orderItem))
+                .filter(card => card.querySelector(CONFIG.selectors.checkbox)?.checked)
+                .filter(isCardShippable);
+        }
+
+        async function startShipQueue(cards) {
+            if (shipQueue.running) return;
+            const queueCards = cards.filter(isCardShippable);
+            if (queueCards.length === 0) return;
+
+            shipQueue.running = true;
+            shipQueue.stopRequested = false;
+            shipQueue.total = queueCards.length;
+            shipQueue.done = 0;
+            shipQueue.failed = 0;
+            shipQueue.skipped = 0;
+            shipQueue.current = 0;
+
+            const perOrderTimeout = shipDeadlineMs() + 5000;
+            SHIPDBG('queue:start', { orders: queueCards.length, perOrderTimeout: perOrderTimeout });
+            renderShipDock('Starting…');
+            queueCards.forEach(c => markCardQueued(c, true));
+            repaintSkuPanel();
+
+            // Everything below is wrapped: a single throw used to leave
+            // shipQueue.running true forever, which silently disabled batch
+            // shipping for the rest of the session with no way back but a
+            // reload. One bad order must never cost the other twenty-four.
+            try {
+                for (let i = 0; i < queueCards.length; i++) {
+                    if (shipQueue.stopRequested) {
+                        queueCards.slice(i).forEach(c => markCardQueued(c, false));
+                        SHIPDBG('queue:stopped-by-user', { atIndex: i });
+                        break;
+                    }
+                    const card = queueCards[i];
+                    markCardQueued(card, false);
+                    if (!document.body.contains(card) || !isCardShippable(card)) {
+                        shipQueue.skipped++;
+                        SHIPDBG('order:skipped', { card: card.id, state: shipCardState(card) });
+                        renderShipDock();
+                        continue;
+                    }
+                    shipQueue.current = i + 1;
+                    renderShipDock();
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                    const btn = card.querySelector(`.${CONFIG.classNames.markAsShippedBtn}`);
+                    if (!btn) {
+                        shipQueue.failed++;
+                        markCardShipFailed(card, 'The card lost its Mark as Shipped button before the batch reached it.');
+                        SHIPDBG('order:no-button', { card: card.id });
+                        renderShipDock();
+                        continue;
+                    }
+
+                    SHIPDBG('order:begin', { n: i + 1, of: queueCards.length, card: card.id, ids: card.dataset.orderId });
+                    let outcome;
+                    try {
+                        await runShipForCard(card, btn);
+                        outcome = await awaitCardShipResolution(card, perOrderTimeout);
+                    } catch (err) {
+                        outcome = 'threw';
+                        console.error('[Ship] Order threw during batch:', err);
+                        markCardShipFailed(card, 'The ship request threw: ' + (err?.message || err));
+                    }
+                    SHIPDBG('order:end', { card: card.id, outcome: outcome, state: shipCardState(card) });
+
+                    if (outcome === 'confirmed') shipQueue.done++;
+                    else if (outcome === 'cancelled' || outcome === 'gone') shipQueue.skipped++;
+                    else {
+                        shipQueue.failed++;
+                        if (outcome === 'timeout') {
+                            markCardShipFailed(card, 'The batch gave up waiting for eBay to confirm.');
+                        }
+                    }
+                    renderShipDock();
+                    // A breath between orders so eBay isn't hit back to back.
+                    if (i < queueCards.length - 1 && !shipQueue.stopRequested) {
+                        await new Promise(r => setTimeout(r, 1200));
+                    }
+                }
+            } catch (err) {
+                console.error('[Ship] Batch aborted:', err);
+                SHIPDBG('queue:threw', { message: err?.message || String(err) });
+            } finally {
+                queueCards.forEach(c => markCardQueued(c, false));
+                shipQueue.running = false;
+                shipQueue.current = shipQueue.total;
+                const stopped = shipQueue.stopRequested;
+                renderShipDock(stopped
+                    ? `Stopped — ${shipQueue.done} shipped, ${shipQueue.failed} failed`
+                    : (shipQueue.failed > 0
+                        ? `Finished with ${shipQueue.failed} problem${shipQueue.failed === 1 ? '' : 's'}`
+                        : `All ${shipQueue.done} shipped`));
+                // Repaint so the panel button leaves its "Shipping…" state.
+                repaintSkuPanel();
+                SHIPDBG('queue:finished', { done: shipQueue.done, failed: shipQueue.failed, skipped: shipQueue.skipped });
+            }
+        }
+
+        // A card waiting its turn shows a badge, so it is obvious which orders
+        // the batch still owns and that clicking them by hand is a bad idea.
+        function markCardQueued(card, isQueued) {
+            if (!card) return;
+            const existing = card.querySelector(`.${CONFIG.classNames.shipQueuedBadge}`);
+            if (!isQueued) { existing?.remove(); return; }
+            if (existing) return;
+            const shipBtn = card.querySelector(`.${CONFIG.classNames.markAsShippedBtn}`);
+            if (!shipBtn) return;
+            const badge = document.createElement('div');
+            badge.className = CONFIG.classNames.shipQueuedBadge;
+            badge.textContent = '⏳ Queued for batch shipping';
+            shipBtn.insertAdjacentElement('afterend', badge);
+        }
+
+        // Pre-flight. Never start a batch without saying exactly what it will
+        // do — especially the message count, because those tabs take focus.
+        function confirmShipBatch(cards) {
+            const withMsg = cards.filter(c => c.querySelector('.thank-you-checkbox')?.checked).length;
+            const withNote = cards.filter(c => c.querySelector('.ship-tomorrow-checkbox')?.checked).length;
+            const mins = Math.max(1, Math.round((cards.length * 20) / 60));
+
+            const overlay = document.createElement('div');
+            overlay.className = 'canned-modal-overlay';
+            const content = document.createElement('div');
+            content.className = 'canned-modal-content';
+
+            const h3 = document.createElement('h3');
+            h3.textContent = `Ship ${cards.length} order${cards.length === 1 ? '' : 's'}?`;
+            content.appendChild(h3);
+
+            const list = document.createElement('ul');
+            list.className = 'ship-confirm-list';
+            [
+                ['Orders to mark shipped', cards.length],
+                ['Thank-you messages', withMsg],
+                ['"Will ship" notes', withNote],
+                ['Rough time, one at a time', `~${mins} min`]
+            ].forEach(([label, value]) => {
+                const li = document.createElement('li');
+                const l = document.createElement('span');
+                l.textContent = label;
+                const v = document.createElement('b');
+                v.textContent = String(value);
+                li.append(l, v);
+                list.appendChild(li);
+            });
+            content.appendChild(list);
+
+            if (withMsg > 0) {
+                const warn = document.createElement('p');
+                warn.className = 'ship-confirm-warn';
+                warn.textContent = `${withMsg} message tab${withMsg === 1 ? '' : 's'} will open in the foreground and take focus as they go, so the browser won't be usable during the run. Turn off "Send thank you msg" in Configuration to keep everything in background tabs.`;
+                content.appendChild(warn);
+            }
+
+            const buttons = document.createElement('div');
+            buttons.className = 'canned-modal-buttons';
+            const cancel = document.createElement('button');
+            cancel.className = 'canned-modal-button secondary';
+            cancel.textContent = 'Cancel';
+            cancel.addEventListener('click', () => overlay.remove());
+            const go = document.createElement('button');
+            go.className = 'canned-modal-button primary';
+            go.textContent = `Ship ${cards.length}`;
+            go.addEventListener('click', () => {
+                overlay.remove();
+                startShipQueue(cards);
+            });
+            buttons.append(cancel, go);
+            content.appendChild(buttons);
+
+            overlay.appendChild(content);
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+            const esc = (e) => {
+                if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', esc); }
+            };
+            document.addEventListener('keydown', esc);
+            document.body.appendChild(overlay);
+        }
+
+        // --- Ship one card (extracted verbatim from the old click handler) ---
+        // Both the per-card button and the batch queue go through here, so the
+        // two paths can never drift. Behaviour is unchanged apart from three
+        // things: the overlay no longer claims success before eBay has
+        // confirmed anything, a failure deadline is armed, and any previous
+        // failed state on the card is cleared before a retry.
+        async function runShipForCard(orderItemElement, target) {
+            if (!orderItemElement || !target) return;
+            // Bail before touching any state if there is nothing to ship —
+            // otherwise the batch clears the card's banner, opens nothing, and
+            // then burns the full per-order timeout waiting for a confirmation
+            // that was never requested.
+            // Returns true if a ship request actually went out. Bail before
+            // touching any state when there is nothing to ship — otherwise the
+            // batch clears the card's banner, opens nothing, and then burns the
+            // full per-order timeout waiting for a confirmation never requested.
+            if (!target.dataset.orderId) {
+                SHIPDBG('order:no-order-id', { card: orderItemElement.id });
+                markCardShipFailed(orderItemElement, 'This card has no eBay order id — nothing to mark as shipped.');
+                return false;
+            }
+            clearShipFailedState(orderItemElement);
+            delete orderItemElement.dataset.shipUndone;
+            // Stamped so a late failure report from a PREVIOUS attempt can be
+            // recognised as stale and ignored, instead of tearing down the
+            // retry that is currently in flight.
+            orderItemElement.dataset.shipAttemptAt = String(Date.now());
+            SHIPDBG('order:ship-requested', { card: orderItemElement.id, ids: target.dataset.orderId });
+            const orderIdString = target.dataset.orderId;
+            if (orderIdString && orderItemElement) {
+                const shipTomorrowCheckbox = orderItemElement.querySelector('.ship-tomorrow-checkbox');
+                const thankYouCheckbox = orderItemElement.querySelector('.thank-you-checkbox');
+                const firstOrderId = orderIdString.split(',')[0];
+
+                // The `…Sent` guards make this safe to call twice on one card.
+                // Only the SHIP step can fail and be retried; the note and the
+                // message are one-shot side effects, and re-running them would
+                // send the buyer a second thank-you every time you hit Retry.
+                if (shipTomorrowCheckbox && shipTomorrowCheckbox.checked && orderItemElement.dataset.shipNoteSent !== '1') {
+                    orderItemElement.dataset.shipNoteSent = '1';
+                    const tomorrow = computeNextShipDateSkippingSunday(1);
+                    const options = { weekday: 'long', month: 'short', day: 'numeric' };
+                    const formattedDate = tomorrow.toLocaleDateString('en-US', options);
+                    const noteText = `Will be shipped on ${formattedDate}`;
+
+                    await GM_setValue(NOTE_ADD_KEY, { orderId: firstOrderId, note: noteText });
+                    openAutomationTab(`https://www.ebay.com/mesh/ord/details?orderid=${firstOrderId}&tm_action=add_note`, { active: false });
+
+                    const noteLink = orderItemElement.querySelector(`.${CONFIG.classNames.addNoteLink}[data-order-id="${firstOrderId}"]`);
+                    if (noteLink) {
+                        noteLink.textContent = 'note ✅';
+                    }
+                }
+
+                if (thankYouCheckbox && thankYouCheckbox.checked && orderItemElement.dataset.shipMsgSent !== '1') {
+                    orderItemElement.dataset.shipMsgSent = '1';
+                    let shipmentDate = new Date();
+                    if (shipTomorrowCheckbox && shipTomorrowCheckbox.checked) {
+                        shipmentDate = computeNextShipDateSkippingSunday(1);
+                    }
+                    const options = { weekday: 'long', month: 'short', day: 'numeric' };
+                    const isToday = (new Date()).toDateString() === shipmentDate.toDateString();
+                    const formattedShipmentDate = `${isToday ? 'today, ' : ''}${shipmentDate.toLocaleDateString('en-US', options)}`;
+                    // Extract buyer name for personalization
+                    const fullNameEl = orderItemElement.querySelector('.print__address__fullname');
+                    const buyerName = (fullNameEl?.textContent || '').trim();
+                    const buyerFirst = buyerName.split(/\s+/)[0] || 'there';
+                    // Determine total item quantity and content type (sticker, magnet, or mixed)
+                    let totalItemQty = 0;
+                    let totalItemsPrice = 0;
+                    let containsSticker = false;
+                    let containsMagnet = false;
+
+                    orderItemElement.querySelectorAll('.item').forEach(itemEl => {
+                        let qty = 1;
+                        const detailsList = itemEl.querySelector('[class*="item__details"]');
+                        if (detailsList) {
+                            const qtyLi = Array.from(detailsList.querySelectorAll('li')).find(li => li.innerText.trim().startsWith('Quantity:'));
+                            if (qtyLi) {
+                                const m = qtyLi.innerText.match(/Quantity:\s*(\d+)/);
+                                if (m) qty = parseInt(m[1], 10) || 1;
+                            }
+                            const priceLi = Array.from(detailsList.querySelectorAll('li')).find(li => li.innerText.trim().startsWith('Item price:') || li.innerText.trim().startsWith('Sold for:'));
+                            if (priceLi) {
+                                const pm = priceLi.innerText.match(/\$(\d+\.\d{2})/);
+                                if (pm?.[1]) totalItemsPrice += parseFloat(pm[1]) * qty;
+                            }
+                        }
+                        totalItemQty += qty;
+
+                        const itemTitle = itemEl.querySelector('.item__description h2 a')?.textContent.toLowerCase() || '';
+                        if (itemTitle.includes('sticker')) {
+                            containsSticker = true;
+                        }
+                        if (itemTitle.includes('magnet')) {
+                            containsMagnet = true;
+                        }
+                    });
+
+                    const plural = totalItemQty !== 1;
+                    let productWord = 'goodies'; // Default for mixed orders
+                    if (containsSticker && !containsMagnet) {
+                        productWord = plural ? 'stickers' : 'sticker';
+                    } else if (containsMagnet && !containsSticker) {
+                        productWord = plural ? 'magnets' : 'magnet';
+                    }
+                    const pronounSubj = plural ? 'they' : 'it';
+                    const pronounObj = plural ? 'them' : 'it';
+                    const demonstrative = plural ? 'these' : 'this';
+                    // Determine if destination is Canada to adjust delivery note (needs plural computed)
+                    const isCanadianDest = orderItemElement.dataset.isCanadian === 'true' || /canada/i.test(orderItemElement.querySelector(`.${CONFIG.classNames.addressContainer}`)?.textContent || '');
+                    const dn = CONFIG.deliveryNotes;
+                    const deliveryNote = isCanadianDest
+                        ? dn.canada
+                        : `${plural ? dn.usualPlural : dn.usualSingular}, ${dn.patienceVariants[Math.floor(Math.random() * dn.patienceVariants.length)]}`;
+                    // Dynamic tracking note based on order total value vs threshold
+                    const threshold = USER_CONFIG.trackingOrderAmountThreshold || 25;
+                    const trackingNote = totalItemsPrice > threshold
+                        ? ''
+                        : `To keep prices fair, orders at or under $${threshold} ship without tracking.`;
+                    const templates = CONFIG.messageTemplates?.thankYouDrafts || [];
+                    const template = templates[Math.floor(Math.random() * templates.length)] || 'Hello {BUYER_FIRST}, thanks for your order! We will ship it on {SHIP_DATE}.';
+                    const messageText = applyTemplate(template, {
+                        BUYER_NAME: buyerName,
+                        BUYER_FIRST: buyerFirst,
+                        SHIP_DATE: formattedShipmentDate,
+                        STICKER_WORD: productWord,
+                        PRONOUN_SUBJ: pronounSubj,
+                        PRONOUN_OBJ: pronounObj,
+                        DEMONSTRATIVE: demonstrative,
+                        DELIVERY_NOTE: deliveryNote,
+                        TRACKING_NOTE: trackingNote
+                    });
+                    // Smooth out awkward phrasing like "on today, Friday Oct 10" -> "today, Friday Oct 10"
+                    // Append a random musician quote at the very end (controlled by USER_CONFIG.enableQuotesInMessages)
+                    const quotesEnabled = USER_CONFIG.enableQuotesInMessages !== false;
+                    let chosenQuote = '';
+                    if (quotesEnabled) {
+                        const allSKUsText = Array.from(orderItemElement.querySelectorAll('.item .item__description h2 a')).map(a => a.textContent.toLowerCase()).join(' ');
+                        const quoteKeywords = CONFIG.quoteKeywords || {};
+                        const quotes = CONFIG.quotes || {};
+                        let matchedGroup = null;
+
+                        for (const group in quoteKeywords) {
+                            if (quoteKeywords[group].some(keyword => allSKUsText.includes(keyword.toLowerCase()))) {
+                                matchedGroup = group;
+                                break;
+                            }
+                        }
+
+                        if (matchedGroup && quotes[matchedGroup] && quotes[matchedGroup].length > 0) {
+                            const groupQuotes = quotes[matchedGroup];
+                            chosenQuote = groupQuotes[Math.floor(Math.random() * groupQuotes.length)];
+                        } else {
+                            const allQuotes = Object.values(quotes).flat();
+                            if (allQuotes.length > 0) {
+                                chosenQuote = allQuotes[Math.floor(Math.random() * allQuotes.length)];
+                            }
+                        }
+                    }
+                    const finalMessageText = (messageText + (chosenQuote ? `\n\n***\n\n${chosenQuote}` : ''))
+                        .replace(/\bon\s+today\b(?=[^\w]|$)/gi, 'today')
+                        // Collapse any leftover blank lines from an empty {TRACKING_NOTE}
+                        .replace(/\n{3,}/g, '\n\n');
+                    try {
+                        await queueBuyerMessage(MESSAGE_SEND_KEY, firstOrderId, finalMessageText);
+                    } catch (err) {
+                        // The flag is set before the write so a retry can never
+                        // double-send. If the write itself failed then nothing
+                        // was queued, so let a retry attempt it again.
+                        delete orderItemElement.dataset.shipMsgSent;
+                        throw err;
+                    }
+                    // Open the message tab in the foreground so paste/auto-send runs with focus
+                    openAutomationTab(`https://www.ebay.com/mesh/ord/details?orderid=${firstOrderId}&tm_action=auto_message`, { active: true });
+                }
+
+                const orderIds = orderIdString.split(',');
+                const overlay = document.createElement('div');
+                overlay.className = CONFIG.classNames.pendingOverlay;
+                overlay.innerHTML = `<div class="${CONFIG.classNames.pendingOverlayContent}"><div class="${CONFIG.classNames.processingIcon}"></div><span id="overlay-text"></span><span class="pending-sub" id="overlay-sub"></span></div>`;
+                const undoBtn = document.createElement('button');
+                undoBtn.textContent = 'Undo';
+                undoBtn.style.cssText = 'margin-top:8px;padding:3px 10px;font-size:12px;border-radius:4px;background:#f5f5f5;color:#666;border:1px solid #ddd;cursor:pointer;font-weight:normal;opacity:0.7;';
+                undoBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    overlay.remove();
+                    target.textContent = orderItemElement.querySelector('.thank-you-checkbox')?.checked ? 'Mark as Shipped & Msg' : 'Mark as Shipped';
+                    target.disabled = false;
+                    target.classList.remove(CONFIG.classNames.markAsShippedWaiting);
+                    orderItemElement.dataset.shipUndone = '1';
+                    delete orderItemElement.dataset.shipInFlight;
+                    clearShipDeadline(orderItemElement);
+                    SHIPDBG('order:undone', { card: orderItemElement.id });
+                    syncPendingBadge();
+                };
+                overlay.firstChild.appendChild(undoBtn);
+                // Set the instant the overlay exists, NOT after the tab loop:
+                // a combined card opens one tab per order id with a 1s gap
+                // between them, and an eBay re-render landing inside that
+                // window would otherwise strip the overlay and leave real ship
+                // tabs in flight with no overlay, no timer and no banner.
+                orderItemElement.dataset.shipInFlight = '1';
+                orderItemElement.appendChild(overlay);
+                syncPendingBadge();
+                const textElement = overlay.querySelector('#overlay-text');
+                target.textContent = 'Requested...';
+                target.disabled = true;
+                target.classList.add(CONFIG.classNames.markAsShippedWaiting);
+                for (let i = 0; i < orderIds.length; i++) {
+                    textElement.textContent = `Opening tab ${i + 1} of ${orderIds.length}...`;
+                    // tm_attempt lets a failure report identify WHICH attempt it
+                    // belongs to. Stamping the report with Date.now() is not
+                    // enough: a watchdog from attempt 1 fires after attempt 2
+                    // has already started, so by report time it looks newer.
+                    openAutomationTab(`https://www.ebay.com/mesh/ord/details?orderid=${orderIds[i]}&tm_action=ship&tm_attempt=${orderItemElement.dataset.shipAttemptAt || ''}`, { active: false });
+                    if (i < orderIds.length - 1) await new Promise(resolve => setTimeout(resolve, CONFIG.timing.sequentialTabDelay));
+                }
+                textElement.textContent = 'Marked as shipped — confirming…';
+                const subElement = overlay.querySelector('#overlay-sub');
+                if (subElement) subElement.textContent = `waiting up to ${Math.round(shipDeadlineMs() / 1000)}s for eBay`;
+                startShipDeadline(orderItemElement);
+            }
+            return true;
+        }
+
         // --- Global Event Listeners ---
         // A single, delegated event listener on the main orders container.
         // It handles clicks for all custom actions like 'Copy Address', 'Add Note', 'Mark as Shipped', etc.
@@ -1415,170 +2404,18 @@
                 }
                 if (target.classList.contains(CONFIG.classNames.markAsShippedBtn)) {
                     event.preventDefault();
-                    const orderIdString = target.dataset.orderId;
-                    if (orderIdString && orderItemElement) {
-                        const shipTomorrowCheckbox = orderItemElement.querySelector('.ship-tomorrow-checkbox');
-                        const thankYouCheckbox = orderItemElement.querySelector('.thank-you-checkbox');
-                        const firstOrderId = orderIdString.split(',')[0];
-
-                        if (shipTomorrowCheckbox && shipTomorrowCheckbox.checked) {
-                            const tomorrow = computeNextShipDateSkippingSunday(1);
-                            const options = { weekday: 'long', month: 'short', day: 'numeric' };
-                            const formattedDate = tomorrow.toLocaleDateString('en-US', options);
-                            const noteText = `Will be shipped on ${formattedDate}`;
-
-                            await GM_setValue(NOTE_ADD_KEY, { orderId: firstOrderId, note: noteText });
-                            openAutomationTab(`https://www.ebay.com/mesh/ord/details?orderid=${firstOrderId}&tm_action=add_note`, { active: false });
-
-                            const noteLink = orderItemElement.querySelector(`.${CONFIG.classNames.addNoteLink}[data-order-id="${firstOrderId}"]`);
-                            if (noteLink) {
-                                noteLink.textContent = 'note ✅';
-                            }
-                        }
-
-                        if (thankYouCheckbox && thankYouCheckbox.checked) {
-                            let shipmentDate = new Date();
-                            if (shipTomorrowCheckbox && shipTomorrowCheckbox.checked) {
-                                shipmentDate = computeNextShipDateSkippingSunday(1);
-                            }
-                            const options = { weekday: 'long', month: 'short', day: 'numeric' };
-                            const isToday = (new Date()).toDateString() === shipmentDate.toDateString();
-                            const formattedShipmentDate = `${isToday ? 'today, ' : ''}${shipmentDate.toLocaleDateString('en-US', options)}`;
-                            // Extract buyer name for personalization
-                            const fullNameEl = orderItemElement.querySelector('.print__address__fullname');
-                            const buyerName = (fullNameEl?.textContent || '').trim();
-                            const buyerFirst = buyerName.split(/\s+/)[0] || 'there';
-                            // Determine total item quantity and content type (sticker, magnet, or mixed)
-                            let totalItemQty = 0;
-                            let totalItemsPrice = 0;
-                            let containsSticker = false;
-                            let containsMagnet = false;
-
-                            orderItemElement.querySelectorAll('.item').forEach(itemEl => {
-                                let qty = 1;
-                                const detailsList = itemEl.querySelector('[class*="item__details"]');
-                                if (detailsList) {
-                                    const qtyLi = Array.from(detailsList.querySelectorAll('li')).find(li => li.innerText.trim().startsWith('Quantity:'));
-                                    if (qtyLi) {
-                                        const m = qtyLi.innerText.match(/Quantity:\s*(\d+)/);
-                                        if (m) qty = parseInt(m[1], 10) || 1;
-                                    }
-                                    const priceLi = Array.from(detailsList.querySelectorAll('li')).find(li => li.innerText.trim().startsWith('Item price:') || li.innerText.trim().startsWith('Sold for:'));
-                                    if (priceLi) {
-                                        const pm = priceLi.innerText.match(/\$(\d+\.\d{2})/);
-                                        if (pm?.[1]) totalItemsPrice += parseFloat(pm[1]) * qty;
-                                    }
-                                }
-                                totalItemQty += qty;
-
-                                const itemTitle = itemEl.querySelector('.item__description h2 a')?.textContent.toLowerCase() || '';
-                                if (itemTitle.includes('sticker')) {
-                                    containsSticker = true;
-                                }
-                                if (itemTitle.includes('magnet')) {
-                                    containsMagnet = true;
-                                }
-                            });
-
-                            const plural = totalItemQty !== 1;
-                            let productWord = 'goodies'; // Default for mixed orders
-                            if (containsSticker && !containsMagnet) {
-                                productWord = plural ? 'stickers' : 'sticker';
-                            } else if (containsMagnet && !containsSticker) {
-                                productWord = plural ? 'magnets' : 'magnet';
-                            }
-                            const pronounSubj = plural ? 'they' : 'it';
-                            const pronounObj = plural ? 'them' : 'it';
-                            const demonstrative = plural ? 'these' : 'this';
-                            // Determine if destination is Canada to adjust delivery note (needs plural computed)
-                            const isCanadianDest = orderItemElement.dataset.isCanadian === 'true' || /canada/i.test(orderItemElement.querySelector(`.${CONFIG.classNames.addressContainer}`)?.textContent || '');
-                            const dn = CONFIG.deliveryNotes;
-                            const deliveryNote = isCanadianDest
-                                ? dn.canada
-                                : `${plural ? dn.usualPlural : dn.usualSingular}, ${dn.patienceVariants[Math.floor(Math.random() * dn.patienceVariants.length)]}`;
-                            // Dynamic tracking note based on order total value vs threshold
-                            const threshold = USER_CONFIG.trackingOrderAmountThreshold || 25;
-                            const trackingNote = totalItemsPrice > threshold
-                                ? ''
-                                : `To keep prices fair, orders at or under $${threshold} ship without tracking.`;
-                            const templates = CONFIG.messageTemplates?.thankYouDrafts || [];
-                            const template = templates[Math.floor(Math.random() * templates.length)] || 'Hello {BUYER_FIRST}, thanks for your order! We will ship it on {SHIP_DATE}.';
-                            const messageText = applyTemplate(template, {
-                                BUYER_NAME: buyerName,
-                                BUYER_FIRST: buyerFirst,
-                                SHIP_DATE: formattedShipmentDate,
-                                STICKER_WORD: productWord,
-                                PRONOUN_SUBJ: pronounSubj,
-                                PRONOUN_OBJ: pronounObj,
-                                DEMONSTRATIVE: demonstrative,
-                                DELIVERY_NOTE: deliveryNote,
-                                TRACKING_NOTE: trackingNote
-                            });
-                            // Smooth out awkward phrasing like "on today, Friday Oct 10" -> "today, Friday Oct 10"
-                            // Append a random musician quote at the very end (controlled by USER_CONFIG.enableQuotesInMessages)
-                            const quotesEnabled = USER_CONFIG.enableQuotesInMessages !== false;
-                            let chosenQuote = '';
-                            if (quotesEnabled) {
-                                const allSKUsText = Array.from(orderItemElement.querySelectorAll('.item .item__description h2 a')).map(a => a.textContent.toLowerCase()).join(' ');
-                                const quoteKeywords = CONFIG.quoteKeywords || {};
-                                const quotes = CONFIG.quotes || {};
-                                let matchedGroup = null;
-
-                                for (const group in quoteKeywords) {
-                                    if (quoteKeywords[group].some(keyword => allSKUsText.includes(keyword.toLowerCase()))) {
-                                        matchedGroup = group;
-                                        break;
-                                    }
-                                }
-
-                                if (matchedGroup && quotes[matchedGroup] && quotes[matchedGroup].length > 0) {
-                                    const groupQuotes = quotes[matchedGroup];
-                                    chosenQuote = groupQuotes[Math.floor(Math.random() * groupQuotes.length)];
-                                } else {
-                                    const allQuotes = Object.values(quotes).flat();
-                                    if (allQuotes.length > 0) {
-                                        chosenQuote = allQuotes[Math.floor(Math.random() * allQuotes.length)];
-                                    }
-                                }
-                            }
-                            const finalMessageText = (messageText + (chosenQuote ? `\n\n***\n\n${chosenQuote}` : ''))
-                                .replace(/\bon\s+today\b(?=[^\w]|$)/gi, 'today')
-                                // Collapse any leftover blank lines from an empty {TRACKING_NOTE}
-                                .replace(/\n{3,}/g, '\n\n');
-                            await queueBuyerMessage(MESSAGE_SEND_KEY, firstOrderId, finalMessageText);
-                            // Open the message tab in the foreground so paste/auto-send runs with focus
-                            openAutomationTab(`https://www.ebay.com/mesh/ord/details?orderid=${firstOrderId}&tm_action=auto_message`, { active: true });
-                        }
-
-                        const orderIds = orderIdString.split(',');
-                        const overlay = document.createElement('div');
-                        overlay.className = CONFIG.classNames.pendingOverlay;
-                        overlay.innerHTML = `<div class="${CONFIG.classNames.pendingOverlayContent}"><div class="${CONFIG.classNames.processingIcon}">✔</div><span id="overlay-text"></span></div>`;
-                        const undoBtn = document.createElement('button');
-                        undoBtn.textContent = 'Undo';
-                        undoBtn.style.cssText = 'margin-top:8px;padding:3px 10px;font-size:12px;border-radius:4px;background:#f5f5f5;color:#666;border:1px solid #ddd;cursor:pointer;font-weight:normal;opacity:0.7;';
-                        undoBtn.onclick = (e) => {
-                            e.stopPropagation();
-                            overlay.remove();
-                            target.textContent = orderItemElement.querySelector('.thank-you-checkbox')?.checked ? 'Mark as Shipped & Msg' : 'Mark as Shipped';
-                            target.disabled = false;
-                            target.classList.remove(CONFIG.classNames.markAsShippedWaiting);
-                            syncPendingBadge();
-                        };
-                        overlay.firstChild.appendChild(undoBtn);
-                        orderItemElement.appendChild(overlay);
-                        syncPendingBadge();
-                        const textElement = overlay.querySelector('#overlay-text');
-                        target.textContent = 'Requested...';
-                        target.disabled = true;
-                        target.classList.add(CONFIG.classNames.markAsShippedWaiting);
-                        for (let i = 0; i < orderIds.length; i++) {
-                            textElement.textContent = `Opening tab ${i + 1} of ${orderIds.length}...`;
-                            openAutomationTab(`https://www.ebay.com/mesh/ord/details?orderid=${orderIds[i]}&tm_action=ship`, { active: false });
-                            if (i < orderIds.length - 1) await new Promise(resolve => setTimeout(resolve, CONFIG.timing.sequentialTabDelay));
-                        }
-                        textElement.textContent = 'Marked as Shipped';
+                    // A manual click during a batch would put two ship tabs in
+                    // flight at once, and the single-slot CONFIRMED_SHIP_KEY
+                    // can only carry one — the loser rides its deadline to a
+                    // red "failed" banner on an order eBay actually shipped.
+                    if (shipQueue.running) {
+                        SHIPDBG('manual-click:blocked-during-batch', { card: orderItemElement?.id });
+                        const prev = target.textContent;
+                        target.textContent = 'Batch running…';
+                        setTimeout(() => { if (target.textContent === 'Batch running…') target.textContent = prev; }, 1600);
+                        return;
                     }
+                    await runShipForCard(orderItemElement, target);
                     return;
                 }
                 if (target.classList.contains(CONFIG.classNames.sendCannedMessageBtn)) {
@@ -1989,15 +2826,13 @@
             }
         }
 
-        // A card counts as "done" for the favicon counter when it has either
-        // the confirmed orderShipped class (background tab confirmed) OR the
-        // immediate "Marked as Shipped" pending overlay. Undo removes the
-        // overlay, which restores the card to pending.
+        // A card counts as "done" for the favicon counter ONLY once the
+        // shipment is confirmed. It used to also count the pending overlay,
+        // which meant a request that silently failed made the tab look MORE
+        // finished than it was — the counter dropped and never came back. A
+        // card in flight is still work outstanding, so it still counts.
         function isOrderCardDone(card) {
-            return !!card && (
-                card.classList.contains(CONFIG.classNames.orderShipped) ||
-                !!card.querySelector('.' + CONFIG.classNames.pendingOverlay)
-            );
+            return !!card && card.classList.contains(CONFIG.classNames.orderShipped);
         }
 
         // Recounts pending SKUs directly from ALL order cards and redraws the
@@ -2115,6 +2950,32 @@
                         printButton.onclick = () => printEnvelopes(Array.from(allOrderItems));
                     }
                     contentWrapper.appendChild(printButton);
+
+                    // Batch ship, driven by the same checkboxes that drive
+                    // "Print N Selected". Deliberately absent when nothing is
+                    // checked — there is no "Ship All" here, because shipping
+                    // the whole page by accident is not a recoverable click.
+                    if (checkedCheckboxes.length > 0) {
+                        const shippable = selectedShippableCards();
+                        const shipSelectedBtn = document.createElement('button');
+                        shipSelectedBtn.type = 'button';
+                        shipSelectedBtn.className = CONFIG.classNames.shipSelectedBtn;
+                        if (shipQueue.running) {
+                            shipSelectedBtn.textContent = 'Shipping…';
+                            shipSelectedBtn.disabled = true;
+                        } else if (shippable.length === 0) {
+                            shipSelectedBtn.textContent = 'Selected orders already shipped';
+                            shipSelectedBtn.disabled = true;
+                        } else {
+                            shipSelectedBtn.textContent = `Ship ${shippable.length} Selected Order${shippable.length === 1 ? '' : 's'}`;
+                            shipSelectedBtn.title = 'Mark each selected order as shipped, one at a time, waiting for eBay to confirm each before starting the next';
+                            shipSelectedBtn.addEventListener('click', () => {
+                                const cards = selectedShippableCards();
+                                if (cards.length) confirmShipBatch(cards);
+                            });
+                        }
+                        contentWrapper.appendChild(shipSelectedBtn);
+                    }
                 }
 
                 // --- CUSTOM ENVELOPE FEATURE (link in SKU panel) ---
@@ -2541,6 +3402,7 @@
             const skuManager = setupSkuLogic();
             document.querySelectorAll(CONFIG.selectors.orderItem).forEach((orderItem, index) => processOrderCard(orderItem, index));
             setupGlobalEventListeners(skuManager);
+            skuManagerRef = skuManager; // so the batch queue can repaint the panel
             skuManager.createSKUPackingList();
             refreshAddressBanner();
             autoHidePostageCostOnLabel();
@@ -2566,7 +3428,15 @@
                 const allIdsOnCard = (orderCard.dataset.orderId || '').split(',').filter(Boolean);
                 if (allIdsOnCard.length > 0 && allIdsOnCard.every(id => confirmedIds.includes(id))) {
                     orderCard.querySelector(`.${CONFIG.classNames.pendingOverlay}`)?.remove();
+                    // A confirmation always beats a failure, however late it
+                    // arrives — a merely-slow eBay must resolve to "shipped",
+                    // not leave a red card behind.
+                    clearShipDeadline(orderCard);
+                    clearShipFailedState(orderCard);
+                    markCardQueued(orderCard, false);
+                    delete orderCard.dataset.shipInFlight;
                     orderCard.classList.add(CONFIG.classNames.orderShipped);
+                    SHIPDBG('order:confirmed', { card: orderCard.id, ids: orderCard.dataset.orderId });
                     const shipButton = orderCard.querySelector(`.${CONFIG.classNames.markAsShippedBtn}`);
                     if (shipButton) {
                         const shippedLabel = document.createElement('span');
@@ -2603,6 +3473,49 @@
                     await GM_setValue(CONFIRMED_SHIP_KEY, null);
                 }
             }, CONFIG.timing.pollingInterval);
+
+            // Ship failures, mirroring the confirmation path above (listener
+            // AND poller, because GM_addValueChangeListener does not fire
+            // reliably in every Tampermonkey/Firefox combination).
+            const processShipFailure = async (payload) => {
+                if (!payload?.orderId) return;
+                const card = findCardByOrderId(payload.orderId);
+                if (!card) return;
+                // Drop a report that belongs to an attempt we have already
+                // moved past. The main-page deadline (70s) can fire before the
+                // tab's own watchdog on the second page does, so a retry
+                // started in between would otherwise be torn down by the
+                // previous attempt's timeout landing late.
+                // Match on the attempt id carried through the tab URL, not on
+                // when the report was written — a watchdog fires long after
+                // its attempt began, so by wall-clock it can look newer than
+                // the retry it would otherwise tear down. If tm_attempt did
+                // not survive eBay's navigation the id is absent, and the
+                // guard degrades to the old permissive behaviour rather than
+                // dropping a real failure.
+                const attemptAt = card.dataset.shipAttemptAt || '';
+                if (payload.attemptId && attemptAt && payload.attemptId !== attemptAt) {
+                    SHIPDBG('failure:ignored-stale', { card: card.id, payloadAttempt: payload.attemptId, currentAttempt: attemptAt });
+                    return;
+                }
+                SHIPDBG('failure:received', { card: card.id, orderId: payload.orderId, reason: payload.reason });
+                markCardShipFailed(card, payload.reason || 'The automation tab timed out.');
+            };
+            GM_addValueChangeListener(SHIP_FAILED_KEY, async (name, oldValue, newValue) => {
+                if (newValue?.orderId) {
+                    await processShipFailure(newValue);
+                    await GM_setValue(SHIP_FAILED_KEY, null);
+                }
+            });
+            setInterval(async () => {
+                const failed = await GM_getValue(SHIP_FAILED_KEY, null);
+                if (failed?.orderId) {
+                    await processShipFailure(failed);
+                    await GM_setValue(SHIP_FAILED_KEY, null);
+                }
+            }, CONFIG.timing.pollingInterval);
+            // Clear anything stale left by a previous session.
+            GM_setValue(SHIP_FAILED_KEY, null);
 
             // --- Combined-card re-render watchdog ---
             // eBay recalculates shipping for combined orders asynchronously and
@@ -2875,8 +3788,21 @@
             else if (urlAction === 'ship') {
                 const SHIP_TIMEOUT = (USER_CONFIG.automationTabTimeoutSeconds || 45) * 1000;
 
+                // Report a timeout back to the pick-and-pack tab so the card
+                // stops pretending it shipped. Best-effort: if this tab is
+                // already gone the main page's own deadline covers it.
+                // tm_attempt rides along from the pick-and-pack tab so the main
+                // page can tell a report about THIS attempt from one about an
+                // attempt it has already given up on and retried.
+                const shipAttemptId = urlParams.get('tm_attempt') || '';
+                const reportShipFailure = (reason) => {
+                    try { GM_setValue(SHIP_FAILED_KEY, { orderId: urlOrderId, reason: reason, attemptId: shipAttemptId, timestamp: Date.now() }); }
+                    catch (e) { console.error('[Ship] Could not report failure:', e); }
+                };
+
                 if (window.location.pathname.startsWith('/mesh/ord/details')) {
-                    const cancelWatchdog = startAutomationWatchdog('Mark as Shipped', SHIP_TIMEOUT);
+                    const cancelWatchdog = startAutomationWatchdog('Mark as Shipped', SHIP_TIMEOUT,
+                        () => reportShipFailure('The order page never reached eBay\'s shipment confirmation step.'));
                     const markAsShippedLink = await waitForElement('div[data-action-id="MARK_SHIPPED"] a', 12000);
                     if (markAsShippedLink) {
                         // This navigates the SAME tab to /om/shipment/update,
@@ -2893,7 +3819,8 @@
                     }
                 }
                 else if (window.location.pathname.startsWith('/om/shipment/update')) {
-                    const cancelWatchdog = startAutomationWatchdog('Shipment confirmation', SHIP_TIMEOUT);
+                    const cancelWatchdog = startAutomationWatchdog('Shipment confirmation', SHIP_TIMEOUT,
+                        () => reportShipFailure('eBay never acknowledged the shipment.'));
                     let done = false;
                     let observer = null;
 
@@ -3191,10 +4118,16 @@
     }
 
     // Hard stop for any automation tab. Returns a cancel function.
-    function startAutomationWatchdog(label, timeoutMs) {
+    // The optional onTimeout callback is how a timeout gets reported back to
+    // the pick-and-pack tab; without it the failure only ever existed as a
+    // banner on a tab nobody was looking at.
+    function startAutomationWatchdog(label, timeoutMs, onTimeout) {
         const timer = setTimeout(() => {
             console.error('[Automation] ' + label + ' timed out after ' + Math.round(timeoutMs / 1000) + 's.');
             showMsgBanner(label + ' timed out — nothing was completed on this tab. Finish it by hand, then close the tab.', false);
+            if (typeof onTimeout === 'function') {
+                try { onTimeout(); } catch (e) { console.error('[Automation] onTimeout handler threw:', e); }
+            }
         }, timeoutMs);
         return () => clearTimeout(timer);
     }
