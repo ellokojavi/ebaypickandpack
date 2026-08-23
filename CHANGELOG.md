@@ -50,6 +50,25 @@ Two standalone scripts added to the repo, documented in
   constructible `CSSStyleSheet` if a nonce-based `style-src` refuses a `<style>`
   element.
 
+## v4.18
+- Fixed the canned "coming late" messages never pasting or sending: the order
+  tab opened, the Contact-buyer pane never appeared, and nothing was reported
+  on the page. Cause was a temporal-dead-zone crash, not eBay. `msgSleep` and
+  `MSG_LOG` were `const` arrow functions declared near the bottom of the file,
+  while the `tm_action` dispatcher sits above them. The `manual_message` branch
+  awaits nothing before calling `runBuyerMessageAutomation()`, so it ran during
+  top-level execution, before those two `const`s had initialized;
+  `runBuyerMessageAutomation()` calls `MSG_LOG()` on its first line and threw
+  "can't access lexical declaration 'MSG_LOG' before initialization". The
+  `auto_message` branch masked the bug entirely — it does
+  `await GM_getValue(AUTO_SEND_MESSAGES_KEY)` first, and that one microtask
+  yield is enough for the rest of the file to finish evaluating, which is why
+  auto thank-you messages kept working while the canned ones died. Both helpers
+  are now hoisted function declarations.
+- The `tm_action` dispatcher no longer swallows exceptions. A crash used to
+  become an unhandled promise rejection visible only in the console, leaving a
+  tab that looked idle; it now paints the same red banner a failed send does.
+
 ## v4.17
 - Automation tabs (mark-as-shipped, note, tracking, message) now reliably close
   when their job is done and hand focus back to the pick-and-pack tab. Every
