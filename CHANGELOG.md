@@ -1,5 +1,27 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.25
+- Fixes the stepper read shipped one version earlier, which could not actually
+  recognise an unshipped order. eBay **renames** the middle step rather than
+  just restyling it — an order that has not shipped reads "Ship by \<due date>",
+  and only once it ships does that step become "Shipped \<ship date>". v4.24
+  matched the literal word "Shipped", so on a paid-but-unshipped order it found
+  no matching step at all and reported "no status stepper on this page". Safe —
+  it still never claimed success — but the stated reason was wrong, and would
+  have sent anyone reading it hunting for a parsing fault that wasn't there.
+  The match now anchors on the "ship" prefix and lets the step icon decide the
+  state, so "Ship by", "Shipped" and any future "Shipping" all resolve.
+- A failed card now quotes eBay's own words: *eBay still shows this order as NOT
+  shipped (eBay shows "Ship by Aug 26")* rather than a generic failure string.
+- When neither icon signal (`<title>` / `<use href>`) can be read, the result is
+  `unknown` rather than being guessed in either direction.
+- Re-tested against **both** real page states, plus a relabelled step, missing
+  icon signals, a stepper with no ship step, and a login page — 10 cases.
+  The v4.24 suite passed only because one of its fixtures was invented: it kept
+  the "Shipped" label and flipped the icon, a combination eBay never renders.
+  A hand-made fixture confirmed the assumption it was built from; the real
+  markup did not.
+
 ## v4.24
 - The last path that could mark an unshipped order as shipped is closed. When
   the "Mark as shipped" button did not appear within 12s, the automation assumed

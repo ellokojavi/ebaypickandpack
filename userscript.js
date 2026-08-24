@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260824-v4.24-stepper-status-check
+// @version      20260824-v4.25-ship-by-step-label
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -4110,9 +4110,15 @@
                             finishAutomationTab('Order was already marked shipped' +
                                 (orderStatus.date ? ' (' + orderStatus.date + ')' : ''));
                         } else {
+                            // Quote eBay's own words back — "Ship by Aug 26" is
+                            // a far more useful thing to read on the card than
+                            // a generic failure string.
+                            const stepperSays = orderStatus.label
+                                ? ' (eBay shows "' + orderStatus.label + (orderStatus.date ? ' ' + orderStatus.date : '') + '")'
+                                : '';
                             const why = orderStatus.status === 'not-shipped'
-                                ? 'eBay still shows this order as NOT shipped, and the "Mark as shipped" button never appeared.'
-                                : 'Neither the "Mark as shipped" button nor eBay\'s status stepper was found on this page.';
+                                ? 'eBay still shows this order as NOT shipped' + stepperSays + ', and the "Mark as shipped" button never appeared.'
+                                : 'Neither the "Mark as shipped" button nor a readable status stepper was found on this page.';
                             reportShipFailure(why);
                             // Deliberately NOT closing the tab: this is the one
                             // case where a human needs to look at the page.
@@ -4879,32 +4885,46 @@
     //       .progress-stepper__icon svg > title            → "complete" | "upcoming"
     //                                     use[href]        → #icon-stepper-confirmation-24
     //                                                      | #icon-stepper-upcoming-24
-    //       .progress-stepper__text h4                     → "Buyer paid" | "Shipped" | "Delivery"
-    //                               p                      → "Aug 23"
+    //       .progress-stepper__text h4                     → step label
+    //                               p                      → a date
     //
-    // Returns { status: 'shipped' | 'not-shipped' | 'unknown', date }.
+    // The middle step is RENAMED, not merely restyled, as the order progresses:
+    //
+    //   not shipped   "Buyer paid" Aug 23 · "Ship by" Aug 26 (upcoming) · "Delivery"
+    //   shipped       "Buyer paid" Aug 23 · "Shipped"  Aug 23 (complete) · "Delivery"
+    //
+    // So matching the literal word "Shipped" finds nothing at all on an
+    // unshipped order — the case this function exists to detect. Anchor on the
+    // "ship" prefix instead and let the icon decide the state. Note the date
+    // means different things either side of that line: a DUE date when the step
+    // reads "Ship by", the actual ship date once it reads "Shipped".
+    //
+    // Returns { status: 'shipped' | 'not-shipped' | 'unknown', date, label }.
     // 'unknown' is a real answer, not a soft failure: it means the page was not
     // what we expected, and the caller must NOT treat it as success.
     function readOrderShippedStatus(doc) {
         const d = doc || document;
         try {
             const container = d.querySelector('.progress-stepper__items');
-            if (!container) return { status: 'unknown', date: null };
-            const shippedItem = Array.from(container.querySelectorAll('.progress-stepper__item'))
-                .find(el => /^\s*shipped\s*$/i.test(el.querySelector('.progress-stepper__text h4')?.textContent || ''));
-            if (!shippedItem) return { status: 'unknown', date: null };
+            if (!container) return { status: 'unknown', date: null, label: null };
+            const step = Array.from(container.querySelectorAll('.progress-stepper__item'))
+                .find(el => /^\s*ship/i.test(el.querySelector('.progress-stepper__text h4')?.textContent || ''));
+            if (!step) return { status: 'unknown', date: null, label: null };
+            const label = (step.querySelector('.progress-stepper__text h4')?.textContent || '').trim() || null;
+            const date = (step.querySelector('.progress-stepper__text p')?.textContent || '').trim() || null;
             // Two independent signals, either sufficient. The <title> is the
             // clearer one but is human-readable text and so the likelier of the
             // two to be localised or reworded; the <use> href is structural.
-            const titleText = (shippedItem.querySelector('.progress-stepper__icon svg title')?.textContent || '')
+            const titleText = (step.querySelector('.progress-stepper__icon svg title')?.textContent || '')
                 .trim().toLowerCase();
-            const useHref = shippedItem.querySelector('.progress-stepper__icon svg use')?.getAttribute('href') || '';
+            const useHref = step.querySelector('.progress-stepper__icon svg use')?.getAttribute('href') || '';
+            // Neither signal readable — say so rather than guessing a direction.
+            if (!titleText && !useHref) return { status: 'unknown', date: date, label: label };
             const isComplete = titleText === 'complete' || /confirmation/i.test(useHref);
-            const date = (shippedItem.querySelector('.progress-stepper__text p')?.textContent || '').trim() || null;
-            return { status: isComplete ? 'shipped' : 'not-shipped', date: date };
+            return { status: isComplete ? 'shipped' : 'not-shipped', date: date, label: label };
         } catch (e) {
             console.error('[Ship] Could not read the progress stepper:', e);
-            return { status: 'unknown', date: null };
+            return { status: 'unknown', date: null, label: null };
         }
     }
 
