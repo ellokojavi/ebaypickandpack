@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260823-v4.23-message-outcome-channel
+// @version      20260824-v4.24-stepper-status-check
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -4091,12 +4091,33 @@
                         // that navigation never happens, the watchdog fires.
                         markAsShippedLink.click();
                     } else {
-                        // No Mark-as-shipped action on the page — almost always
-                        // because the order is already shipped. That counts as
-                        // the job being done, so confirm it and close.
+                        // No Mark-as-shipped action on the page. That is USUALLY
+                        // because the order already shipped — but it is equally
+                        // what a slow page, a changed layout, or a quietly
+                        // logged-out session look like, and this branch used to
+                        // report all of them as success. Ask eBay's own progress
+                        // stepper instead of reasoning from an absence.
                         cancelWatchdog();
-                        await GM_setValue(CONFIRMED_SHIP_KEY, { orderId: urlOrderId, timestamp: Date.now(), alreadyShipped: true });
-                        finishAutomationTab('Order was already marked shipped');
+                        await waitForElement('.progress-stepper__items', 5000);
+                        const orderStatus = readOrderShippedStatus(document);
+                        console.log('[Ship] No Mark-as-shipped link. Stepper says: ' + orderStatus.status +
+                            (orderStatus.date ? ' (' + orderStatus.date + ')' : ''));
+                        if (orderStatus.status === 'shipped') {
+                            await GM_setValue(CONFIRMED_SHIP_KEY, {
+                                orderId: urlOrderId, timestamp: Date.now(),
+                                alreadyShipped: true, shippedDate: orderStatus.date
+                            });
+                            finishAutomationTab('Order was already marked shipped' +
+                                (orderStatus.date ? ' (' + orderStatus.date + ')' : ''));
+                        } else {
+                            const why = orderStatus.status === 'not-shipped'
+                                ? 'eBay still shows this order as NOT shipped, and the "Mark as shipped" button never appeared.'
+                                : 'Neither the "Mark as shipped" button nor eBay\'s status stepper was found on this page.';
+                            reportShipFailure(why);
+                            // Deliberately NOT closing the tab: this is the one
+                            // case where a human needs to look at the page.
+                            showMsgBanner('Mark as Shipped failed — ' + why + ' Finish it by hand, then close this tab.', false);
+                        }
                     }
                 }
                 else if (window.location.pathname.startsWith('/om/shipment/update')) {
@@ -4843,6 +4864,47 @@
             await reportMessageResult(urlOrderId, 'failed', 'The draft was pasted but the Send click was not confirmed. The message tab is still open — send it there.', { action: options.action, retryable: false });
             showMsgBanner('AUTO-SEND FAILED — the draft is in the box, click Send yourself. (Tab left open on purpose.)', false);
             console.error('[Buyer-Msg] ' + label + ': send could not be confirmed for order ' + urlOrderId + '. Tab left open.');
+        }
+    }
+
+    // --- eBay's order progress stepper ---
+    // A POSITIVE read of what eBay itself says about an order, used where the
+    // ship automation previously reasoned from an absence ("no Mark as shipped
+    // button, therefore shipped") and so reported a slow page, a markup change
+    // or a logged-out session as a successful shipment.
+    //
+    // The markup, per an order that has shipped:
+    //   .progress-stepper__items
+    //     .progress-stepper__item
+    //       .progress-stepper__icon svg > title            → "complete" | "upcoming"
+    //                                     use[href]        → #icon-stepper-confirmation-24
+    //                                                      | #icon-stepper-upcoming-24
+    //       .progress-stepper__text h4                     → "Buyer paid" | "Shipped" | "Delivery"
+    //                               p                      → "Aug 23"
+    //
+    // Returns { status: 'shipped' | 'not-shipped' | 'unknown', date }.
+    // 'unknown' is a real answer, not a soft failure: it means the page was not
+    // what we expected, and the caller must NOT treat it as success.
+    function readOrderShippedStatus(doc) {
+        const d = doc || document;
+        try {
+            const container = d.querySelector('.progress-stepper__items');
+            if (!container) return { status: 'unknown', date: null };
+            const shippedItem = Array.from(container.querySelectorAll('.progress-stepper__item'))
+                .find(el => /^\s*shipped\s*$/i.test(el.querySelector('.progress-stepper__text h4')?.textContent || ''));
+            if (!shippedItem) return { status: 'unknown', date: null };
+            // Two independent signals, either sufficient. The <title> is the
+            // clearer one but is human-readable text and so the likelier of the
+            // two to be localised or reworded; the <use> href is structural.
+            const titleText = (shippedItem.querySelector('.progress-stepper__icon svg title')?.textContent || '')
+                .trim().toLowerCase();
+            const useHref = shippedItem.querySelector('.progress-stepper__icon svg use')?.getAttribute('href') || '';
+            const isComplete = titleText === 'complete' || /confirmation/i.test(useHref);
+            const date = (shippedItem.querySelector('.progress-stepper__text p')?.textContent || '').trim() || null;
+            return { status: isComplete ? 'shipped' : 'not-shipped', date: date };
+        } catch (e) {
+            console.error('[Ship] Could not read the progress stepper:', e);
+            return { status: 'unknown', date: null };
         }
     }
 
