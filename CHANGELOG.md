@@ -1,5 +1,24 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.24
+- The last path that could mark an unshipped order as shipped is closed. When
+  the "Mark as shipped" button did not appear within 12s, the automation assumed
+  the order had already shipped and wrote a **success** — which is true most of
+  the time, and is also exactly what a slow page, a markup change or a quietly
+  logged-out session look like. It now reads eBay's own progress stepper
+  instead of reasoning from an absence:
+  - stepper says **Shipped** → confirmed, and eBay's own ship date is recorded
+    alongside it;
+  - stepper says **not shipped**, or no stepper on the page at all → reported as
+    a real failure, red banner on the card, and the tab is deliberately left
+    open, because this is the one case where a human needs to look at the page.
+- The status read (`readOrderShippedStatus`) takes two independent signals — the
+  step icon's `<title>` ("complete" / "upcoming") and its `<use href>`
+  (`#icon-stepper-confirmation-24` / `#icon-stepper-upcoming-24`) — and accepts
+  either, so a reworded or localised title alone cannot break it. Unit-tested
+  against real order markup across seven cases including both signals changing
+  independently, a missing stepper, and a stepper with no Shipped step.
+
 ## v4.23
 - A buyer message that never went out is now visible on the order card. v4.21
   gave shipping three honest states but left messaging with the same bug it
