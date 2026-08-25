@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260825-v4.30-drop-non-label-select
+// @version      20260825-v4.31-batch-bar-alignment
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -459,6 +459,15 @@
                     border-color: ${isDarkMode ? '#3f5a86' : '#B7CCF0'}; opacity: 1;
                 }
                 .${CONFIG.classNames.batchSelectBtn} {
+                    /* .batch-select is a flex row. Without align-self these spans
+                       take the default 'stretch', becoming full-height boxes with
+                       their text pinned to the top — which is what pushed them
+                       above "Select all" and "Sort by". inline-flex + center keeps
+                       the flag emoji from dragging the line box around too, and
+                       vertical-align is the fallback if eBay ever re-renders this
+                       bar as ordinary inline flow. */
+                    align-self: center; vertical-align: middle;
+                    display: inline-flex; align-items: center; line-height: 1.2;
                     margin-left: 16px; font-size: 13px; font-weight: 600; text-decoration: none; cursor: pointer;
                     white-space: nowrap; user-select: none; color: ${isDarkMode ? '#78BFFF' : '#3665f3'};
                 }
