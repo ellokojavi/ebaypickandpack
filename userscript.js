@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260825-v4.33-filter-checkboxes
+// @version      20260825-v4.34-clone-ebay-checkbox
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -465,6 +465,15 @@
                    three attempts at matching their baseline from the outside. */
                 ${CONFIG.selectors.batchSelect} > .checkbox[data-batch-part="box"] { margin-left: 16px; cursor: pointer; }
                 ${CONFIG.selectors.batchSelect} > .checkbox[data-batch-part="box"] input { pointer-events: none; }
+                /* "Some but not all of this filter is selected". eBay's icon
+                   markup has no indeterminate glyph, so the state is drawn as a
+                   dimmed box with a dash over it. */
+                ${CONFIG.selectors.batchSelect} > .checkbox[data-batch-part="box"][data-batch-state="partial"] { position: relative; opacity: 0.85; }
+                ${CONFIG.selectors.batchSelect} > .checkbox[data-batch-part="box"][data-batch-state="partial"]::after {
+                    content: ''; position: absolute; left: 50%; top: 50%; width: 8px; height: 2px;
+                    transform: translate(-50%, -50%); border-radius: 1px; pointer-events: none;
+                    background: ${isDarkMode ? '#78BFFF' : '#3665f3'};
+                }
                 ${CONFIG.selectors.batchSelect} > .${CONFIG.classNames.batchSelectBtn} {
                     margin-left: 6px; font-weight: 600; cursor: pointer; text-decoration: none;
                     white-space: nowrap; user-select: none; color: ${isDarkMode ? '#78BFFF' : '#3665f3'};
@@ -1192,21 +1201,48 @@
                     // attempts to align a bespoke span against their label all
                     // drifted by a pixel or so; being the same kind of element in
                     // the same flex row is the only way that stays fixed.
-                    boxWrap = document.createElement('span');
-                    boxWrap.className = 'checkbox';
+                    // CLONED from eBay's own "Select all" checkbox rather than
+                    // rebuilt. v4.33 hand-made a <span class="checkbox"> with a
+                    // bare <input> and the box was invisible: eBay hides the raw
+                    // input and draws the visible control from sibling icon
+                    // markup, so a lookalike wrapper renders nothing at all.
+                    // Cloning inherits whatever their structure actually is,
+                    // including any of it I have not seen.
+                    // :not([data-batch-part]) so the second filter clones eBay's
+                    // original rather than a copy of the first filter's copy.
+                    const template = batchSelect.querySelector('span.checkbox:not([data-batch-part])');
+                    if (template) {
+                        boxWrap = template.cloneNode(true);
+                    } else {
+                        boxWrap = document.createElement('span');
+                        boxWrap.className = 'checkbox';
+                        const fallback = document.createElement('input');
+                        fallback.type = 'checkbox';
+                        boxWrap.appendChild(fallback);
+                    }
                     boxWrap.dataset.batchFilter = filter.key;
                     boxWrap.dataset.batchPart = 'box';
-                    const input = document.createElement('input');
-                    input.type = 'checkbox';
-                    input.className = 'checkbox__control';
-                    // The input never toggles itself — pointer-events:none sends
-                    // the click to its wrapper, and its checked state is always
-                    // recomputed from the real selection below. A checkbox that
-                    // could be ticked independently of the orders it describes
-                    // would be worse than no checkbox at all.
-                    input.tabIndex = -1;
-                    input.setAttribute('aria-hidden', 'true');
-                    boxWrap.appendChild(input);
+                    const input = boxWrap.querySelector('input');
+                    if (input) {
+                        // Strip the master's identity off the copy — a duplicate
+                        // id or data-testid would make this box answer to eBay's
+                        // own label and tests.
+                        input.removeAttribute('id');
+                        input.removeAttribute('data-testid');
+                        input.removeAttribute('aria-label');
+                        input.checked = false;
+                        input.indeterminate = false;
+                        // The input never toggles itself — pointer-events:none
+                        // sends the click to its wrapper, and its state is always
+                        // recomputed from the real selection below. A checkbox
+                        // that could be ticked independently of the orders it
+                        // describes would be worse than no checkbox at all.
+                        input.tabIndex = -1;
+                        input.setAttribute('aria-hidden', 'true');
+                        // Marked as already wired so the SKU-panel change listener
+                        // pass skips it; this box is display-only.
+                        input.dataset.skuChangeListenerAdded = 'true';
+                    }
 
                     labelEl = document.createElement('label');
                     labelEl.className = `field__label ${CONFIG.classNames.batchSelectBtn}`;
@@ -1243,9 +1279,13 @@
                 boxWrap.classList.toggle(CONFIG.classNames.selectBatchBtnDisabled, disabled);
                 labelEl.title = disabled ? filter.emptyTitle : filter.title;
 
+                boxWrap.dataset.batchState = state;
                 if (input) {
                     input.disabled = disabled;
                     input.checked = state === 'exact';
+                    // Native indeterminate only shows if eBay renders the real
+                    // input; the data-batch-state hook above carries the same
+                    // fact for CSS when they render an icon instead.
                     input.indeterminate = state === 'partial';
                 }
             });

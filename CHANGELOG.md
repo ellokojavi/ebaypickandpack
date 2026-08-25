@@ -1,5 +1,19 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.34
+- Makes the v4.33 filter checkboxes actually visible. v4.33 hand-built a
+  `<span class="checkbox">` around a bare `<input>`, on the assumption that
+  wearing eBay's class was enough. It isn't: eBay hides the raw input and draws
+  the visible control from sibling icon markup, so a lookalike wrapper rendered
+  nothing at all — the labels appeared, the boxes did not.
+- The wrapper is now **cloned** from eBay's own "Select all" checkbox, with the
+  master's `id`, `data-testid` and `aria-label` stripped off the copy. Cloning
+  inherits whatever their structure really is, including the parts of it I
+  haven't seen — which is the point, since guessing at it is what failed.
+- eBay's icon markup has no indeterminate glyph, so the "some but not all of
+  this filter is selected" state is drawn from a `data-batch-state` hook on the
+  wrapper: a dimmed box with a dash across it.
+
 ## v4.33
 - Each batch filter now has its own checkbox, so the bar says whether the list
   is currently filtered instead of leaving you to infer it. `Select all` was the
