@@ -1,5 +1,21 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.321
+- Fixes "Select all" staying ticked after a batch filter narrowed the
+  selection underneath it. eBay's master checkbox is driven purely by its own
+  click handler — it does not derive from how many orders are actually
+  selected — so nothing was ever going to move it but us.
+- Applying a filter now resets the master through a real `click()` first, so
+  eBay's internal "all selected" flag and the box agree before the per-order
+  pass runs. At the end the master is re-synced: ticked if the filter happened
+  to cover every order on the page, indeterminate if it covered some.
+- The end-of-run sync deliberately **assigns** `checked = false` rather than
+  clicking when it needs to turn the box off. Clicking there would run eBay's
+  toggle-all and wipe the very selection the filter had just made; a stale
+  internal flag is much the cheaper bug. Turning the box *on* still goes
+  through a real click, since toggle-all over an already-full list changes
+  nothing.
+
 ## v4.32
 - Actually fixes the batch-control alignment, this time from measurements
   rather than inference. v4.31 (and the version before it) tried to *centre*

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260825-v4.32-batch-bar-baseline
+// @version      20260825-v4.321-select-all-sync
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -125,7 +125,7 @@
                 pollingInterval: 2000
             },
             selectors: {
-                ordersContainer: '.card.select-service', orderItem: '.orders-list__item', buttonList: '.button-list', header: '.site-header', headerTop: '.site-header__top', headerBottom: '.site-header__bottom', headerBottomH1: '.site-header__bottom h1', headerLogo: '.site-header__top .ebay-logo', bulkLabelsAppCard: '#bulk-labels-app .card.select-service', combineOrdersButton: '.service-actions__combine-all', tcellItem: '.tcell__item', tcellTransaction: '.tcell__transaction', buyerCell: '.tcell__buyer', itemImage: '.item__image img', itemDescription: '.item__description', itemDetailsContainer: '[class*="item__details"]', checkbox: '.checkbox__control', addressActions: '.piped-links.address__actions', orderIdContainer: '.unique_order_id_container', buyerPaidService: '.buyer-paid-service', reviseLink: 'a[href*="revise"]', uniqueOrderIdLink: '.unique-order-id a', pageFooter: 'footer', removableNotices: '.section-notice--attention, .section-notice__main, .page-announcement, .section-notice, .section-notice--information', groupingSummary: '.grouping_summary', serviceActions: '.service-actions', ordersFilters: '.orders-filters', batchSelect: '.batch-select', sortOrderSelector: '.sort-order-selector', listboxButtonForm: '.listbox-button .btn.btn--form', listboxIcon: '.listbox-button .btn.btn--form .icon', listboxDropdown: '.listbox-button .listbox-button__listbox', listboxOption: '.listbox-button .listbox-button__option', listboxSelectedIcon: '.listbox-button__option[aria-selected="true"] .icon--tick-small', skuPanelTitle: '#SKUListContainer h2.sku-title', skuPanelToggles: '.sku-toggles', gridGroup: '.grid__group'
+                ordersContainer: '.card.select-service', orderItem: '.orders-list__item', buttonList: '.button-list', header: '.site-header', headerTop: '.site-header__top', headerBottom: '.site-header__bottom', headerBottomH1: '.site-header__bottom h1', headerLogo: '.site-header__top .ebay-logo', bulkLabelsAppCard: '#bulk-labels-app .card.select-service', combineOrdersButton: '.service-actions__combine-all', tcellItem: '.tcell__item', tcellTransaction: '.tcell__transaction', buyerCell: '.tcell__buyer', itemImage: '.item__image img', itemDescription: '.item__description', itemDetailsContainer: '[class*="item__details"]', checkbox: '.checkbox__control', addressActions: '.piped-links.address__actions', orderIdContainer: '.unique_order_id_container', buyerPaidService: '.buyer-paid-service', reviseLink: 'a[href*="revise"]', uniqueOrderIdLink: '.unique-order-id a', pageFooter: 'footer', removableNotices: '.section-notice--attention, .section-notice__main, .page-announcement, .section-notice, .section-notice--information', groupingSummary: '.grouping_summary', serviceActions: '.service-actions', ordersFilters: '.orders-filters', batchSelect: '.batch-select', selectAllCheckbox: '#select-all, [data-testid="bulk-order-filters-toggle-all"]', sortOrderSelector: '.sort-order-selector', listboxButtonForm: '.listbox-button .btn.btn--form', listboxIcon: '.listbox-button .btn.btn--form .icon', listboxDropdown: '.listbox-button .listbox-button__listbox', listboxOption: '.listbox-button .listbox-button__option', listboxSelectedIcon: '.listbox-button__option[aria-selected="true"] .icon--tick-small', skuPanelTitle: '#SKUListContainer h2.sku-title', skuPanelToggles: '.sku-toggles', gridGroup: '.grid__group'
             },
             ids: {
                 copyAddressButton: 'copyAddressButton', editAddressButton: 'editAddressButton', createTemplateButton: 'createTemplateButton', printEnvelopeHTML: 'HTMLEnvelopeToPrint', printAllEnvelopesButton: 'printAllEnvelopesButton', skuPanelContainer: 'SKUListContainer', skuList: 'SKUsToPackContainer', skuContentWrapper: 'sku-content-wrapper'
@@ -1060,7 +1060,47 @@
             }
         ];
 
+        // eBay's "Select all" box is driven only by its own click handler — it
+        // does not derive from how many orders are actually ticked. So narrowing
+        // the selection underneath it used to leave it sitting there checked
+        // while only some orders were selected.
+        //
+        // It is always moved with a real .click(), never a .checked assignment.
+        // Assigning would desync eBay's internal "all selected" flag from what
+        // the box shows, and the user's next click on it would then appear to do
+        // nothing at all.
+        function syncSelectAllCheckbox() {
+            const master = document.querySelector(CONFIG.selectors.selectAllCheckbox);
+            if (!master) return;
+            const boxes = Array.from(document.querySelectorAll(CONFIG.selectors.orderItem))
+                .map(order => order.querySelector(CONFIG.selectors.checkbox))
+                .filter(Boolean);
+            const allChecked = boxes.length > 0 && boxes.every(cb => cb.checked);
+            if (allChecked === master.checked) return;
+            if (allChecked) {
+                // Safe to click: toggle-all "on" over an already-full list
+                // changes no order, and eBay's flag ends up honest.
+                master.click();
+            } else {
+                // Assigned, NOT clicked. A click here runs eBay's toggle-all,
+                // which would wipe the very selection this filter just made.
+                // A stale internal flag is a far cheaper bug than losing the
+                // user's selection. Indeterminate is the honest picture anyway:
+                // some orders are ticked, not all.
+                master.checked = false;
+                master.indeterminate = boxes.some(cb => cb.checked);
+            }
+            console.debug(`[Tampermonkey][SELECT] select-all → ${allChecked ? 'checked' : 'partial/none'}`);
+        }
+
         function applyBatchSelectFilter(filter) {
+            const master = document.querySelector(CONFIG.selectors.selectAllCheckbox);
+            // Reset through eBay's own toggle-all first when it is on, so the
+            // per-order pass below starts from a clean, consistent state rather
+            // than fighting a master flag that still believes everything is on.
+            if (master && master.checked) master.click();
+            if (master) master.indeterminate = false;
+
             let checked = 0;
             batchSelectCandidates().forEach(orderEl => {
                 const cb = orderEl.querySelector(CONFIG.selectors.checkbox);
@@ -1078,6 +1118,10 @@
                 const cb = orderEl.querySelector(CONFIG.selectors.checkbox);
                 if (cb && cb.checked) cb.click();
             });
+            // And put the master back on if this filter happened to cover every
+            // order on the page — an unchecked box over a fully ticked list is
+            // the same lie in the other direction.
+            syncSelectAllCheckbox();
             console.debug(`[Tampermonkey][SELECT] ${filter.key} → ${checked} order(s) checked`);
         }
 
