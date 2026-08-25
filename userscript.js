@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260825-v4.26-order-watch
+// @version      20260825-v4.27-watch-status-line
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -136,6 +136,7 @@
                 orderShipFailed: 'ship-failed-state', shipFailedBanner: 'ship-failed-banner', shipQueuedBadge: 'ship-queued-badge', shipSelectedBtn: 'ship-selected-btn',
                 msgFailedPill: 'msg-failed-pill',
                 orderWatchPill: 'order-watch-pill', orderWatchPillAction: 'order-watch-pill-action',
+                orderWatchStatus: 'order-watch-status', orderWatchStatusLabel: 'order-watch-status-label', orderWatchStatusAction: 'order-watch-status-action', orderWatchStatusWarn: 'order-watch-status-warn',
                 messageContainer: 'message-container', cannedMessageSelect: 'canned-message-select', sendCannedMessageBtn: 'send-canned-message-btn', buyLabelLink: 'buy-label-link',
                 shipsLabelPill: 'ships-label-pill', shipsLabelActive: 'ships-label-active', selectNonLabelBtn: 'select-non-label-btn',
                 addrWarningBadge: 'addr-warning-badge', addrWarningTooltip: 'addr-warning-tooltip',
@@ -228,6 +229,10 @@
                 .${CONFIG.classNames.orderWatchPill} { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 12px 2px; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; line-height: 1.3; text-decoration: none; cursor: pointer; background: ${isDarkMode ? '#4a3a12' : '#fff8e1'}; color: ${isDarkMode ? '#ffd97a' : '#7a5b00'}; border: 1px solid ${isDarkMode ? '#7a5f1f' : '#f0d48a'}; }
                 .${CONFIG.classNames.orderWatchPill}:hover { filter: brightness(1.08); }
                 .${CONFIG.classNames.orderWatchPillAction} { text-decoration: underline; font-weight: 700; white-space: nowrap; }
+                .${CONFIG.classNames.orderWatchStatus} { display: flex; align-items: center; gap: 5px; margin: 4px 14px 8px; font-size: 11px; line-height: 1.4; color: ${isDarkMode ? '#7f7f7f' : '#a0a0a0'}; user-select: none; }
+                .${CONFIG.classNames.orderWatchStatus}.${CONFIG.classNames.orderWatchStatusWarn} { color: ${isDarkMode ? '#e0a33a' : '#a8730a'}; }
+                .${CONFIG.classNames.orderWatchStatusAction} { cursor: pointer; text-decoration: underline; }
+                .${CONFIG.classNames.orderWatchStatusAction}:hover { color: ${isDarkMode ? '#ddd' : '#333'}; }
                 .${CONFIG.classNames.darkModeSwitch} { position: relative; display: inline-block; width: 40px; height: 20px; }
                 .${CONFIG.classNames.darkModeSwitch} input { opacity: 0; width: 0; height: 0; }
                 .${CONFIG.classNames.darkModeSlider} { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: ${isDarkMode ? '#555' : '#ccc'}; transition: .4s; border-radius: 20px; }
@@ -1663,6 +1668,8 @@
             skipCount: 0,
             lastSkipReason: '',
             capWarned: false,
+            checking: false,
+            lastManualAt: 0,
             timer: null
         };
 
@@ -1712,9 +1719,24 @@
                     orderWatch.skipCount++;
                     orderWatch.lastSkipReason = reason;
                     WATCHDBG('skip', { reason: reason });
+                    renderOrderWatchStatus();
                     return;
                 }
             }
+            // The status line has to settle back to a truthful state whichever
+            // way the poll ends — including the throwing ways. Hence finally,
+            // rather than a call at each of the four exit points.
+            orderWatch.checking = true;
+            renderOrderWatchStatus();
+            try {
+                await orderWatchPoll();
+            } finally {
+                orderWatch.checking = false;
+                renderOrderWatchStatus();
+            }
+        }
+
+        async function orderWatchPoll() {
             orderWatch.lastSkipReason = '';
             orderWatch.pollCount++;
 
@@ -1795,6 +1817,9 @@
                 return;
             }
             WATCHDBG('start', { intervalMinutes: USER_CONFIG.orderWatchIntervalMinutes || 5 });
+            // Lazy refresher: 30s is enough to keep "checked 4m ago" honest
+            // without re-rendering anything once a second.
+            setInterval(renderOrderWatchStatus, 30000);
             // Arm the baseline immediately so the "since you loaded" window
             // really starts at load, then fall into the normal cadence.
             orderWatchTick(true).then(scheduleOrderWatch, scheduleOrderWatch);
@@ -1850,6 +1875,104 @@
             else container.prepend(pill);
         }
 
+        // The status line. Silence from the watcher is ambiguous — "nothing new"
+        // and "this died an hour ago" look identical — so a thin line under the
+        // pill slot says when it last succeeded, goes amber when it is failing
+        // or backed off, and carries the manual check. Deliberately not a
+        // countdown: it updates on poll and on a lazy 30s timer, not per second.
+        function orderWatchAgo(ms) {
+            const secs = Math.round(ms / 1000);
+            if (secs < 60) return 'just now';
+            const mins = Math.round(secs / 60);
+            if (mins < 60) return mins + 'm ago';
+            return Math.round(mins / 60) + 'h ago';
+        }
+
+        function orderWatchDuration(ms) {
+            const secs = Math.round(ms / 1000);
+            if (secs < 60) return secs + 's';
+            const mins = Math.round(secs / 60);
+            if (mins < 60) return mins + 'm';
+            return Math.round(mins / 60) + 'h';
+        }
+
+        function orderWatchStatusState() {
+            const base = Math.max(1, USER_CONFIG.orderWatchIntervalMinutes || 5) * 60 * 1000;
+            if (orderWatch.checking) return { tone: 'ok', text: 'checking…' };
+            if (!orderWatch.baseline) return { tone: 'ok', text: 'starting…' };
+            if (orderWatch.consecutiveFailures > 0) {
+                const what = orderWatch.lastResult === 'inconclusive' ? 'unreadable' : 'failed';
+                // nextPollAt is only set once the retry is actually scheduled,
+                // which is a beat after the failure lands — don't render a
+                // confident "retrying in 0s" in that gap.
+                const untilRetry = orderWatch.nextPollAt - Date.now();
+                const when = untilRetry > 1000 ? `in ${orderWatchDuration(untilRetry)}` : 'shortly';
+                return { tone: 'warn', text: `last check ${what} — retrying ${when}` };
+            }
+            const age = Date.now() - orderWatch.lastPollAt;
+            // Two intervals with nothing to show means the timer itself is gone
+            // (a suspended tab, a thrown scheduler) — worth saying out loud,
+            // because the pill's silence would otherwise read as reassurance.
+            if (age > base * 2) return { tone: 'warn', text: `no check in ${orderWatchDuration(age)}` };
+            return { tone: 'ok', text: `checked ${orderWatchAgo(age)}` };
+        }
+
+        function renderOrderWatchStatus() {
+            const container = document.getElementById(CONFIG.ids.skuPanelContainer);
+            if (!container) return;
+            if (USER_CONFIG.enableOrderWatch === false) {
+                container.querySelector(`.${CONFIG.classNames.orderWatchStatus}`)?.remove();
+                return;
+            }
+            let el = container.querySelector(`.${CONFIG.classNames.orderWatchStatus}`);
+            if (!el) {
+                el = document.createElement('div');
+                el.className = CONFIG.classNames.orderWatchStatus;
+                const label = document.createElement('span');
+                label.className = CONFIG.classNames.orderWatchStatusLabel;
+                const action = document.createElement('span');
+                action.className = CONFIG.classNames.orderWatchStatusAction;
+                action.textContent = 'check now';
+                action.title = 'Ask eBay for the current order list right now';
+                action.addEventListener('click', orderWatchCheckNow);
+                el.append(label, action);
+                // Below the pill when there is one, so news stays on top.
+                const pill = container.querySelector(`.${CONFIG.classNames.orderWatchPill}`);
+                const title = container.querySelector('h2.sku-title');
+                if (pill) pill.insertAdjacentElement('afterend', el);
+                else if (title) title.insertAdjacentElement('afterend', el);
+                else container.prepend(el);
+            }
+            const state = orderWatchStatusState();
+            el.classList.toggle(CONFIG.classNames.orderWatchStatusWarn, state.tone === 'warn');
+            const label = el.querySelector(`.${CONFIG.classNames.orderWatchStatusLabel}`);
+            if (label) label.textContent = `· ${state.text} ·`;
+        }
+
+        function flashOrderWatchStatus(text) {
+            const container = document.getElementById(CONFIG.ids.skuPanelContainer);
+            const label = container?.querySelector(`.${CONFIG.classNames.orderWatchStatusLabel}`);
+            if (!label) return;
+            label.textContent = `· ${text} ·`;
+            clearTimeout(flashOrderWatchStatus._timer);
+            flashOrderWatchStatus._timer = setTimeout(renderOrderWatchStatus, 2200);
+        }
+
+        // Manual check. Forced, so it ignores the suspend rules — you asked.
+        // Debounced because this origin runs bot detection and an impatient
+        // double-click should not turn into a burst of identical requests.
+        function orderWatchCheckNow() {
+            if (orderWatch.checking) return;
+            const sinceManual = Date.now() - (orderWatch.lastManualAt || 0);
+            if (sinceManual < 20000) {
+                flashOrderWatchStatus(`just checked — wait ${Math.ceil((20000 - sinceManual) / 1000)}s`);
+                return;
+            }
+            orderWatch.lastManualAt = Date.now();
+            WATCHDBG('manual-check', { pending: orderWatch.newIds.size });
+            orderWatchTick(true).then(scheduleOrderWatch, scheduleOrderWatch);
+        }
+
         // --- Order watch diagnostics ---
         //   altheastixWatchReport()          → copyable state + event log
         //   altheastixWatchReport(true)      → also copies it to the clipboard
@@ -1871,6 +1994,8 @@
             lines.push(`suspend check right now: ${orderWatchSuspendReason() || 'clear'}`);
             lines.push(`new since load (${orderWatch.newIds.size}): ${Array.from(orderWatch.newIds).join(', ') || '-'}`);
             lines.push(`pill in DOM: ${document.querySelector('.' + CONFIG.classNames.orderWatchPill) ? 'yes' : 'no'}`);
+            lines.push(`status line: ${document.querySelector('.' + CONFIG.classNames.orderWatchStatus) ? orderWatchStatusState().tone + ' — ' + orderWatchStatusState().text : 'NOT IN DOM'}`);
+            lines.push(`manual check: ${orderWatch.lastManualAt ? orderWatchAgo(Date.now() - orderWatch.lastManualAt) : 'never'}`);
             lines.push(`--- log (${watchLogBuffer.length}) ---`);
             watchLogBuffer.forEach(e => {
                 lines.push(`${e.t} ${e.event}${e.data !== null ? ' ' + JSON.stringify(e.data) : ''}`);
@@ -1896,11 +2021,26 @@
                 WATCHDBG('simulate', { kind: 'clear' });
                 renderOrderWatchPill();
                 syncPendingBadge();
+            } else if (kind === 'stale') {
+                // Paints the amber state. Not sticky — the next successful poll
+                // resets consecutiveFailures and the line goes quiet again.
+                orderWatch.consecutiveFailures = 2;
+                orderWatch.lastResult = 'error';
+                orderWatch.lastError = 'simulated';
+                WATCHDBG('simulate', { kind: 'stale' });
+                renderOrderWatchStatus();
+            } else if (kind === 'fresh') {
+                orderWatch.consecutiveFailures = 0;
+                orderWatch.lastResult = 'ok';
+                orderWatch.lastError = '';
+                orderWatch.lastPollAt = Date.now();
+                WATCHDBG('simulate', { kind: 'fresh' });
+                renderOrderWatchStatus();
             } else if (kind === 'poll') {
                 WATCHDBG('simulate', { kind: 'poll' });
                 orderWatchTick(true).then(() => altheastixWatchReport(), () => altheastixWatchReport());
             } else {
-                console.warn("[Altheastix][watch] kind must be 'new' | 'clear' | 'poll'");
+                console.warn("[Altheastix][watch] kind must be 'new' | 'clear' | 'stale' | 'fresh' | 'poll'");
                 return;
             }
             console.log('[Altheastix][watch] pending new orders: ' + orderWatch.newIds.size);
@@ -3425,9 +3565,10 @@
                 title.append(titleText, togglesWrapper);
                 container.appendChild(title);
                 // The panel is rebuilt from scratch on every repaint, so the
-                // watch pill has to be re-hung here or it disappears the first
-                // time an order is marked shipped.
+                // watch pill and status line have to be re-hung here or they
+                // disappear the first time an order is marked shipped.
                 renderOrderWatchPill();
+                renderOrderWatchStatus();
 
                 const contentWrapper = document.createElement('div');
                 contentWrapper.id = CONFIG.ids.skuContentWrapper;
