@@ -45,6 +45,7 @@ Orders are visually flagged by type at a glance:
 - Shipped SKUs are visually marked as completed ✅
 - **Favicon & tab-title badge** — the browser tab shows the eBay favicon with a semi-transparent white bottom-right box (65% of the icon's width) counting the SKUs still pending in black, and the tab title is prefixed with "(N)"; when everything is shipped, the box turns into a green check
 - **🔔 New-order watch** — the page is a snapshot and never refreshes itself, so every 5 minutes the script checks eBay's own awaiting-shipment list in the background. When a sale lands after the page was loaded, a "🔔 N new orders since load" pill appears under the panel title (and "— 🔔N new" is appended to the tab title); click it to reload. It never reloads on its own, refuses to reload mid-batch, pauses while a batch ship or automation tab is running, and stays silent on any inconclusive response rather than raising a false alarm
+- **Watch status line** — a thin `· checked 2m ago · check now` line under the pill slot, so the watcher's silence is never ambiguous. It goes amber when a check has failed, is backed off, or hasn't succeeded in more than two intervals. `check now` forces an immediate check (debounced to 20s). Not a countdown — it refreshes on each poll and on a lazy 30s timer 🩺
 
 ### 🔍 Address Validation
 Every order's shipping address is automatically linted against structural rules:
@@ -166,6 +167,8 @@ bulk shipping page and run:
 | `altheastixWatchReport(true)` | Same, and copies the report to the clipboard |
 | `altheastixWatchSimulate('new', 2)` | Fakes two new orders so the pill and tab title can be checked — **without contacting eBay** |
 | `altheastixWatchSimulate('clear')` | Clears the pill and starts the window over |
+| `altheastixWatchSimulate('stale')` | Paints the amber "last check failed" status line — clears itself on the next good poll |
+| `altheastixWatchSimulate('fresh')` | Returns the status line to its quiet state |
 | `altheastixWatchSimulate('poll')` | Forces one real check right now and prints the report |
 
 The simulator only manipulates the page's own state machine — it never opens an

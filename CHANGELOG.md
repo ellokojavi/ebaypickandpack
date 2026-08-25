@@ -1,5 +1,24 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.27
+- Gives the order watch a face. v4.26 was completely invisible until it had
+  news, which made its silence ambiguous: "no new orders" and "this died an
+  hour ago" looked exactly the same from the outside. A thin line now sits
+  under the pill slot in the SKU panel — `· checked 2m ago · check now` — and
+  turns amber when the watcher is failing, backed off, or has gone more than
+  two intervals without a successful check.
+- Deliberately not a countdown. A per-second timer would turn an ambient
+  watcher into something you watch, and the exact timing doesn't matter — the
+  line refreshes on each poll and on a lazy 30s timer instead.
+- `check now` is a manual, forced check: it ignores the batch-ship and
+  hidden-tab suspend rules, because you asked for it explicitly. It is
+  debounced to 20 seconds — this origin runs bot detection, and an impatient
+  double-click shouldn't become a burst of identical requests.
+- The status line settles through a `finally`, so it tells the truth however a
+  poll ends, including the throwing ways. New simulator kinds
+  `altheastixWatchSimulate('stale')` / `('fresh')` paint and clear the amber
+  state without breaking anything.
+
 ## v4.26
 - Adds a background order watch, so a pick-and-pack tab left open no longer
   goes quietly stale. The page renders one snapshot of the work list and never
