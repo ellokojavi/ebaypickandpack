@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260825-v4.28-watch-pill-colors
+// @version      20260825-v4.29-batch-select-filters
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -138,7 +138,7 @@
                 orderWatchPill: 'order-watch-pill', orderWatchPillAction: 'order-watch-pill-action',
                 orderWatchStatus: 'order-watch-status', orderWatchStatusLabel: 'order-watch-status-label', orderWatchStatusAction: 'order-watch-status-action', orderWatchStatusWarn: 'order-watch-status-warn',
                 messageContainer: 'message-container', cannedMessageSelect: 'canned-message-select', sendCannedMessageBtn: 'send-canned-message-btn', buyLabelLink: 'buy-label-link',
-                shipsLabelPill: 'ships-label-pill', shipsLabelActive: 'ships-label-active', selectNonLabelBtn: 'select-non-label-btn',
+                shipsLabelPill: 'ships-label-pill', shipsLabelActive: 'ships-label-active', selectNonLabelBtn: 'select-non-label-btn', selectBatchBtnDisabled: 'select-batch-btn-disabled',
                 addrWarningBadge: 'addr-warning-badge', addrWarningTooltip: 'addr-warning-tooltip',
                 addrOkBadge: 'addr-ok-badge', addrOkTooltip: 'addr-ok-tooltip'
             },
@@ -460,9 +460,15 @@
                 }
                 .${CONFIG.classNames.selectNonLabelBtn} {
                     margin-left: 16px; font-size: 13px; font-weight: 600; text-decoration: none; cursor: pointer;
-                    white-space: nowrap; color: ${isDarkMode ? '#78BFFF' : '#3665f3'};
+                    white-space: nowrap; user-select: none; color: ${isDarkMode ? '#78BFFF' : '#3665f3'};
                 }
                 .${CONFIG.classNames.selectNonLabelBtn}:hover { text-decoration: underline; }
+                /* Disabled, not hidden — the bar keeps its shape and the count
+                   tells you the filter is empty rather than broken. */
+                .${CONFIG.classNames.selectNonLabelBtn}.${CONFIG.classNames.selectBatchBtnDisabled} {
+                    color: ${isDarkMode ? '#5f5f5f' : '#b0b0b0'}; cursor: default; opacity: 0.85;
+                }
+                .${CONFIG.classNames.selectNonLabelBtn}.${CONFIG.classNames.selectBatchBtnDisabled}:hover { text-decoration: none; }
                 .${CONFIG.classNames.addTrackingLink} {
                     display: inline-block; margin-left: 5px; padding: 2px 8px; border-radius: 12px;
                     font-size: 11px; font-weight: bold; text-decoration: none;
@@ -1008,46 +1014,115 @@
             console.debug('[Tampermonkey][INIT] Header & base layout adjustments complete');
         }
 
-        // --- "Select non-label" batch control ---
-        // A second option next to eBay's native "Select all" that checks only orders
-        // NOT shipping with a label (i.e. envelope orders), reusing eBay's native
-        // per-order checkboxes so the SKUs-to-Pack panel shrinks to the selection and
-        // the print button becomes "Print N Selected Envelopes".
-        function selectNonLabelOrders() {
-            document.querySelectorAll(CONFIG.selectors.orderItem).forEach(orderEl => {
+        // --- Batch selection controls ---
+        // A row of filters next to eBay's native "Select all". Each one checks
+        // exactly the orders it matches and unchecks everything else, so picking
+        // a filter REPLACES the selection rather than adding to it — that is what
+        // makes the SKU panel shrink and the print button become
+        // "Print N Selected Envelopes" for that subset.
+        //
+        // Already-shipped cards are excluded from both the counts and the
+        // selection. A filter that offers to print envelopes you packed an hour
+        // ago is worse than no filter at all.
+        function batchSelectCandidates() {
+            return Array.from(document.querySelectorAll(CONFIG.selectors.orderItem))
+                .filter(order => !isOrderCardDone(order));
+        }
+
+        const BATCH_SELECT_FILTERS = [
+            {
+                key: 'non-label',
+                label: 'Select non-label',
+                title: 'Check every envelope order — no active 📦 label pill — manila and LG included',
+                emptyTitle: 'Nothing to select: every remaining order ships with a 📦 label',
+                match: order => order.dataset.shipsWithLabel !== 'true'
+            },
+            {
+                key: 'standard-envelope',
+                label: 'Select standard envelope',
+                title: 'Check only plain-envelope orders: no 📦 label, no manila, no LG',
+                emptyTitle: 'Nothing to select: no plain-envelope orders left to pack',
+                match: order => order.dataset.shipsWithLabel !== 'true' &&
+                    !order.classList.contains(CONFIG.classNames.highlightManila) &&
+                    !order.classList.contains(CONFIG.classNames.highlightLg)
+            },
+            {
+                key: 'canada',
+                label: 'Select 🇨🇦 Canada',
+                title: 'Check every order shipping to Canada',
+                emptyTitle: 'Nothing to select: no Canadian orders left to pack',
+                match: order => order.dataset.isCanadian === 'true'
+            }
+        ];
+
+        function applyBatchSelectFilter(filter) {
+            let checked = 0;
+            batchSelectCandidates().forEach(orderEl => {
                 const cb = orderEl.querySelector(CONFIG.selectors.checkbox);
                 if (!cb) return;
-                const shouldCheck = orderEl.dataset.shipsWithLabel !== 'true';
-                // Real click (not a .checked assignment) so eBay's React selection
-                // state and the script's change listeners both stay in sync.
+                const shouldCheck = !!filter.match(orderEl);
+                // A real click, not a .checked assignment, so eBay's React
+                // selection state and this script's listeners both stay in sync.
                 if (cb.checked !== shouldCheck) cb.click();
+                if (shouldCheck) checked++;
             });
+            // A shipped card left checked would keep dragging its SKUs into the
+            // print selection, so clear those on the way out.
+            document.querySelectorAll(CONFIG.selectors.orderItem).forEach(orderEl => {
+                if (!isOrderCardDone(orderEl)) return;
+                const cb = orderEl.querySelector(CONFIG.selectors.checkbox);
+                if (cb && cb.checked) cb.click();
+            });
+            console.debug(`[Tampermonkey][SELECT] ${filter.key} → ${checked} order(s) checked`);
         }
-        // Injects or updates the control. Hidden entirely when every order is a
-        // non-label order (selecting non-label would equal "Select all"); otherwise
-        // shows the live envelope-order count, e.g. "Select non-label (3)". Safe to
-        // call repeatedly (on init, on batch-select re-render, on pill toggle).
+
+        // Kept under its original name: older call sites reach the envelope
+        // filter through this, and it is the one with muscle memory behind it.
+        function selectNonLabelOrders() {
+            const filter = BATCH_SELECT_FILTERS.find(f => f.key === 'non-label');
+            if (filter) applyBatchSelectFilter(filter);
+        }
+
+        // Injects or refreshes the whole row. A filter matching nothing renders
+        // DISABLED rather than disappearing: a control that vanishes makes the
+        // bar jump around and leaves you guessing whether the feature broke or
+        // the orders simply ran out. Safe to call repeatedly — on init, on a
+        // batch-select re-render, on a label-pill toggle, on every ship.
         function refreshSelectNonLabelControl() {
             const batchSelect = document.querySelector(CONFIG.selectors.batchSelect);
             if (!batchSelect) return;
-            const orders = document.querySelectorAll(CONFIG.selectors.orderItem);
-            let nonLabel = 0, labelCount = 0;
-            orders.forEach(o => { o.dataset.shipsWithLabel === 'true' ? labelCount++ : nonLabel++; });
-            let btn = batchSelect.querySelector(`.${CONFIG.classNames.selectNonLabelBtn}`);
-            // Redundant with "Select all" when there are no label orders → remove it.
-            if (orders.length === 0 || labelCount === 0) {
-                if (btn) btn.remove();
-                return;
-            }
-            if (!btn) {
-                btn = document.createElement('a');
-                btn.href = '#';
-                btn.className = CONFIG.classNames.selectNonLabelBtn;
-                btn.title = 'Check only envelope orders (those without an active 📦 label pill), then press Print Selected Envelopes';
-                btn.addEventListener('click', (e) => { e.preventDefault(); selectNonLabelOrders(); });
-                batchSelect.appendChild(btn);
-            }
-            btn.textContent = `Select non-label (${nonLabel})`;
+            const candidates = batchSelectCandidates();
+            BATCH_SELECT_FILTERS.forEach(filter => {
+                let count = 0;
+                candidates.forEach(order => { if (filter.match(order)) count++; });
+                let btn = batchSelect.querySelector(`[data-batch-filter="${filter.key}"]`);
+                if (!btn) {
+                    // A span, not an <a href="#">. An anchor pointed at this page
+                    // is a permanently "visited" link, and :visited then owns its
+                    // colour whatever this file asks for — the same trap the new
+                    // order pill fell into in v4.27.
+                    btn = document.createElement('span');
+                    btn.className = CONFIG.classNames.selectNonLabelBtn;
+                    btn.dataset.batchFilter = filter.key;
+                    btn.setAttribute('role', 'button');
+                    const activate = (event) => {
+                        event.preventDefault();
+                        if (btn.getAttribute('aria-disabled') === 'true') return;
+                        applyBatchSelectFilter(filter);
+                    };
+                    btn.addEventListener('click', activate);
+                    btn.addEventListener('keydown', (event) => {
+                        if (event.key === 'Enter' || event.key === ' ') activate(event);
+                    });
+                    batchSelect.appendChild(btn);
+                }
+                const disabled = count === 0;
+                btn.textContent = `${filter.label} (${count})`;
+                btn.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+                btn.setAttribute('tabindex', disabled ? '-1' : '0');
+                btn.classList.toggle(CONFIG.classNames.selectBatchBtnDisabled, disabled);
+                btn.title = disabled ? filter.emptyTitle : filter.title;
+            });
         }
 
         // --- Address Warning Banner ---
@@ -2415,6 +2490,9 @@
         let skuManagerRef = null;
         function repaintSkuPanel() {
             try { skuManagerRef?.createSKUPackingList(); } catch (e) { console.error('[Ship] panel repaint failed:', e); }
+            // Shipping an order changes what each filter would match, so the
+            // counts in the batch bar have to move with it.
+            try { refreshSelectNonLabelControl(); } catch (e) { console.error('[Ship] batch control refresh failed:', e); }
         }
 
         function shipDock() {
