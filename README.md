@@ -44,6 +44,7 @@ Orders are visually flagged by type at a glance:
 - Special styling for Manila SKUs, LG SKUs, and multi-quantity SKUs
 - Shipped SKUs are visually marked as completed ✅
 - **Favicon & tab-title badge** — the browser tab shows the eBay favicon with a semi-transparent white bottom-right box (65% of the icon's width) counting the SKUs still pending in black, and the tab title is prefixed with "(N)"; when everything is shipped, the box turns into a green check
+- **🔔 New-order watch** — the page is a snapshot and never refreshes itself, so every 5 minutes the script checks eBay's own awaiting-shipment list in the background. When a sale lands after the page was loaded, a "🔔 N new orders since load" pill appears under the panel title (and "— 🔔N new" is appended to the tab title); click it to reload. It never reloads on its own, refuses to reload mid-batch, pauses while a batch ship or automation tab is running, and stays silent on any inconclusive response rather than raising a false alarm
 
 ### 🔍 Address Validation
 Every order's shipping address is automatically linted against structural rules:
@@ -112,6 +113,8 @@ Edit the `USER_CONFIG` object near the top of the script to customize local pref
 | `enableDarkModeByDefault` | `true` | Start in dark mode 🌙 |
 | `enableQuotesInMessages` | `true` | Append a random quote to outgoing thank-you messages 💬 |
 | `automationTabTimeoutSeconds` | `45` | How long a background automation tab may run before it flags itself instead of closing ⏱️ |
+| `enableOrderWatch` | `true` | Poll eBay in the background for orders that arrived after page load 🔔 |
+| `orderWatchIntervalMinutes` | `5` | Minutes between background checks (backs off to 15 on repeated failures) ⏲️ |
 | `orderColors` | 40-color palette | Colors used for multi-item order card backgrounds 🌈 |
 | `headerLinks` | Seller Hub, Orders, etc. | Quick-nav links rendered in the page header 🔗 |
 
@@ -147,8 +150,9 @@ If the config file fails to load, the script falls back to built-in defaults and
 
 ## 🔧 Console Diagnostics
 
-Two helpers are exposed on the pick-and-pack page for checking what the shipping
-logic is actually doing. Open the browser console on the bulk shipping page and run:
+Helpers are exposed on the pick-and-pack page for checking what the shipping
+logic and the order watch are actually doing. Open the browser console on the
+bulk shipping page and run:
 
 | Command | What it does |
 |---------|--------------|
@@ -158,6 +162,11 @@ logic is actually doing. Open the browser console on the bulk shipping page and 
 | `altheastixShipSimulate('confirm', 'order-item-3')` | Drives card 3 into the confirmed state |
 | `altheastixShipSimulate('pending', 'order-item-3')` | Shows the "queued for batch shipping" badge |
 | `altheastixShipSimulate('reset', 'order-item-3')` | Returns card 3 to its untouched state |
+| `altheastixWatchReport()` | Prints the order-watch state — baseline size, last poll result, next poll countdown, ids seen since load — plus a rolling 200-entry event log |
+| `altheastixWatchReport(true)` | Same, and copies the report to the clipboard |
+| `altheastixWatchSimulate('new', 2)` | Fakes two new orders so the pill and tab title can be checked — **without contacting eBay** |
+| `altheastixWatchSimulate('clear')` | Clears the pill and starts the window over |
+| `altheastixWatchSimulate('poll')` | Forces one real check right now and prints the report |
 
 The simulator only manipulates the page's own state machine — it never opens an
 automation tab, marks anything shipped on eBay, or messages a buyer. 🧪

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260824-v4.25-ship-by-step-label
+// @version      20260825-v4.26-order-watch
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -79,6 +79,12 @@
         // message) may run before it gives up and flags itself instead of
         // sitting there looking finished.
         automationTabTimeoutSeconds: 45,
+        // --- Order watch ---
+        // Polls eBay's own "orders awaiting shipment" list in the background
+        // and offers a refresh when a sale lands after this page was loaded.
+        // Set enableOrderWatch to false to switch the whole thing off.
+        enableOrderWatch: true,
+        orderWatchIntervalMinutes: 5,
         orderColors: [
             // Expanded 40-color palette — hues spread across the spectrum and interleaved
             // so that consecutive assignments are always visually distinct
@@ -129,6 +135,7 @@
                 printEnvelopeBtn: 'print-envelope-btn', markAsShippedWaiting: 'waiting-confirmation', orderShipped: 'shipped-state', shippedLabel: 'shipped-label', orderPendingShipment: 'order-pending-shipment', pendingOverlay: 'pending-overlay', pendingOverlayContent: 'pending-overlay-content', processingIcon: 'processing-icon', skuShipped: 'sku-shipped', addTrackingLink: 'add-tracking-link', trackingLinkSubmitted: 'tracking-link-submitted', reviseLink: 'revise-link', addNoteLink: 'add-note-link', noteLinkSubmitted: 'note-link-submitted',
                 orderShipFailed: 'ship-failed-state', shipFailedBanner: 'ship-failed-banner', shipQueuedBadge: 'ship-queued-badge', shipSelectedBtn: 'ship-selected-btn',
                 msgFailedPill: 'msg-failed-pill',
+                orderWatchPill: 'order-watch-pill', orderWatchPillAction: 'order-watch-pill-action',
                 messageContainer: 'message-container', cannedMessageSelect: 'canned-message-select', sendCannedMessageBtn: 'send-canned-message-btn', buyLabelLink: 'buy-label-link',
                 shipsLabelPill: 'ships-label-pill', shipsLabelActive: 'ships-label-active', selectNonLabelBtn: 'select-non-label-btn',
                 addrWarningBadge: 'addr-warning-badge', addrWarningTooltip: 'addr-warning-tooltip',
@@ -218,6 +225,9 @@
                 #altheastix-config-container { position: fixed; width: 360px; z-index: 1000; background: ${isDarkMode ? '#2a2a2a' : '#fdfdfd'}; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: 1px solid ${isDarkMode ? '#444' : '#ddd'}; transition: top 0.3s ease-in-out; }
                 ${CONFIG.selectors.skuPanelTitle} { position: sticky; top: 0; background: ${isDarkMode ? '#333' : '#f5f5f5'}; z-index: 1; margin: 0; padding: 12px 15px; font-size: 16px; border-bottom: 1px solid ${isDarkMode ? '#444' : '#ddd'}; display: flex; justify-content: space-between; align-items: center; color: ${isDarkMode ? '#e0e0e0' : '#000'}; }
                 ${CONFIG.selectors.skuPanelToggles} { display: flex; gap: 10px; align-items: center; }
+                .${CONFIG.classNames.orderWatchPill} { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 12px 2px; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; line-height: 1.3; text-decoration: none; cursor: pointer; background: ${isDarkMode ? '#4a3a12' : '#fff8e1'}; color: ${isDarkMode ? '#ffd97a' : '#7a5b00'}; border: 1px solid ${isDarkMode ? '#7a5f1f' : '#f0d48a'}; }
+                .${CONFIG.classNames.orderWatchPill}:hover { filter: brightness(1.08); }
+                .${CONFIG.classNames.orderWatchPillAction} { text-decoration: underline; font-weight: 700; white-space: nowrap; }
                 .${CONFIG.classNames.darkModeSwitch} { position: relative; display: inline-block; width: 40px; height: 20px; }
                 .${CONFIG.classNames.darkModeSwitch} input { opacity: 0; width: 0; height: 0; }
                 .${CONFIG.classNames.darkModeSlider} { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: ${isDarkMode ? '#555' : '#ccc'}; transition: .4s; border-radius: 20px; }
@@ -1617,6 +1627,295 @@
             } catch (e2) { console.warn('[Altheastix][ship] diagnostics not reachable from the page console.'); }
         }
 
+        // ===================================================================
+        // ORDER WATCH — background staleness detector
+        // ===================================================================
+        // This page renders one snapshot of the work list and then never
+        // updates itself, so a tab left open through a packing session can be
+        // quietly missing sales that came in ten minutes ago.
+        //
+        // eBay's own bulk UI gets its work list from
+        //   /ship/single/api/fulfilment/v2/orders/available
+        //     -> {"nextOrderIds":["25-15048-98836", ...]}
+        // a ~2KB authenticated GET listing EVERY order awaiting shipment —
+        // 99 of them at the time of writing, against the 10 rendered here.
+        // That mismatch is why the baseline is a snapshot of the API's id set
+        // taken at load rather than the ids on the page: diffing against the
+        // page would report ~89 phantom "new" orders on the first tick.
+        //
+        // Additions only. An id leaving the list means shipped/cancelled and
+        // is never a reason to nag. And this NEVER auto-reloads: automation
+        // tabs may be in flight and an address may be half-edited.
+
+        const ORDER_WATCH_ENDPOINT = 'https://www.ebay.com/ship/single/api/fulfilment/v2/orders/available';
+        const ORDER_WATCH_MAX_INTERVAL_MS = 15 * 60 * 1000;
+
+        const orderWatch = {
+            baseline: null,          // Set of ids present at load; null until armed
+            newIds: new Set(),       // ids seen since, absent from the baseline
+            lastPollAt: 0,
+            nextPollAt: 0,
+            lastResult: 'never',     // 'ok' | 'inconclusive' | 'error' | 'never'
+            lastError: '',
+            lastCount: 0,
+            consecutiveFailures: 0,
+            pollCount: 0,
+            skipCount: 0,
+            lastSkipReason: '',
+            capWarned: false,
+            timer: null
+        };
+
+        const watchLogBuffer = [];
+        function WATCHDBG(event, data) {
+            const stamp = new Date().toLocaleTimeString('en-US', { hour12: false });
+            watchLogBuffer.push({ t: stamp, event: event, data: data === undefined ? null : data });
+            if (watchLogBuffer.length > 200) watchLogBuffer.shift();
+            console.log(`[Altheastix][watch] ${stamp} ${event}`, data === undefined ? '' : data);
+        }
+
+        // Page-context fetch on purpose. GM_xmlhttpRequest would issue this
+        // from the extension context, without the sec-fetch-* headers eBay's
+        // own call carries — and this origin runs bot detection
+        // (cas.avalon.perfdrive.com). One request every few minutes to an
+        // endpoint the app itself polls should look like ordinary use.
+        async function orderWatchFetchIds() {
+            const res = await fetch(ORDER_WATCH_ENDPOINT + '?_=' + Date.now(), {
+                credentials: 'include',
+                cache: 'no-store',
+                headers: { accept: 'application/json' }
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            if (!data || !Array.isArray(data.nextOrderIds)) {
+                throw new Error('unexpected shape: ' + (Object.keys(data || {}).join(',') || 'empty'));
+            }
+            return data.nextOrderIds.filter(id => typeof id === 'string' && id.length > 0);
+        }
+
+        // Reasons to sit this round out. Suppressed once the baseline exists —
+        // arming it is worth doing even on a hidden tab, since the whole point
+        // is to fix the window start at page load.
+        function orderWatchSuspendReason() {
+            try {
+                if (shipQueue && shipQueue.running) return 'batch ship running';
+                if (document.querySelector(`.${CONFIG.classNames.pendingOverlay}`)) return 'automation tab in flight';
+                if (document.hidden) return 'tab hidden';
+            } catch (e) {}
+            return '';
+        }
+
+        async function orderWatchTick(force) {
+            if (orderWatch.baseline && !force) {
+                const reason = orderWatchSuspendReason();
+                if (reason) {
+                    orderWatch.skipCount++;
+                    orderWatch.lastSkipReason = reason;
+                    WATCHDBG('skip', { reason: reason });
+                    return;
+                }
+            }
+            orderWatch.lastSkipReason = '';
+            orderWatch.pollCount++;
+
+            let ids;
+            try {
+                ids = await orderWatchFetchIds();
+            } catch (e) {
+                // A sign-in redirect, an interstitial, a shape change and a
+                // dropped connection all land here. None of them is evidence
+                // of a new order, so none of them badges — they just back off.
+                orderWatch.consecutiveFailures++;
+                orderWatch.lastResult = 'error';
+                orderWatch.lastError = String(e && e.message ? e.message : e);
+                WATCHDBG('error', { attempt: orderWatch.consecutiveFailures, error: orderWatch.lastError });
+                return;
+            }
+
+            orderWatch.lastPollAt = Date.now();
+
+            if (ids.length === 0) {
+                // Indistinguishable from "everything is shipped", and crying
+                // wolf costs more than a late notice. Treat as inconclusive.
+                orderWatch.consecutiveFailures++;
+                orderWatch.lastResult = 'inconclusive';
+                WATCHDBG('inconclusive', { reason: 'empty list', attempt: orderWatch.consecutiveFailures });
+                return;
+            }
+
+            orderWatch.consecutiveFailures = 0;
+            orderWatch.lastResult = 'ok';
+            orderWatch.lastError = '';
+            orderWatch.lastCount = ids.length;
+
+            // If eBay ever truncates this list, a new order could arrive past
+            // the cut and never be seen. Say so once rather than pretending to
+            // cover a case we cannot see.
+            if (ids.length >= 100 && !orderWatch.capWarned) {
+                orderWatch.capWarned = true;
+                WATCHDBG('possible-cap', { count: ids.length, note: 'list may be truncated; new orders past the cut would be missed' });
+            }
+
+            if (!orderWatch.baseline) {
+                orderWatch.baseline = new Set(ids);
+                WATCHDBG('baseline', { count: ids.length, onPage: document.querySelectorAll(CONFIG.selectors.orderItem).length });
+                return;
+            }
+
+            let added = 0;
+            ids.forEach(id => {
+                if (!orderWatch.baseline.has(id) && !orderWatch.newIds.has(id)) {
+                    orderWatch.newIds.add(id);
+                    added++;
+                }
+            });
+
+            if (added > 0) {
+                WATCHDBG('new-orders', { added: added, pending: orderWatch.newIds.size, listSize: ids.length });
+                renderOrderWatchPill();
+                syncPendingBadge();
+            } else {
+                WATCHDBG('no-change', { listSize: ids.length });
+            }
+        }
+
+        function scheduleOrderWatch() {
+            if (orderWatch.timer) clearTimeout(orderWatch.timer);
+            const base = Math.max(1, USER_CONFIG.orderWatchIntervalMinutes || 5) * 60 * 1000;
+            const wait = Math.min(base * Math.min(Math.pow(2, orderWatch.consecutiveFailures), 3), ORDER_WATCH_MAX_INTERVAL_MS);
+            orderWatch.nextPollAt = Date.now() + wait;
+            orderWatch.timer = setTimeout(() => {
+                orderWatchTick().catch(e => WATCHDBG('tick-threw', String(e))).then(scheduleOrderWatch, scheduleOrderWatch);
+            }, wait);
+        }
+
+        function startOrderWatch() {
+            if (USER_CONFIG.enableOrderWatch === false) {
+                WATCHDBG('disabled', { reason: 'USER_CONFIG.enableOrderWatch is false' });
+                return;
+            }
+            WATCHDBG('start', { intervalMinutes: USER_CONFIG.orderWatchIntervalMinutes || 5 });
+            // Arm the baseline immediately so the "since you loaded" window
+            // really starts at load, then fall into the normal cadence.
+            orderWatchTick(true).then(scheduleOrderWatch, scheduleOrderWatch);
+
+            // Coming back to a tab that has been hidden for a while is exactly
+            // when the page is most likely to be stale — check on the spot
+            // instead of waiting out the remainder of the interval.
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden || !orderWatch.baseline) return;
+                const base = Math.max(1, USER_CONFIG.orderWatchIntervalMinutes || 5) * 60 * 1000;
+                if (Date.now() - orderWatch.lastPollAt < base) return;
+                WATCHDBG('visible-recheck', { staleMs: Date.now() - orderWatch.lastPollAt });
+                orderWatchTick().then(scheduleOrderWatch, scheduleOrderWatch);
+            });
+        }
+
+        // The signal itself: a pill under the SKU panel title. PrintSKUTable
+        // wipes the panel on every repaint, so it calls this on the way out
+        // and the pill re-appears rather than vanishing on the next redraw.
+        function renderOrderWatchPill() {
+            const container = document.getElementById(CONFIG.ids.skuPanelContainer);
+            if (!container) return;
+            container.querySelector(`.${CONFIG.classNames.orderWatchPill}`)?.remove();
+            const count = orderWatch.newIds.size;
+            if (count < 1) return;
+
+            const pill = document.createElement('a');
+            pill.className = CONFIG.classNames.orderWatchPill;
+            pill.href = window.location.href;
+            pill.title = 'eBay has orders this page has not seen. Finish what you are doing, then refresh.';
+            const label = document.createElement('span');
+            label.textContent = `🔔 ${count} new order${count === 1 ? '' : 's'} since load`;
+            const action = document.createElement('span');
+            action.className = CONFIG.classNames.orderWatchPillAction;
+            action.textContent = 'Refresh';
+            pill.append(label, action);
+
+            pill.addEventListener('click', (event) => {
+                event.preventDefault();
+                // Reloading mid-batch would strand the queue and lose the
+                // per-card state that tells you what actually shipped.
+                if (shipQueue.running) {
+                    action.textContent = 'wait — batch running';
+                    setTimeout(() => { action.textContent = 'Refresh'; }, 2500);
+                    return;
+                }
+                WATCHDBG('refresh-clicked', { pending: orderWatch.newIds.size });
+                window.location.reload();
+            });
+
+            const title = container.querySelector('h2.sku-title');
+            if (title) title.insertAdjacentElement('afterend', pill);
+            else container.prepend(pill);
+        }
+
+        // --- Order watch diagnostics ---
+        //   altheastixWatchReport()          → copyable state + event log
+        //   altheastixWatchReport(true)      → also copies it to the clipboard
+        //   altheastixWatchSimulate('new', 2)→ fake 2 new orders, no eBay contact
+        //   altheastixWatchSimulate('clear') → clear the pill and start over
+        //   altheastixWatchSimulate('poll')  → force one real check right now
+        function altheastixWatchReport(copy) {
+            const lines = [];
+            const ago = ms => (ms ? Math.round((Date.now() - ms) / 1000) + 's ago' : 'never');
+            lines.push('=== Altheastix order watch report ===');
+            lines.push(`version: ${(typeof GM_info !== 'undefined' && GM_info?.script?.version) || 'unknown'}`);
+            lines.push(`enabled: ${USER_CONFIG.enableOrderWatch !== false} interval: ${USER_CONFIG.orderWatchIntervalMinutes || 5}min`);
+            lines.push(`baseline: ${orderWatch.baseline ? orderWatch.baseline.size + ' ids' : 'NOT ARMED'}`);
+            lines.push(`cards on page: ${document.querySelectorAll(CONFIG.selectors.orderItem).length}`);
+            lines.push(`last result: ${orderWatch.lastResult}${orderWatch.lastError ? ' (' + orderWatch.lastError + ')' : ''}`);
+            lines.push(`last good poll: ${ago(orderWatch.lastPollAt)} listSize=${orderWatch.lastCount}`);
+            lines.push(`next poll in: ${orderWatch.nextPollAt ? Math.max(0, Math.round((orderWatch.nextPollAt - Date.now()) / 1000)) + 's' : 'unscheduled'}`);
+            lines.push(`polls: ${orderWatch.pollCount} skips: ${orderWatch.skipCount}${orderWatch.lastSkipReason ? ' (last: ' + orderWatch.lastSkipReason + ')' : ''} failures: ${orderWatch.consecutiveFailures}`);
+            lines.push(`suspend check right now: ${orderWatchSuspendReason() || 'clear'}`);
+            lines.push(`new since load (${orderWatch.newIds.size}): ${Array.from(orderWatch.newIds).join(', ') || '-'}`);
+            lines.push(`pill in DOM: ${document.querySelector('.' + CONFIG.classNames.orderWatchPill) ? 'yes' : 'no'}`);
+            lines.push(`--- log (${watchLogBuffer.length}) ---`);
+            watchLogBuffer.forEach(e => {
+                lines.push(`${e.t} ${e.event}${e.data !== null ? ' ' + JSON.stringify(e.data) : ''}`);
+            });
+            const text = lines.join('\n');
+            console.log(text);
+            if (copy) { try { GM_setClipboard(text); console.log('[Altheastix][watch] report copied to clipboard.'); } catch (e) {} }
+            return text;
+        }
+
+        function altheastixWatchSimulate(kind, n) {
+            if (kind === 'new') {
+                const howMany = Math.max(1, parseInt(n, 10) || 1);
+                if (!orderWatch.baseline) orderWatch.baseline = new Set();
+                for (let i = 0; i < howMany; i++) {
+                    orderWatch.newIds.add('SIM-' + (orderWatch.newIds.size + 1) + '-' + Math.floor(Math.random() * 100000));
+                }
+                WATCHDBG('simulate', { kind: 'new', added: howMany, pending: orderWatch.newIds.size });
+                renderOrderWatchPill();
+                syncPendingBadge();
+            } else if (kind === 'clear') {
+                orderWatch.newIds.clear();
+                WATCHDBG('simulate', { kind: 'clear' });
+                renderOrderWatchPill();
+                syncPendingBadge();
+            } else if (kind === 'poll') {
+                WATCHDBG('simulate', { kind: 'poll' });
+                orderWatchTick(true).then(() => altheastixWatchReport(), () => altheastixWatchReport());
+            } else {
+                console.warn("[Altheastix][watch] kind must be 'new' | 'clear' | 'poll'");
+                return;
+            }
+            console.log('[Altheastix][watch] pending new orders: ' + orderWatch.newIds.size);
+        }
+
+        try {
+            unsafeWindow.altheastixWatchReport = altheastixWatchReport;
+            unsafeWindow.altheastixWatchSimulate = altheastixWatchSimulate;
+        } catch (e) {
+            try {
+                window.altheastixWatchReport = altheastixWatchReport;
+                window.altheastixWatchSimulate = altheastixWatchSimulate;
+            } catch (e2) { console.warn('[Altheastix][watch] diagnostics not reachable from the page console.'); }
+        }
+
         // The tab's own watchdog, plus room for tab startup and the second
         // page load (/mesh/ord/details → /om/shipment/update).
         function shipDeadlineMs() {
@@ -2970,11 +3269,17 @@
                 // Skip the redraw if the count is unchanged AND our favicon is
                 // still in place (eBay occasionally re-injects its own icon)
                 const ourIcon = document.querySelector('link[data-altheastix-favicon]');
-                if (pendingCount === updatePendingBadge._lastCount && ourIcon) return;
-                updatePendingBadge._lastCount = pendingCount;
+                // The order watch also writes to the tab title, so the
+                // skip-if-unchanged key has to cover both counts or a new
+                // order would never make it into the title.
+                const newOrderCount = (typeof orderWatch !== 'undefined' && orderWatch.newIds) ? orderWatch.newIds.size : 0;
+                const cacheKey = pendingCount + '/' + newOrderCount;
+                if (cacheKey === updatePendingBadge._lastCount && ourIcon) return;
+                updatePendingBadge._lastCount = cacheKey;
 
                 const baseTitle = 'Altheastix: Pick-and-Pack';
-                document.title = pendingCount > 0 ? `(${pendingCount}) ${baseTitle}` : baseTitle;
+                const newSuffix = newOrderCount > 0 ? ` — 🔔${newOrderCount} new` : '';
+                document.title = (pendingCount > 0 ? `(${pendingCount}) ${baseTitle}` : baseTitle) + newSuffix;
 
                 getEbayFaviconImage().then((baseImg) => drawFaviconCounter(baseImg, pendingCount));
             } catch (e) {
@@ -3119,6 +3424,10 @@
                 togglesWrapper.append(darkModeToggle, darkModeEmoji);
                 title.append(titleText, togglesWrapper);
                 container.appendChild(title);
+                // The panel is rebuilt from scratch on every repaint, so the
+                // watch pill has to be re-hung here or it disappears the first
+                // time an order is marked shipped.
+                renderOrderWatchPill();
 
                 const contentWrapper = document.createElement('div');
                 contentWrapper.id = CONFIG.ids.skuContentWrapper;
@@ -3644,6 +3953,7 @@
             skuManager.createSKUPackingList();
             refreshAddressBanner();
             autoHidePostageCostOnLabel();
+            startOrderWatch();
             console.debug('[Tampermonkey][MAIN] Order cards processed & SKU panel built');
 
             // Favicon counter safety sync: recount pending SKU pills every 3s
