@@ -1,5 +1,33 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.26
+- Adds a background order watch, so a pick-and-pack tab left open no longer
+  goes quietly stale. The page renders one snapshot of the work list and never
+  updates itself; sales that land mid-session were invisible until a manual
+  reload. Every 5 minutes the script now reads eBay's own
+  `/ship/single/api/fulfilment/v2/orders/available` — the ~2KB JSON list of
+  order ids the bulk UI itself is driven by — and compares it against a
+  snapshot taken at page load. New ids raise a "🔔 N new orders since load"
+  pill under the SKU panel title, plus a "— 🔔N new" suffix on the tab title.
+  Clicking the pill reloads.
+- Deliberate limits, all of them to avoid crying wolf or making a mess:
+  additions only (an id leaving the list means shipped or cancelled, never a
+  reason to nag); it never auto-reloads, since automation tabs may be in
+  flight and an address may be half-edited; clicking Refresh during a running
+  batch is refused rather than stranding the queue; and any response that is
+  not a well-formed non-empty list — a sign-in redirect, an interstitial, a
+  shape change — is treated as inconclusive and backed off from (up to 15 min)
+  rather than badged. Polling pauses during a batch ship, while an automation
+  tab is pending, and while the tab is hidden, with an immediate re-check when
+  you come back to a tab that has gone stale.
+- The request deliberately goes out via a page-context `fetch` rather than
+  `GM_xmlhttpRequest`: eBay runs bot detection on this origin, and issuing it
+  from the extension context would drop the `sec-fetch-*` headers the app's
+  own identical call carries.
+- New `USER_CONFIG` keys `enableOrderWatch` (default `true`) and
+  `orderWatchIntervalMinutes` (default `5`), and new console diagnostics
+  `altheastixWatchReport()` / `altheastixWatchSimulate()`.
+
 ## v4.25
 - Fixes the stepper read shipped one version earlier, which could not actually
   recognise an unshipped order. eBay **renames** the middle step rather than
