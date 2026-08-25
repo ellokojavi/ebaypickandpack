@@ -1,5 +1,28 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.33
+- Each batch filter now has its own checkbox, so the bar says whether the list
+  is currently filtered instead of leaving you to infer it. `Select all` was the
+  only thing in the row with any state; the custom filters were bare text that
+  looked identical before and after a click.
+- The state is **derived, never remembered**. A filter's box is ticked only
+  while the selection is exactly what that filter would produce, shows
+  indeterminate while the selection is a subset of it, and clears the moment the
+  selection reaches outside it. Untick one order by hand and the box drops
+  immediately — it answers "is this list filtered right now?", not "did I click
+  this a while ago?", and the second question is the one that lies.
+- Clicking a ticked filter now clears the selection, which is what a ticked
+  checkbox should do when clicked.
+- The controls are built as checkbox + label sibling pairs wearing eBay's own
+  `.checkbox` and `.field__label` classes, appended as direct children of
+  `.batch-select` — the same shape as their "Select all". Alignment is now
+  inherited rather than reconstructed, which retires the pixel drift that took
+  three attempts to chase in v4.30–v4.32 (and `syncBatchBtnTypography` with it).
+- The filter checkbox can never be ticked independently of the orders it
+  describes: `pointer-events: none` sends every click to the wrapper, and the
+  checked state is recomputed from the real selection on every render and on
+  every manual checkbox change.
+
 ## v4.321
 - Fixes "Select all" staying ticked after a batch filter narrowed the
   selection underneath it. eBay's master checkbox is driven purely by its own

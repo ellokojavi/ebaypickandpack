@@ -56,6 +56,12 @@ Next to eBay's native **Select all**, in the batch bar above the order list:
 | `Select standard envelope (N)` | Plain-envelope orders only: no 📦 label, no manila, no LG |
 | `Select 🇨🇦 Canada (N)` | Every order shipping to Canada |
 
+Each filter carries its own checkbox showing whether it is **currently** the
+active selection — ticked when the selection is exactly that filter's set,
+indeterminate when it's a subset, clear otherwise. The state is derived from the
+live selection on every change, so unticking one order by hand drops the box
+straight away. Clicking a ticked filter clears the selection.
+
 Each filter **replaces** the current selection rather than adding to it, so the
 SKU panel and the "Print N Selected Envelopes" button always reflect exactly one
 filter's worth of work. Already-shipped orders are excluded from both the counts

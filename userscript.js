@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260825-v4.321-select-all-sync
+// @version      20260825-v4.33-filter-checkboxes
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -458,29 +458,25 @@
                     background-color: ${isDarkMode ? '#2c3e5a' : '#E1ECFF'}; color: ${isDarkMode ? '#78BFFF' : '#0b5cad'};
                     border-color: ${isDarkMode ? '#3f5a86' : '#B7CCF0'}; opacity: 1;
                 }
-                .${CONFIG.classNames.batchSelectBtn} {
-                    /* Measured, not guessed. eBay's "Select all" label is
-                       baseline-aligned at 12.8px/16px; two earlier attempts here
-                       CENTRED these controls instead (align-self:center,
-                       vertical-align:middle) at 13px/15.6px. Centring two boxes of
-                       different type scales cannot align their baselines — it
-                       splits the difference, which was the ~1px drift. Baseline
-                       alignment at the label's own metrics measures to 0.00 on
-                       both baseline and centre. syncBatchBtnTypography() re-reads
-                       those metrics from the live label at render time, so this
-                       survives eBay changing its type scale. */
-                    display: inline; align-self: baseline; vertical-align: baseline;
-                    font-size: 12.8px; line-height: 16px;
-                    margin-left: 16px; font-weight: 600; text-decoration: none; cursor: pointer;
+                /* These controls are checkbox + label sibling pairs sitting as
+                   direct children of .batch-select, wearing eBay's own .checkbox
+                   and .field__label classes. Alignment is therefore inherited
+                   rather than reconstructed — the fix that finally held after
+                   three attempts at matching their baseline from the outside. */
+                ${CONFIG.selectors.batchSelect} > .checkbox[data-batch-part="box"] { margin-left: 16px; cursor: pointer; }
+                ${CONFIG.selectors.batchSelect} > .checkbox[data-batch-part="box"] input { pointer-events: none; }
+                ${CONFIG.selectors.batchSelect} > .${CONFIG.classNames.batchSelectBtn} {
+                    margin-left: 6px; font-weight: 600; cursor: pointer; text-decoration: none;
                     white-space: nowrap; user-select: none; color: ${isDarkMode ? '#78BFFF' : '#3665f3'};
                 }
-                .${CONFIG.classNames.batchSelectBtn}:hover { text-decoration: underline; }
+                ${CONFIG.selectors.batchSelect} > .${CONFIG.classNames.batchSelectBtn}:hover { text-decoration: underline; }
                 /* Disabled, not hidden — the bar keeps its shape and the count
                    tells you the filter is empty rather than broken. */
-                .${CONFIG.classNames.batchSelectBtn}.${CONFIG.classNames.selectBatchBtnDisabled} {
-                    color: ${isDarkMode ? '#5f5f5f' : '#b0b0b0'}; cursor: default; opacity: 0.85;
+                ${CONFIG.selectors.batchSelect} > .checkbox[data-batch-part="box"].${CONFIG.classNames.selectBatchBtnDisabled} { cursor: default; opacity: 0.55; }
+                ${CONFIG.selectors.batchSelect} > .${CONFIG.classNames.batchSelectBtn}.${CONFIG.classNames.selectBatchBtnDisabled} {
+                    color: ${isDarkMode ? '#5f5f5f' : '#b0b0b0'}; cursor: default;
                 }
-                .${CONFIG.classNames.batchSelectBtn}.${CONFIG.classNames.selectBatchBtnDisabled}:hover { text-decoration: none; }
+                ${CONFIG.selectors.batchSelect} > .${CONFIG.classNames.batchSelectBtn}.${CONFIG.classNames.selectBatchBtnDisabled}:hover { text-decoration: none; }
                 .${CONFIG.classNames.addTrackingLink} {
                     display: inline-block; margin-left: 5px; padding: 2px 8px; border-radius: 12px;
                     font-size: 11px; font-weight: bold; text-decoration: none;
@@ -1130,60 +1126,128 @@
         // bar jump around and leaves you guessing whether the feature broke or
         // the orders simply ran out. Safe to call repeatedly — on init, on a
         // batch-select re-render, on a label-pill toggle, on every ship.
-        // eBay owns the type scale in this bar and it is not ours to predict —
-        // copy the sibling label's metrics onto our controls at render time so
-        // the baselines match whatever eBay is currently using.
-        function syncBatchBtnTypography(batchSelect, btn) {
-            try {
-                const label = batchSelect.querySelector('label.field__label');
-                if (!label) return;
-                const cs = getComputedStyle(label);
-                if (cs.fontSize) btn.style.fontSize = cs.fontSize;
-                if (cs.lineHeight && cs.lineHeight !== 'normal') btn.style.lineHeight = cs.lineHeight;
-            } catch (e) {}
+        function orderCheckboxRows() {
+            return Array.from(document.querySelectorAll(CONFIG.selectors.orderItem))
+                .map(order => ({ order: order, cb: order.querySelector(CONFIG.selectors.checkbox) }))
+                .filter(row => row.cb);
+        }
+
+        // Derived state, never remembered. A filter's box reads as ON only while
+        // the current selection is exactly what that filter would produce — untick
+        // one card by hand and it drops immediately. That is the whole point: the
+        // box answers "is this list filtered right now?", not "did I click this a
+        // while ago?", and the second question is the one that lies.
+        //   'exact'   — selection is precisely this filter's set
+        //   'partial' — selection is a non-empty subset of it, nothing outside
+        //   'none'    — anything else, including a selection reaching outside
+        function filterSelectionState(filter) {
+            const rows = orderCheckboxRows();
+            const matched = new Set();
+            rows.forEach(row => {
+                if (!isOrderCardDone(row.order) && filter.match(row.order)) matched.add(row.order);
+            });
+            if (matched.size === 0) return 'none';
+            let insideChecked = 0, outsideChecked = 0;
+            rows.forEach(row => {
+                if (!row.cb.checked) return;
+                if (matched.has(row.order)) insideChecked++;
+                else outsideChecked++;
+            });
+            if (outsideChecked > 0) return 'none';
+            if (insideChecked === matched.size) return 'exact';
+            return insideChecked > 0 ? 'partial' : 'none';
+        }
+
+        function clearAllOrderSelection() {
+            const master = document.querySelector(CONFIG.selectors.selectAllCheckbox);
+            // eBay's toggle-all is the cheapest way to clear everything, and using
+            // it keeps their internal flag honest.
+            if (master && master.checked) master.click();
+            orderCheckboxRows().forEach(row => { if (row.cb.checked) row.cb.click(); });
+            if (master) master.indeterminate = false;
         }
 
         function refreshBatchSelectControls() {
             const batchSelect = document.querySelector(CONFIG.selectors.batchSelect);
             if (!batchSelect) return;
             const candidates = batchSelectCandidates();
-            // Drop any control whose filter has been retired, so a span left by
-            // an earlier version cannot outlive it in a re-rendered bar.
+            // Drop any control whose filter has been retired, so an element left
+            // by an earlier version cannot outlive it in a re-rendered bar.
             const liveKeys = BATCH_SELECT_FILTERS.map(f => f.key);
             batchSelect.querySelectorAll('[data-batch-filter]').forEach(el => {
                 if (!liveKeys.includes(el.dataset.batchFilter)) el.remove();
             });
+
             BATCH_SELECT_FILTERS.forEach(filter => {
                 let count = 0;
                 candidates.forEach(order => { if (filter.match(order)) count++; });
-                let btn = batchSelect.querySelector(`[data-batch-filter="${filter.key}"]`);
-                if (!btn) {
-                    // A span, not an <a href="#">. An anchor pointed at this page
-                    // is a permanently "visited" link, and :visited then owns its
-                    // colour whatever this file asks for — the same trap the new
-                    // order pill fell into in v4.27.
-                    btn = document.createElement('span');
-                    btn.className = CONFIG.classNames.batchSelectBtn;
-                    btn.dataset.batchFilter = filter.key;
-                    btn.setAttribute('role', 'button');
+
+                let boxWrap = batchSelect.querySelector(`.checkbox[data-batch-filter="${filter.key}"]`);
+                let labelEl = batchSelect.querySelector(`label[data-batch-filter="${filter.key}"]`);
+
+                if (!boxWrap || !labelEl) {
+                    // Built as a checkbox + label sibling pair, with eBay's own
+                    // classes, appended as direct children of .batch-select —
+                    // exactly the shape of their "Select all". Three earlier
+                    // attempts to align a bespoke span against their label all
+                    // drifted by a pixel or so; being the same kind of element in
+                    // the same flex row is the only way that stays fixed.
+                    boxWrap = document.createElement('span');
+                    boxWrap.className = 'checkbox';
+                    boxWrap.dataset.batchFilter = filter.key;
+                    boxWrap.dataset.batchPart = 'box';
+                    const input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.className = 'checkbox__control';
+                    // The input never toggles itself — pointer-events:none sends
+                    // the click to its wrapper, and its checked state is always
+                    // recomputed from the real selection below. A checkbox that
+                    // could be ticked independently of the orders it describes
+                    // would be worse than no checkbox at all.
+                    input.tabIndex = -1;
+                    input.setAttribute('aria-hidden', 'true');
+                    boxWrap.appendChild(input);
+
+                    labelEl = document.createElement('label');
+                    labelEl.className = `field__label ${CONFIG.classNames.batchSelectBtn}`;
+                    labelEl.dataset.batchFilter = filter.key;
+                    labelEl.dataset.batchPart = 'label';
+                    labelEl.setAttribute('role', 'button');
+
                     const activate = (event) => {
                         event.preventDefault();
-                        if (btn.getAttribute('aria-disabled') === 'true') return;
-                        applyBatchSelectFilter(filter);
+                        if (labelEl.getAttribute('aria-disabled') === 'true') return;
+                        // Clicking an already-exact filter clears the selection,
+                        // which is what a ticked checkbox should do when clicked.
+                        if (filterSelectionState(filter) === 'exact') clearAllOrderSelection();
+                        else applyBatchSelectFilter(filter);
+                        refreshBatchSelectControls();
                     };
-                    btn.addEventListener('click', activate);
-                    btn.addEventListener('keydown', (event) => {
+                    boxWrap.addEventListener('click', activate);
+                    labelEl.addEventListener('click', activate);
+                    labelEl.addEventListener('keydown', (event) => {
                         if (event.key === 'Enter' || event.key === ' ') activate(event);
                     });
-                    batchSelect.appendChild(btn);
+
+                    batchSelect.append(boxWrap, labelEl);
                 }
+
                 const disabled = count === 0;
-                btn.textContent = `${filter.label} (${count})`;
-                btn.setAttribute('aria-disabled', disabled ? 'true' : 'false');
-                btn.setAttribute('tabindex', disabled ? '-1' : '0');
-                btn.classList.toggle(CONFIG.classNames.selectBatchBtnDisabled, disabled);
-                btn.title = disabled ? filter.emptyTitle : filter.title;
-                syncBatchBtnTypography(batchSelect, btn);
+                const state = disabled ? 'none' : filterSelectionState(filter);
+                const input = boxWrap.querySelector('input');
+
+                labelEl.textContent = `${filter.label} (${count})`;
+                labelEl.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+                labelEl.tabIndex = disabled ? -1 : 0;
+                labelEl.classList.toggle(CONFIG.classNames.selectBatchBtnDisabled, disabled);
+                boxWrap.classList.toggle(CONFIG.classNames.selectBatchBtnDisabled, disabled);
+                labelEl.title = disabled ? filter.emptyTitle : filter.title;
+
+                if (input) {
+                    input.disabled = disabled;
+                    input.checked = state === 'exact';
+                    input.indeterminate = state === 'partial';
+                }
             });
         }
 
@@ -3508,7 +3572,13 @@
             });
             document.querySelectorAll(CONFIG.selectors.checkbox).forEach(cb => {
                 if (!cb.dataset.skuChangeListenerAdded) {
-                    cb.addEventListener('change', skuManager.createSKUPackingList);
+                    cb.addEventListener('change', () => {
+                        skuManager.createSKUPackingList();
+                        // Ticking or unticking a single order by hand can take the
+                        // selection out of (or into) a filter's exact set, and the
+                        // boxes are only honest if they re-derive on every change.
+                        refreshBatchSelectControls();
+                    });
                     cb.dataset.skuChangeListenerAdded = 'true';
                 }
             });
