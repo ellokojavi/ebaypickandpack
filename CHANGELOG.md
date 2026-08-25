@@ -1,5 +1,14 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.31
+- Fixes the batch-selection controls sitting higher than "Select all" and
+  "Sort by". `.batch-select` is a flex row, and the controls carried no
+  `align-self`, so they took the default `stretch` — full-height boxes with
+  their text pinned to the top rather than centred like everything else in the
+  bar. They are `align-self: center` + `inline-flex` now, which also stops the
+  🇨🇦 flag emoji from dragging its line box around, with `vertical-align:
+  middle` as a fallback should eBay ever render this bar as inline flow.
+
 ## v4.30
 - Removes **Select non-label**. Three filters plus eBay's own controls
   overflowed the batch bar and pushed the sort selector to the edge, and the
