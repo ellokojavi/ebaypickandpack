@@ -47,6 +47,23 @@ Orders are visually flagged by type at a glance:
 - **🔔 New-order watch** — the page is a snapshot and never refreshes itself, so every 5 minutes the script checks eBay's own awaiting-shipment list in the background. When a sale lands after the page was loaded, a "🔔 N new orders since load" pill appears under the panel title (and "— 🔔N new" is appended to the tab title); click it to reload. It never reloads on its own, refuses to reload mid-batch, pauses while a batch ship or automation tab is running, and stays silent on any inconclusive response rather than raising a false alarm
 - **Watch status line** — a thin `· checked 2m ago · check now` line under the pill slot, so the watcher's silence is never ambiguous. It goes amber when a check has failed, is backed off, or hasn't succeeded in more than two intervals. `check now` forces an immediate check (debounced to 20s). Not a countdown — it refreshes on each poll and on a lazy 30s timer 🩺
 
+### ☑️ Batch Selection Filters
+
+Next to eBay's native **Select all**, in the batch bar above the order list:
+
+| Control | Selects |
+|---------|---------|
+| `Select non-label (N)` | Every envelope order — no active 📦 label pill — manila and LG included |
+| `Select standard envelope (N)` | Plain-envelope orders only: no 📦 label, no manila, no LG |
+| `Select 🇨🇦 Canada (N)` | Every order shipping to Canada |
+
+Each filter **replaces** the current selection rather than adding to it, so the
+SKU panel and the "Print N Selected Envelopes" button always reflect exactly one
+filter's worth of work. Already-shipped orders are excluded from both the counts
+and the selection. A filter with nothing to match stays visible but is
+**disabled**, showing `(0)` and a tooltip explaining why — so the bar never
+changes shape underneath you.
+
 ### 🔍 Address Validation
 Every order's shipping address is automatically linted against structural rules:
 - Minimum line count, buyer name presence, street number format

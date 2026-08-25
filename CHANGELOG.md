@@ -1,5 +1,31 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.29
+- Turns the single "Select non-label" control into a row of batch-selection
+  filters beside eBay's native "Select all":
+  - **Select non-label (N)** — every envelope order, manila and LG included
+    (unchanged behaviour, new name for the same thing).
+  - **Select standard envelope (N)** — plain-envelope orders only: no 📦 label,
+    no manila, no LG. The batch you can pack in one pass without switching
+    envelope stock.
+  - **Select 🇨🇦 Canada (N)** — everything shipping to Canada, off the same
+    `isCanadian` flag that drives the flag emoji and the stamp reminder.
+- A filter matching nothing renders **disabled but visible**, with its count and
+  a tooltip explaining why it is empty. Controls that vanish make the bar jump
+  around and leave you guessing whether the feature broke or the orders ran out.
+- **Already-shipped orders are now excluded from the counts and the selection.**
+  This also changes "Select non-label", which previously counted and checked
+  shipped cards — meaning it could quietly re-add envelopes you packed an hour
+  ago to the print selection. Any shipped card that was already checked is
+  unchecked when a filter runs. Counts refresh on every ship, not just on
+  re-render.
+- Each filter replaces the selection rather than adding to it, so the SKU panel
+  and "Print N Selected Envelopes" always describe exactly one filter's worth
+  of work.
+- The controls are `span role="button"` rather than `<a href="#">`, for the
+  reason v4.28 documents: an anchor pointing at the current page is a
+  permanently visited link, and `:visited` then owns its colour.
+
 ## v4.28
 - Fixes the new-order pill rendering in magenta instead of the colour this file
   asked for. The pill was an `<a href="<the current page>">` — which makes it a
