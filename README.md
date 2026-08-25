@@ -53,7 +53,6 @@ Next to eBay's native **Select all**, in the batch bar above the order list:
 
 | Control | Selects |
 |---------|---------|
-| `Select non-label (N)` | Every envelope order — no active 📦 label pill — manila and LG included |
 | `Select standard envelope (N)` | Plain-envelope orders only: no 📦 label, no manila, no LG |
 | `Select 🇨🇦 Canada (N)` | Every order shipping to Canada |
 

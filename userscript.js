@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260825-v4.29-batch-select-filters
+// @version      20260825-v4.30-drop-non-label-select
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -138,7 +138,7 @@
                 orderWatchPill: 'order-watch-pill', orderWatchPillAction: 'order-watch-pill-action',
                 orderWatchStatus: 'order-watch-status', orderWatchStatusLabel: 'order-watch-status-label', orderWatchStatusAction: 'order-watch-status-action', orderWatchStatusWarn: 'order-watch-status-warn',
                 messageContainer: 'message-container', cannedMessageSelect: 'canned-message-select', sendCannedMessageBtn: 'send-canned-message-btn', buyLabelLink: 'buy-label-link',
-                shipsLabelPill: 'ships-label-pill', shipsLabelActive: 'ships-label-active', selectNonLabelBtn: 'select-non-label-btn', selectBatchBtnDisabled: 'select-batch-btn-disabled',
+                shipsLabelPill: 'ships-label-pill', shipsLabelActive: 'ships-label-active', batchSelectBtn: 'batch-select-btn', selectBatchBtnDisabled: 'select-batch-btn-disabled',
                 addrWarningBadge: 'addr-warning-badge', addrWarningTooltip: 'addr-warning-tooltip',
                 addrOkBadge: 'addr-ok-badge', addrOkTooltip: 'addr-ok-tooltip'
             },
@@ -458,17 +458,17 @@
                     background-color: ${isDarkMode ? '#2c3e5a' : '#E1ECFF'}; color: ${isDarkMode ? '#78BFFF' : '#0b5cad'};
                     border-color: ${isDarkMode ? '#3f5a86' : '#B7CCF0'}; opacity: 1;
                 }
-                .${CONFIG.classNames.selectNonLabelBtn} {
+                .${CONFIG.classNames.batchSelectBtn} {
                     margin-left: 16px; font-size: 13px; font-weight: 600; text-decoration: none; cursor: pointer;
                     white-space: nowrap; user-select: none; color: ${isDarkMode ? '#78BFFF' : '#3665f3'};
                 }
-                .${CONFIG.classNames.selectNonLabelBtn}:hover { text-decoration: underline; }
+                .${CONFIG.classNames.batchSelectBtn}:hover { text-decoration: underline; }
                 /* Disabled, not hidden — the bar keeps its shape and the count
                    tells you the filter is empty rather than broken. */
-                .${CONFIG.classNames.selectNonLabelBtn}.${CONFIG.classNames.selectBatchBtnDisabled} {
+                .${CONFIG.classNames.batchSelectBtn}.${CONFIG.classNames.selectBatchBtnDisabled} {
                     color: ${isDarkMode ? '#5f5f5f' : '#b0b0b0'}; cursor: default; opacity: 0.85;
                 }
-                .${CONFIG.classNames.selectNonLabelBtn}.${CONFIG.classNames.selectBatchBtnDisabled}:hover { text-decoration: none; }
+                .${CONFIG.classNames.batchSelectBtn}.${CONFIG.classNames.selectBatchBtnDisabled}:hover { text-decoration: none; }
                 .${CONFIG.classNames.addTrackingLink} {
                     display: inline-block; margin-left: 5px; padding: 2px 8px; border-radius: 12px;
                     font-size: 11px; font-weight: bold; text-decoration: none;
@@ -979,10 +979,10 @@
                             if ((n.matches && n.matches(CONFIG.selectors.serviceActions)) || (n.closest && n.closest(CONFIG.selectors.serviceActions))) {
                                 ensureOrdersCombined();
                             }
-                            // Re-inject the "Select non-label" control if eBay
+                            // Re-inject the batch-selection controls if eBay
                             // re-renders the batch-select bar.
                             if ((n.matches && n.matches(CONFIG.selectors.batchSelect)) || (n.querySelector && n.querySelector(CONFIG.selectors.batchSelect))) {
-                                refreshSelectNonLabelControl();
+                                refreshBatchSelectControls();
                             }
                         }
                     });
@@ -1007,9 +1007,9 @@
             // Attempt to combine orders before proceeding
             ensureOrdersCombined();
 
-            // Add the "Select non-label" batch control (defined at IIFE scope so
-            // the pill toggle handler can refresh its count too).
-            refreshSelectNonLabelControl();
+            // Add the batch-selection controls (defined at IIFE scope so the
+            // label-pill toggle handler can refresh their counts too).
+            refreshBatchSelectControls();
 
             console.debug('[Tampermonkey][INIT] Header & base layout adjustments complete');
         }
@@ -1030,13 +1030,6 @@
         }
 
         const BATCH_SELECT_FILTERS = [
-            {
-                key: 'non-label',
-                label: 'Select non-label',
-                title: 'Check every envelope order — no active 📦 label pill — manila and LG included',
-                emptyTitle: 'Nothing to select: every remaining order ships with a 📦 label',
-                match: order => order.dataset.shipsWithLabel !== 'true'
-            },
             {
                 key: 'standard-envelope',
                 label: 'Select standard envelope',
@@ -1076,22 +1069,21 @@
             console.debug(`[Tampermonkey][SELECT] ${filter.key} → ${checked} order(s) checked`);
         }
 
-        // Kept under its original name: older call sites reach the envelope
-        // filter through this, and it is the one with muscle memory behind it.
-        function selectNonLabelOrders() {
-            const filter = BATCH_SELECT_FILTERS.find(f => f.key === 'non-label');
-            if (filter) applyBatchSelectFilter(filter);
-        }
-
         // Injects or refreshes the whole row. A filter matching nothing renders
         // DISABLED rather than disappearing: a control that vanishes makes the
         // bar jump around and leaves you guessing whether the feature broke or
         // the orders simply ran out. Safe to call repeatedly — on init, on a
         // batch-select re-render, on a label-pill toggle, on every ship.
-        function refreshSelectNonLabelControl() {
+        function refreshBatchSelectControls() {
             const batchSelect = document.querySelector(CONFIG.selectors.batchSelect);
             if (!batchSelect) return;
             const candidates = batchSelectCandidates();
+            // Drop any control whose filter has been retired, so a span left by
+            // an earlier version cannot outlive it in a re-rendered bar.
+            const liveKeys = BATCH_SELECT_FILTERS.map(f => f.key);
+            batchSelect.querySelectorAll('[data-batch-filter]').forEach(el => {
+                if (!liveKeys.includes(el.dataset.batchFilter)) el.remove();
+            });
             BATCH_SELECT_FILTERS.forEach(filter => {
                 let count = 0;
                 candidates.forEach(order => { if (filter.match(order)) count++; });
@@ -1102,7 +1094,7 @@
                     // colour whatever this file asks for — the same trap the new
                     // order pill fell into in v4.27.
                     btn = document.createElement('span');
-                    btn.className = CONFIG.classNames.selectNonLabelBtn;
+                    btn.className = CONFIG.classNames.batchSelectBtn;
                     btn.dataset.batchFilter = filter.key;
                     btn.setAttribute('role', 'button');
                     const activate = (event) => {
@@ -1349,7 +1341,7 @@
 
                 // Orders over the tracking threshold ship with an eBay label (with
                 // tracking), not a hand-addressed envelope. Tag the card so the
-                // "Select non-label" control can exclude it from the bulk envelope
+                // batch-selection filters can exclude it from the bulk envelope
                 // run. The 📦 label pill (below) lets this be toggled either way.
                 const shipsWithLabel = totalItemsPrice > USER_CONFIG.trackingOrderAmountThreshold;
                 orderItem.dataset.shipsWithLabel = shipsWithLabel ? 'true' : 'false';
@@ -2492,7 +2484,7 @@
             try { skuManagerRef?.createSKUPackingList(); } catch (e) { console.error('[Ship] panel repaint failed:', e); }
             // Shipping an order changes what each filter would match, so the
             // counts in the batch bar have to move with it.
-            try { refreshSelectNonLabelControl(); } catch (e) { console.error('[Ship] batch control refresh failed:', e); }
+            try { refreshBatchSelectControls(); } catch (e) { console.error('[Ship] batch control refresh failed:', e); }
         }
 
         function shipDock() {
@@ -3034,7 +3026,7 @@
                         const nowLabel = orderItemElement.dataset.shipsWithLabel !== 'true';
                         orderItemElement.dataset.shipsWithLabel = nowLabel ? 'true' : 'false';
                         target.classList.toggle(CONFIG.classNames.shipsLabelActive, nowLabel);
-                        refreshSelectNonLabelControl();
+                        refreshBatchSelectControls();
                     }
                     return;
                 }
@@ -4371,7 +4363,7 @@
                 if (reprocessed > 0) {
                     skuManager.createSKUPackingList();
                     refreshAddressBanner();
-                    refreshSelectNonLabelControl();
+                    refreshBatchSelectControls();
                     console.debug(`[Tampermonkey][ORDERS] Re-processed ${reprocessed} re-rendered card(s)`);
                 }
             };
