@@ -1,5 +1,19 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.28
+- Fixes the new-order pill rendering in magenta instead of the colour this file
+  asked for. The pill was an `<a href="<the current page>">` — which makes it a
+  permanently **visited** link, and `:visited` then owns its colour regardless
+  of what any class rule says, with the child spans inheriting it. It is a
+  `div` with `role="button"` now (Enter and Space activate it), which is more
+  honest anyway: it was never navigation, it's a reload button.
+- Repalettes the pill from amber to blue. Amber was a poor choice on a panel
+  where yellow already means "LG SKU" and orange means "manila" — a
+  notification has no business borrowing a colour that carries packing meaning.
+  Blue is unused semantically here and reads as information rather than alarm.
+- Every watch rule is now anchored on the SKU panel's id, so eBay's own
+  stylesheet can't outrank it on specificity again.
+
 ## v4.27
 - Gives the order watch a face. v4.26 was completely invisible until it had
   news, which made its silence ambiguous: "no new orders" and "this died an

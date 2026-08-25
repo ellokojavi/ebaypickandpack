@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260825-v4.27-watch-status-line
+// @version      20260825-v4.28-watch-pill-colors
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -226,13 +226,21 @@
                 #altheastix-config-container { position: fixed; width: 360px; z-index: 1000; background: ${isDarkMode ? '#2a2a2a' : '#fdfdfd'}; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: 1px solid ${isDarkMode ? '#444' : '#ddd'}; transition: top 0.3s ease-in-out; }
                 ${CONFIG.selectors.skuPanelTitle} { position: sticky; top: 0; background: ${isDarkMode ? '#333' : '#f5f5f5'}; z-index: 1; margin: 0; padding: 12px 15px; font-size: 16px; border-bottom: 1px solid ${isDarkMode ? '#444' : '#ddd'}; display: flex; justify-content: space-between; align-items: center; color: ${isDarkMode ? '#e0e0e0' : '#000'}; }
                 ${CONFIG.selectors.skuPanelToggles} { display: flex; gap: 10px; align-items: center; }
-                .${CONFIG.classNames.orderWatchPill} { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 12px 2px; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; line-height: 1.3; text-decoration: none; cursor: pointer; background: ${isDarkMode ? '#4a3a12' : '#fff8e1'}; color: ${isDarkMode ? '#ffd97a' : '#7a5b00'}; border: 1px solid ${isDarkMode ? '#7a5f1f' : '#f0d48a'}; }
-                .${CONFIG.classNames.orderWatchPill}:hover { filter: brightness(1.08); }
-                .${CONFIG.classNames.orderWatchPillAction} { text-decoration: underline; font-weight: 700; white-space: nowrap; }
-                .${CONFIG.classNames.orderWatchStatus} { display: flex; align-items: center; gap: 5px; margin: 4px 14px 8px; font-size: 11px; line-height: 1.4; color: ${isDarkMode ? '#7f7f7f' : '#a0a0a0'}; user-select: none; }
-                .${CONFIG.classNames.orderWatchStatus}.${CONFIG.classNames.orderWatchStatusWarn} { color: ${isDarkMode ? '#e0a33a' : '#a8730a'}; }
-                .${CONFIG.classNames.orderWatchStatusAction} { cursor: pointer; text-decoration: underline; }
-                .${CONFIG.classNames.orderWatchStatusAction}:hover { color: ${isDarkMode ? '#ddd' : '#333'}; }
+                /* Every rule below is anchored on the panel id on purpose.
+                   eBay's own stylesheet reaches into this panel, and the pill
+                   used to be an <a href="<this page>"> — a permanently
+                   "visited" link, which :visited repainted magenta no matter
+                   what colour this file asked for. It is a div now, and these
+                   selectors outrank anything eBay sets on bare elements. */
+                #${CONFIG.ids.skuPanelContainer} .${CONFIG.classNames.orderWatchPill} { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 12px 2px; padding: 9px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; line-height: 1.3; text-decoration: none; cursor: pointer; background: ${isDarkMode ? '#1d3550' : '#f0f6ff'}; color: ${isDarkMode ? '#dbeaff' : '#16457f'}; border: 1px solid ${isDarkMode ? '#35618f' : '#bcd7f7'}; }
+                #${CONFIG.ids.skuPanelContainer} .${CONFIG.classNames.orderWatchPill}:hover { background: ${isDarkMode ? '#244267' : '#e2eeff'}; border-color: ${isDarkMode ? '#4478ac' : '#9dc3ef'}; }
+                #${CONFIG.ids.skuPanelContainer} .${CONFIG.classNames.orderWatchPill} span { color: inherit; }
+                #${CONFIG.ids.skuPanelContainer} .${CONFIG.classNames.orderWatchPillAction} { text-decoration: underline; font-weight: 700; white-space: nowrap; color: ${isDarkMode ? '#a9cdff' : '#1462be'} !important; }
+                #${CONFIG.ids.skuPanelContainer} .${CONFIG.classNames.orderWatchStatus} { display: flex; align-items: center; gap: 5px; margin: 4px 14px 9px; font-size: 11px; line-height: 1.4; color: ${isDarkMode ? '#7a7a7a' : '#a0a0a0'}; user-select: none; }
+                #${CONFIG.ids.skuPanelContainer} .${CONFIG.classNames.orderWatchStatus} span { color: inherit; }
+                #${CONFIG.ids.skuPanelContainer} .${CONFIG.classNames.orderWatchStatus}.${CONFIG.classNames.orderWatchStatusWarn} { color: ${isDarkMode ? '#d99e3c' : '#9a6a08'}; }
+                #${CONFIG.ids.skuPanelContainer} .${CONFIG.classNames.orderWatchStatusAction} { cursor: pointer; text-decoration: underline; }
+                #${CONFIG.ids.skuPanelContainer} .${CONFIG.classNames.orderWatchStatusAction}:hover { color: ${isDarkMode ? '#e8e8e8' : '#333'} !important; }
                 .${CONFIG.classNames.darkModeSwitch} { position: relative; display: inline-block; width: 40px; height: 20px; }
                 .${CONFIG.classNames.darkModeSwitch} input { opacity: 0; width: 0; height: 0; }
                 .${CONFIG.classNames.darkModeSlider} { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: ${isDarkMode ? '#555' : '#ccc'}; transition: .4s; border-radius: 20px; }
@@ -1846,9 +1854,13 @@
             const count = orderWatch.newIds.size;
             if (count < 1) return;
 
-            const pill = document.createElement('a');
+            // A div, not an <a>. Pointing an anchor at the current page makes
+            // it a visited link forever, and :visited then owns its colour.
+            // This was never navigation anyway — it is a reload button.
+            const pill = document.createElement('div');
             pill.className = CONFIG.classNames.orderWatchPill;
-            pill.href = window.location.href;
+            pill.setAttribute('role', 'button');
+            pill.setAttribute('tabindex', '0');
             pill.title = 'eBay has orders this page has not seen. Finish what you are doing, then refresh.';
             const label = document.createElement('span');
             label.textContent = `🔔 ${count} new order${count === 1 ? '' : 's'} since load`;
@@ -1857,7 +1869,7 @@
             action.textContent = 'Refresh';
             pill.append(label, action);
 
-            pill.addEventListener('click', (event) => {
+            const onPillActivate = (event) => {
                 event.preventDefault();
                 // Reloading mid-batch would strand the queue and lose the
                 // per-card state that tells you what actually shipped.
@@ -1868,6 +1880,10 @@
                 }
                 WATCHDBG('refresh-clicked', { pending: orderWatch.newIds.size });
                 window.location.reload();
+            };
+            pill.addEventListener('click', onPillActivate);
+            pill.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') onPillActivate(event);
             });
 
             const title = container.querySelector('h2.sku-title');
