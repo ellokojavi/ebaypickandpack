@@ -1,5 +1,21 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.30
+- Removes **Select non-label**. Three filters plus eBay's own controls
+  overflowed the batch bar and pushed the sort selector to the edge, and the
+  one to cut was obvious: on a typical batch it reported the same count as
+  *Select standard envelope*, so it was spending a third of the bar to say the
+  same thing twice. The batch bar is now
+  `Select all · Select standard envelope (N) · Select 🇨🇦 Canada (N)`.
+- The 📦 label pill and the `shipsWithLabel` tag behind it are untouched —
+  *Select standard envelope* still reads them, and toggling a pill still moves
+  the counts.
+- `refreshSelectNonLabelControl` is now `refreshBatchSelectControls` and the
+  control class is `batch-select-btn`; the retired `selectNonLabelOrders()`
+  helper is gone. The refresher also prunes any control whose filter no longer
+  exists, so a span left behind by an earlier version can't survive an eBay
+  re-render of the bar.
+
 ## v4.29
 - Turns the single "Select non-label" control into a row of batch-selection
   filters beside eBay's native "Select all":
