@@ -1,5 +1,18 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.32
+- Actually fixes the batch-control alignment, this time from measurements
+  rather than inference. v4.31 (and the version before it) tried to *centre*
+  the controls — `align-self: center`, `vertical-align: middle` — while eBay's
+  "Select all" label is **baseline**-aligned at a different type scale:
+  12.8px/16px against these controls' 13px/15.6px. Centring two boxes of
+  different type scales cannot align their baselines; it splits the difference,
+  which was the ~1px drift that survived both attempts. Baseline alignment at
+  the label's own metrics measures to 0.00px on both baseline and centre.
+- Adds `syncBatchBtnTypography()`, which re-reads font-size and line-height off
+  the live sibling label on every render, so the alignment holds if eBay
+  changes its type scale rather than silently drifting again.
+
 ## v4.31
 - Fixes the batch-selection controls sitting higher than "Select all" and
   "Sort by". `.batch-select` is a flex row, and the controls carried no

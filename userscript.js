@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260825-v4.31-batch-bar-alignment
+// @version      20260825-v4.32-batch-bar-baseline
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -459,16 +459,19 @@
                     border-color: ${isDarkMode ? '#3f5a86' : '#B7CCF0'}; opacity: 1;
                 }
                 .${CONFIG.classNames.batchSelectBtn} {
-                    /* .batch-select is a flex row. Without align-self these spans
-                       take the default 'stretch', becoming full-height boxes with
-                       their text pinned to the top — which is what pushed them
-                       above "Select all" and "Sort by". inline-flex + center keeps
-                       the flag emoji from dragging the line box around too, and
-                       vertical-align is the fallback if eBay ever re-renders this
-                       bar as ordinary inline flow. */
-                    align-self: center; vertical-align: middle;
-                    display: inline-flex; align-items: center; line-height: 1.2;
-                    margin-left: 16px; font-size: 13px; font-weight: 600; text-decoration: none; cursor: pointer;
+                    /* Measured, not guessed. eBay's "Select all" label is
+                       baseline-aligned at 12.8px/16px; two earlier attempts here
+                       CENTRED these controls instead (align-self:center,
+                       vertical-align:middle) at 13px/15.6px. Centring two boxes of
+                       different type scales cannot align their baselines — it
+                       splits the difference, which was the ~1px drift. Baseline
+                       alignment at the label's own metrics measures to 0.00 on
+                       both baseline and centre. syncBatchBtnTypography() re-reads
+                       those metrics from the live label at render time, so this
+                       survives eBay changing its type scale. */
+                    display: inline; align-self: baseline; vertical-align: baseline;
+                    font-size: 12.8px; line-height: 16px;
+                    margin-left: 16px; font-weight: 600; text-decoration: none; cursor: pointer;
                     white-space: nowrap; user-select: none; color: ${isDarkMode ? '#78BFFF' : '#3665f3'};
                 }
                 .${CONFIG.classNames.batchSelectBtn}:hover { text-decoration: underline; }
@@ -1083,6 +1086,19 @@
         // bar jump around and leaves you guessing whether the feature broke or
         // the orders simply ran out. Safe to call repeatedly — on init, on a
         // batch-select re-render, on a label-pill toggle, on every ship.
+        // eBay owns the type scale in this bar and it is not ours to predict —
+        // copy the sibling label's metrics onto our controls at render time so
+        // the baselines match whatever eBay is currently using.
+        function syncBatchBtnTypography(batchSelect, btn) {
+            try {
+                const label = batchSelect.querySelector('label.field__label');
+                if (!label) return;
+                const cs = getComputedStyle(label);
+                if (cs.fontSize) btn.style.fontSize = cs.fontSize;
+                if (cs.lineHeight && cs.lineHeight !== 'normal') btn.style.lineHeight = cs.lineHeight;
+            } catch (e) {}
+        }
+
         function refreshBatchSelectControls() {
             const batchSelect = document.querySelector(CONFIG.selectors.batchSelect);
             if (!batchSelect) return;
@@ -1123,6 +1139,7 @@
                 btn.setAttribute('tabindex', disabled ? '-1' : '0');
                 btn.classList.toggle(CONFIG.classNames.selectBatchBtnDisabled, disabled);
                 btn.title = disabled ? filter.emptyTitle : filter.title;
+                syncBatchBtnTypography(batchSelect, btn);
             });
         }
 
