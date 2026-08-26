@@ -1,5 +1,38 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.35
+- A batch that finishes with orders shipped but buyers un-messaged now takes one
+  more automated swing before handing over. Previously every message failure
+  landed as a pill the seller had to notice and clear by hand, one card at a
+  time, after the batch they had already walked away from.
+- The sweep runs at the very end of the batch, reopening the message tab for
+  each card still showing a retryable failure. Anything that fails again keeps
+  its pill and stays the seller's to finish — two automated failures is evidence
+  that something needs eyes, not that a third try would land.
+- **Exactly one attempt per card, per batch.** The marker is written BEFORE the
+  tab opens, so a throw, a reload or an eBay re-render can never turn this into
+  a loop that keeps mailing the same buyer. The marker is cleared at the start of
+  each new batch, so a later batch gets its own single attempt.
+- The action (`auto_message` vs `manual_message`) is re-validated at the moment
+  of use, not just when candidates are collected. An unknown action is skipped
+  rather than falling through to `auto_message`, which would peek the thank-you
+  draft and — with auto-send on — mail the buyer something the seller never
+  chose.
+- Retries open in the **background**, unlike the manual Retry button. That one
+  is a deliberate click and deserves focus; this is cleanup running after the
+  seller has probably looked away, and a foreground tab per failure would drag
+  them back once per card.
+- `shipQueue.running` deliberately stays true through the sweep, so the pills'
+  Retry buttons stay disabled and the seller cannot race the sweep on the same
+  card. The sweep is skipped entirely when the batch was stopped by hand.
+- The closing dock line now reports what the sweep did — `· 2/3 messages
+  recovered, 1 still needs you`. A silent recovery is indistinguishable from
+  never having tried, and a silent failure reads as success.
+- New diagnostics: `altheastixShipSweepPreview()` shows exactly which cards the
+  sweep would pick up (and which failed cards it would skip, and why) without
+  opening anything, and `altheastixShipSimulate('msgfail', 'order-item-3')`
+  raises a real retryable failure pill to feed it.
+
 ## v4.34
 - Makes the v4.33 filter checkboxes actually visible. v4.33 hand-built a
   `<span class="checkbox">` around a bare `<input>`, on the assumption that

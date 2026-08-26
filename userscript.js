@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260825-v4.34-clone-ebay-checkbox
+// @version      20260825-v4.35-message-rescue-sweep
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -1783,6 +1783,7 @@
             lines.push('=== Altheastix ship report ===');
             lines.push(`version: ${(typeof GM_info !== 'undefined' && GM_info?.script?.version) || 'unknown'}`);
             lines.push(`queue: running=${shipQueue.running} total=${shipQueue.total} current=${shipQueue.current} done=${shipQueue.done} failed=${shipQueue.failed} skipped=${shipQueue.skipped} stopRequested=${shipQueue.stopRequested}`);
+            lines.push(`sweep: sweeping=${shipQueue.sweeping} attempted=${shipQueue.sweepAttempted} recovered=${shipQueue.sweepRecovered} pendingCandidates=${messageRescueCandidates().length}`);
             lines.push(`deadline timers armed: ${shipDeadlineTimers.size} [${Array.from(shipDeadlineTimers.keys()).join(', ')}]`);
             lines.push(`--- cards (${cards.length}) ---`);
             cards.forEach(c => {
@@ -1837,6 +1838,14 @@
                     btn.replaceWith(lbl);
                 }
                 repaintSkuPanel();
+            } else if (kind === 'msgfail') {
+                // Produces a real, retryable message-failure pill so the rescue
+                // sweep has something to find. Nothing is sent to eBay.
+                markCardMessageFailed(card, {
+                    reason: 'Simulated message failure (dry run — nothing was sent to eBay).',
+                    action: 'auto_message',
+                    retryable: true
+                });
             } else if (kind === 'pending') {
                 markCardQueued(card, true);
             } else if (kind === 'reset') {
@@ -1855,6 +1864,8 @@
                 delete card.dataset.msgFailedReason;
                 delete card.dataset.msgFailedAction;
                 delete card.dataset.msgFailedRetryable;
+                delete card.dataset.msgFailedAt;
+                delete card.dataset.msgSweepAttempted;
                 card.querySelectorAll(`.${CONFIG.classNames.msgFailedPill}`).forEach(el => el.remove());
                 // 'confirm' replaces the ship button with the ✓ Shipped span,
                 // exactly as a real confirmation does. Reset has to put the
@@ -1863,21 +1874,59 @@
                 ensureShipButton(card);
                 repaintSkuPanel();
             } else {
-                console.warn("[Altheastix][ship] kind must be 'fail' | 'confirm' | 'pending' | 'reset'");
+                console.warn("[Altheastix][ship] kind must be 'fail' | 'confirm' | 'msgfail' | 'pending' | 'reset'");
                 return;
             }
             syncPendingBadge();
             console.log('[Altheastix][ship] ' + cardId + ' is now: ' + shipCardState(card));
         }
 
+        // Read-only look at what the rescue sweep would pick up if a batch
+        // ended right now. Opens nothing, sends nothing — the sweep itself only
+        // ever runs at the end of a real batch, so this is the way to check the
+        // selection logic without mailing a buyer to find out.
+        function altheastixShipSweepPreview() {
+            const cards = messageRescueCandidates();
+            const lines = ['=== Altheastix message rescue preview ==='];
+            lines.push(`would retry: ${cards.length}`);
+            cards.forEach(c => {
+                lines.push([
+                    c.id,
+                    'ids=' + (c.dataset.orderId || '-'),
+                    'action=' + (c.dataset.msgFailedAction || '-'),
+                    'retryable=' + (c.dataset.msgFailedRetryable || '0'),
+                    'sweptAlready=' + (c.dataset.msgSweepAttempted || '0'),
+                    'why=' + (c.dataset.msgFailedReason || '-')
+                ].join(' '));
+            });
+            const skipped = Array.from(document.querySelectorAll(CONFIG.selectors.orderItem))
+                .filter(c => c.dataset.msgOutcome === 'failed' && !cards.includes(c));
+            if (skipped.length) {
+                lines.push(`--- failed but NOT eligible (${skipped.length}) ---`);
+                skipped.forEach(c => {
+                    lines.push([
+                        c.id,
+                        'retryable=' + (c.dataset.msgFailedRetryable || '0'),
+                        'action=' + (c.dataset.msgFailedAction || '-'),
+                        'sweptAlready=' + (c.dataset.msgSweepAttempted || '0')
+                    ].join(' '));
+                });
+            }
+            const text = lines.join('\n');
+            console.log(text);
+            return text;
+        }
+
         // Reachable from the page console (userscripts run in their own scope).
         try {
             unsafeWindow.altheastixShipReport = altheastixShipReport;
             unsafeWindow.altheastixShipSimulate = altheastixShipSimulate;
+            unsafeWindow.altheastixShipSweepPreview = altheastixShipSweepPreview;
         } catch (e) {
             try {
                 window.altheastixShipReport = altheastixShipReport;
                 window.altheastixShipSimulate = altheastixShipSimulate;
+                window.altheastixShipSweepPreview = altheastixShipSweepPreview;
             } catch (e2) { console.warn('[Altheastix][ship] diagnostics not reachable from the page console.'); }
         }
 
@@ -2494,6 +2543,9 @@
             orderCard.dataset.msgFailedReason = why;
             orderCard.dataset.msgFailedAction = p.action || '';
             orderCard.dataset.msgFailedRetryable = p.retryable ? '1' : '0';
+            // Stamped so the rescue sweep can tell a SECOND failure apart from
+            // a first one it is still waiting on.
+            orderCard.dataset.msgFailedAt = String(Date.now());
             orderCard.querySelectorAll(`.${CONFIG.classNames.msgFailedPill}`).forEach(el => el.remove());
             const firstOrderId = (orderCard.dataset.orderId || '').split(',')[0];
 
@@ -2649,7 +2701,8 @@
         // also sidesteps the single-slot CONFIRMED_SHIP_KEY, which two
         // simultaneous ship tabs could otherwise clobber.
 
-        const shipQueue = { running: false, stopRequested: false, total: 0, done: 0, failed: 0, skipped: 0, current: 0 };
+        const shipQueue = { running: false, stopRequested: false, total: 0, done: 0, failed: 0, skipped: 0, current: 0,
+            sweeping: false, sweepAttempted: 0, sweepRecovered: 0 };
         // PrintSKUTable owns the "Ship N Selected" button, but skuManager is a
         // local of main(). The queue needs to force a panel repaint when it
         // finishes, or the button stays stuck reading "Shipping…".
@@ -2753,6 +2806,101 @@
                 .filter(isCardShippable);
         }
 
+        // --- Message rescue sweep ---
+        // A batch can finish with every order shipped and one or two buyers
+        // never messaged: the message tab dies, eBay's composer takes too long,
+        // the watchdog fires. Until now that landed as a pill on the card and
+        // the seller had to notice it and click Retry by hand, once per card,
+        // after the batch they had already walked away from.
+        //
+        // So the batch takes one more automated swing before it hands over.
+        // Exactly one, per card, per batch — the marker is set BEFORE the tab
+        // opens, so a throw, a reload or a re-render can never turn this into a
+        // loop that keeps mailing the same buyer. Anything still failing after
+        // that keeps its pill and stays the seller's to finish, which is the
+        // honest outcome: two automated failures is evidence that something
+        // needs eyes, not evidence that a third try would land.
+        const MESSAGE_SWEEP_TIMEOUT_MS = (USER_CONFIG.automationTabTimeoutSeconds + 15) * 1000;
+
+        function messageRescueCandidates() {
+            return Array.from(document.querySelectorAll(CONFIG.selectors.orderItem)).filter(card => {
+                if (card.dataset.msgOutcome !== 'failed') return false;
+                // retryable is false once the draft has been consumed — reopening
+                // the tab would find nothing queued and stop silently.
+                if (card.dataset.msgFailedRetryable !== '1') return false;
+                if (card.dataset.msgSweepAttempted === '1') return false;
+                const act = card.dataset.msgFailedAction;
+                if (act !== 'auto_message' && act !== 'manual_message') return false;
+                return !!(card.dataset.orderId || '').split(',')[0];
+            });
+        }
+
+        // Resolves 'sent' | 'failed' | 'timeout' | 'gone'. A repeat failure is
+        // told apart from "still waiting" by msgFailedAt changing, so a second
+        // failure is noticed the moment it lands instead of waiting out the
+        // whole timeout.
+        function awaitMessageResolution(card, timeoutMs) {
+            const failedAtBefore = card.dataset.msgFailedAt || '';
+            return new Promise(resolve => {
+                const started = Date.now();
+                const tick = () => {
+                    if (!document.body.contains(card)) return resolve('gone');
+                    const outcome = card.dataset.msgOutcome;
+                    if (outcome && outcome !== 'failed') return resolve('sent');
+                    if (outcome === 'failed' && (card.dataset.msgFailedAt || '') !== failedAtBefore) return resolve('failed');
+                    if (Date.now() - started > timeoutMs) return resolve('timeout');
+                    setTimeout(tick, 500);
+                };
+                tick();
+            });
+        }
+
+        async function runMessageRescueSweep() {
+            const cards = messageRescueCandidates();
+            if (cards.length === 0) {
+                SHIPDBG('sweep:none');
+                return { attempted: 0, recovered: 0 };
+            }
+            shipQueue.sweeping = true;
+            SHIPDBG('sweep:start', { orders: cards.length });
+            let attempted = 0, recovered = 0;
+            for (let i = 0; i < cards.length; i++) {
+                if (shipQueue.stopRequested) { SHIPDBG('sweep:stopped-by-user', { atIndex: i }); break; }
+                const card = cards[i];
+                const orderId = (card.dataset.orderId || '').split(',')[0];
+                const act = card.dataset.msgFailedAction;
+                // Re-validated at the moment of use, not just at collection. The
+                // action decides WHICH draft is reopened, and an unknown one must
+                // never fall through to auto_message — that would mail the buyer
+                // a thank-you the seller never chose.
+                if ((act !== 'auto_message' && act !== 'manual_message') || !orderId) {
+                    SHIPDBG('sweep:skip', { card: card.id, action: act, orderId: orderId });
+                    continue;
+                }
+                card.dataset.msgSweepAttempted = '1';
+                attempted++;
+                renderShipDock(`Retrying message ${attempted} of ${cards.length}…`);
+                SHIPDBG('sweep:attempt', { card: card.id, orderId: orderId, action: act });
+                // Watch BEFORE opening, or a fast result could land before the
+                // listener exists and be missed entirely.
+                const settled = awaitMessageResolution(card, MESSAGE_SWEEP_TIMEOUT_MS);
+                // Background, unlike the manual Retry button. That one is a
+                // deliberate click and deserves focus; this is cleanup running
+                // after the seller has probably looked away, and a foreground tab
+                // per failure would yank them back once per card.
+                openAutomationTab(`https://www.ebay.com/mesh/ord/details?orderid=${orderId}&tm_action=${act}`, { active: false });
+                const outcome = await settled;
+                SHIPDBG('sweep:result', { card: card.id, outcome: outcome });
+                if (outcome === 'sent') recovered++;
+                if (i < cards.length - 1) await new Promise(r => setTimeout(r, 1500));
+            }
+            shipQueue.sweeping = false;
+            shipQueue.sweepAttempted = attempted;
+            shipQueue.sweepRecovered = recovered;
+            SHIPDBG('sweep:end', { attempted: attempted, recovered: recovered, stillFailing: attempted - recovered });
+            return { attempted: attempted, recovered: recovered };
+        }
+
         async function startShipQueue(cards) {
             if (shipQueue.running) return;
             const queueCards = cards.filter(isCardShippable);
@@ -2765,6 +2913,11 @@
             shipQueue.failed = 0;
             shipQueue.skipped = 0;
             shipQueue.current = 0;
+
+            // Each batch is entitled to its own one rescue attempt per card, so
+            // last batch's marker must not suppress this batch's retry.
+            document.querySelectorAll(CONFIG.selectors.orderItem)
+                .forEach(c => { delete c.dataset.msgSweepAttempted; });
 
             const perOrderTimeout = shipDeadlineMs() + 5000;
             SHIPDBG('queue:start', { orders: queueCards.length, perOrderTimeout: perOrderTimeout });
@@ -2837,6 +2990,22 @@
                 SHIPDBG('queue:threw', { message: err?.message || String(err) });
             } finally {
                 queueCards.forEach(c => markCardQueued(c, false));
+                // One last automated attempt at the messages that failed during
+                // this batch, before anything is handed back to the seller.
+                // shipQueue.running is deliberately still true here: it keeps the
+                // pills' Retry buttons disabled so the seller cannot race the
+                // sweep on the same card. Skipped when the batch was stopped by
+                // hand — someone who hit Stop does not want more tabs opening.
+                let sweep = { attempted: 0, recovered: 0 };
+                if (!shipQueue.stopRequested) {
+                    try {
+                        sweep = await runMessageRescueSweep();
+                    } catch (err) {
+                        shipQueue.sweeping = false;
+                        console.error('[Ship] Message rescue sweep threw:', err);
+                        SHIPDBG('sweep:threw', { message: err?.message || String(err) });
+                    }
+                }
                 shipQueue.running = false;
                 shipQueue.current = shipQueue.total;
                 // Re-enable the Retry controls that were disabled because a
@@ -2852,11 +3021,20 @@
                     b.title = '';
                 });
                 const stopped = shipQueue.stopRequested;
-                renderShipDock(stopped
+                // Say what the sweep did. A silent recovery is indistinguishable
+                // from never having tried, and a silent failure reads as success.
+                let sweepTail = '';
+                if (sweep.attempted > 0) {
+                    const stillFailing = sweep.attempted - sweep.recovered;
+                    sweepTail = stillFailing > 0
+                        ? ` · ${sweep.recovered}/${sweep.attempted} messages recovered, ${stillFailing} still need you`
+                        : ` · all ${sweep.attempted} retried message${sweep.attempted === 1 ? '' : 's'} sent`;
+                }
+                renderShipDock((stopped
                     ? `Stopped — ${shipQueue.done} shipped, ${shipQueue.failed} failed`
                     : (shipQueue.failed > 0
                         ? `Finished with ${shipQueue.failed} problem${shipQueue.failed === 1 ? '' : 's'}`
-                        : `All ${shipQueue.done} shipped`));
+                        : `All ${shipQueue.done} shipped`)) + sweepTail);
                 // Repaint so the panel button leaves its "Shipping…" state.
                 repaintSkuPanel();
                 SHIPDBG('queue:finished', { done: shipQueue.done, failed: shipQueue.failed, skipped: shipQueue.skipped });
