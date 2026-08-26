@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260825-v4.35-message-rescue-sweep
+// @version      20260825-v4.36-drop-label-pill
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -138,7 +138,7 @@
                 orderWatchPill: 'order-watch-pill', orderWatchPillAction: 'order-watch-pill-action',
                 orderWatchStatus: 'order-watch-status', orderWatchStatusLabel: 'order-watch-status-label', orderWatchStatusAction: 'order-watch-status-action', orderWatchStatusWarn: 'order-watch-status-warn',
                 messageContainer: 'message-container', cannedMessageSelect: 'canned-message-select', sendCannedMessageBtn: 'send-canned-message-btn', buyLabelLink: 'buy-label-link',
-                shipsLabelPill: 'ships-label-pill', shipsLabelActive: 'ships-label-active', batchSelectBtn: 'batch-select-btn', selectBatchBtnDisabled: 'select-batch-btn-disabled',
+                batchSelectBtn: 'batch-select-btn', selectBatchBtnDisabled: 'select-batch-btn-disabled',
                 addrWarningBadge: 'addr-warning-badge', addrWarningTooltip: 'addr-warning-tooltip',
                 addrOkBadge: 'addr-ok-badge', addrOkTooltip: 'addr-ok-tooltip'
             },
@@ -446,17 +446,6 @@
                 }
                 .${CONFIG.classNames.sendCannedMessageBtn}:hover {
                     background-color: ${isDarkMode ? '#5a82f5' : '#005fb8'};
-                }
-                .${CONFIG.classNames.shipsLabelPill} {
-                    display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 12px;
-                    font-size: 11px; font-weight: bold; cursor: pointer; user-select: none; white-space: nowrap;
-                    background-color: ${isDarkMode ? '#3a3a3a' : '#eef0f2'}; color: ${isDarkMode ? '#8a8a8a' : '#9aa0a6'};
-                    border: 1px solid ${isDarkMode ? '#555' : '#d5d9dd'}; opacity: 0.7; transition: all 0.2s ease;
-                }
-                .${CONFIG.classNames.shipsLabelPill}:hover { opacity: 1; }
-                .${CONFIG.classNames.shipsLabelPill}.${CONFIG.classNames.shipsLabelActive} {
-                    background-color: ${isDarkMode ? '#2c3e5a' : '#E1ECFF'}; color: ${isDarkMode ? '#78BFFF' : '#0b5cad'};
-                    border-color: ${isDarkMode ? '#3f5a86' : '#B7CCF0'}; opacity: 1;
                 }
                 /* These controls are checkbox + label sibling pairs sitting as
                    direct children of .batch-select, wearing eBay's own .checkbox
@@ -1050,7 +1039,7 @@
             {
                 key: 'standard-envelope',
                 label: 'Select standard envelope',
-                title: 'Check only plain-envelope orders: no 📦 label, no manila, no LG',
+                title: 'Check only plain-envelope orders: no eBay label, no manila, no LG',
                 emptyTitle: 'Nothing to select: no plain-envelope orders left to pack',
                 match: order => order.dataset.shipsWithLabel !== 'true' &&
                     !order.classList.contains(CONFIG.classNames.highlightManila) &&
@@ -1516,7 +1505,9 @@
                 // Orders over the tracking threshold ship with an eBay label (with
                 // tracking), not a hand-addressed envelope. Tag the card so the
                 // batch-selection filters can exclude it from the bulk envelope
-                // run. The 📦 label pill (below) lets this be toggled either way.
+                // run, and so it gets a +tracking link. Derived from the price
+                // alone since v4.36 — the 📦 pill that used to let this be
+                // toggled by hand is gone.
                 const shipsWithLabel = totalItemsPrice > USER_CONFIG.trackingOrderAmountThreshold;
                 orderItem.dataset.shipsWithLabel = shipsWithLabel ? 'true' : 'false';
 
@@ -1555,8 +1546,7 @@
                     if (shippingCostMatch) shippingText = `Shipping: <span style="font-weight: bold; color: red;">${shippingCostMatch[0]}</span>`;
                 }
                 if (orderItem.dataset.isCanadian === 'true') shippingText += ' 🇨🇦';
-                const labelPillHTML = `<span class="${CONFIG.classNames.shipsLabelPill}${shipsWithLabel ? ' ' + CONFIG.classNames.shipsLabelActive : ''}" title="Ships with an eBay label (tracking) — excluded from bulk envelope printing. Click to toggle.">📦 label</span>`;
-                infoBlock.innerHTML = `<p>${orderIdContainer.innerHTML} │ ${totalHTML} │ ${shippingText} ${labelPillHTML}</p>`;
+                infoBlock.innerHTML = `<p>${orderIdContainer.innerHTML} │ ${totalHTML} │ ${shippingText}</p>`;
                 tcellItem.insertBefore(infoBlock, tcellItem.firstChild);
                 transactionCell.style.display = 'none';
 
@@ -3372,16 +3362,6 @@
             ordersContainerForEvents.addEventListener('click', async function(event) {
                 const target = event.target;
                 const orderItemElement = target.closest(CONFIG.selectors.orderItem);
-                if (target.classList.contains(CONFIG.classNames.shipsLabelPill)) {
-                    event.preventDefault();
-                    if (orderItemElement) {
-                        const nowLabel = orderItemElement.dataset.shipsWithLabel !== 'true';
-                        orderItemElement.dataset.shipsWithLabel = nowLabel ? 'true' : 'false';
-                        target.classList.toggle(CONFIG.classNames.shipsLabelActive, nowLabel);
-                        refreshBatchSelectControls();
-                    }
-                    return;
-                }
                 if (target.classList.contains('ship-when-btn')) {
                     event.preventDefault();
                     setShipWhenState(orderItemElement, target.dataset.when === 'tomorrow');
