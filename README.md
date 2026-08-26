@@ -53,7 +53,7 @@ Next to eBay's native **Select all**, in the batch bar above the order list:
 
 | Control | Selects |
 |---------|---------|
-| `Select standard envelope (N)` | Plain-envelope orders only: no 📦 label, no manila, no LG |
+| `Select standard envelope (N)` | Plain-envelope orders only: no eBay label, no manila, no LG |
 | `Select 🇨🇦 Canada (N)` | Every order shipping to Canada |
 
 Each filter carries its own checkbox showing whether it is **currently** the
@@ -82,7 +82,7 @@ Every order's shipping address is automatically linted against structural rules:
 
 ### 🖨️ Envelope Printing
 - **Print All Envelopes** — consolidates all envelopes into a single print window with one envelope per page (no more N separate dialogs!) 🎉
-- **Label vs. envelope split** 📦 — each card shows a `📦 label` pill in its shipping-info row, active on orders over the tracking threshold (these ship with an eBay label, not a hand-addressed envelope) and muted on the rest. Click it to reclassify an order either way. A **"Select non-label (N)"** control beside eBay's native "Select all" checks only the envelope orders, shrinking the SKUs-to-Pack panel to that subset and turning the button into "Print N Selected Envelopes" — keeping label orders out of the bulk envelope run. It shows a live count and appears only when at least one order ships with a label (otherwise it would duplicate "Select all")
+- **Label vs. envelope split** — orders above `trackingOrderAmountThreshold` ship with an eBay label (with tracking) rather than a hand-addressed envelope. The split is derived from the order total alone: those orders get a `+tracking` link and are excluded from the *Select standard envelope* filter, keeping them out of the bulk envelope run. (Up to v4.35 a clickable `📦 label` pill let each order be reclassified by hand; it was removed in v4.36.)
 - **Envelope #10 format** (9.5in × 4.125in) with auto-scaled content
 - **Buy shipping label** 🏷️ — a link under each card's Print Envelope button opens eBay's single-label page in a focused tab and auto-fills it for an **eBay Standard Envelope**: Custom size, 1 oz, 9 × 4.1 × 0.1 in. You just click "Buy shipping label" to confirm
 - **Custom Envelope modal** — paste any address block, auto-parse it into editable fields, and print a one-off envelope for orders not in the active queue

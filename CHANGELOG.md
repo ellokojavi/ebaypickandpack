@@ -1,5 +1,19 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.36
+- Removes the `📦 label` pill from every order card, along with its styles, its
+  click handler and its class names. The shipping-info row is just order IDs,
+  total and shipping again.
+- The `shipsWithLabel` tag behind it **stays** — it is derived from the order
+  total against `trackingOrderAmountThreshold` and still drives both the
+  `+tracking` link and the *Select standard envelope* filter. Removing it would
+  have taken those with it.
+- The one behaviour genuinely lost: an order can no longer be reclassified
+  label ⇄ envelope by hand. The split is now purely the price threshold, so an
+  order that needs the other treatment has to be handled outside the filter.
+- Also corrects a stale README section that still described the pill and the
+  "Select non-label" control retired back in v4.30.
+
 ## v4.35
 - A batch that finishes with orders shipped but buyers un-messaged now takes one
   more automated swing before handing over. Previously every message failure
