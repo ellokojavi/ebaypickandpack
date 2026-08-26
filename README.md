@@ -184,7 +184,9 @@ bulk shipping page and run:
 | `altheastixShipSimulate('fail', 'order-item-3')` | Drives card 3 into the failed state — red banner, Retry button, counter update — **without contacting eBay** |
 | `altheastixShipSimulate('confirm', 'order-item-3')` | Drives card 3 into the confirmed state |
 | `altheastixShipSimulate('pending', 'order-item-3')` | Shows the "queued for batch shipping" badge |
+| `altheastixShipSimulate('msgfail', 'order-item-3')` | Raises a real retryable "message not sent" pill on card 3 — **without contacting eBay** |
 | `altheastixShipSimulate('reset', 'order-item-3')` | Returns card 3 to its untouched state |
+| `altheastixShipSweepPreview()` | Lists which cards the end-of-batch message rescue sweep would retry, and which failed cards it would skip and why. Opens nothing |
 | `altheastixWatchReport()` | Prints the order-watch state — baseline size, last poll result, next poll countdown, ids seen since load — plus a rolling 200-entry event log |
 | `altheastixWatchReport(true)` | Same, and copies the report to the clipboard |
 | `altheastixWatchSimulate('new', 2)` | Fakes two new orders so the pill and tab title can be checked — **without contacting eBay** |
