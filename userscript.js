@@ -63,6 +63,11 @@
     const AUTO_SEND_MESSAGES_KEY = 'ebay_auto_send_messages';
     const MESSAGE_SEND_KEY = 'ebay_message_to_send';
     const MANUAL_MESSAGE_SEND_KEY = 'ebay_manual_message_to_send';
+    // Panel defaults. These used to be rebuilt as hardcoded literals on every
+    // repaint of the SKU panel, which silently reverted them (and every
+    // per-card override) whenever a checkbox was ticked or an order shipped.
+    const THANK_YOU_GLOBAL_KEY = 'ebay_thank_you_global';
+    const SHIP_WHEN_TOMORROW_KEY = 'ebay_ship_when_tomorrow';
 
     // ===================================================================
     // USER CONFIGURATION (Local Preferences)
@@ -1006,8 +1011,12 @@
                     .join('');
             }
 
-            // Reset auto-send toggle to OFF at start for safety (new location is in SKUs panel)
-            try { GM_setValue(AUTO_SEND_MESSAGES_KEY, true); } catch(e) {}
+            // Auto-send is deliberately NOT reset here. This line used to
+            // force it back to true on every page load while its comment
+            // claimed it reset to OFF "for safety" — so the toggle never
+            // actually persisted and buyer messages could auto-send after a
+            // reload you thought you had turned off. It now keeps whatever
+            // was last chosen; the panel reads it via GM_getValue.
             // Remove any legacy header toggle if one exists from previous versions
             document.querySelector('#auto-send-messages-toggle')?.closest('span')?.remove();
             // Attempt to combine orders before proceeding
@@ -3977,16 +3986,9 @@
                 title.className = 'sku-title';
                 const titleText = document.createElement('span');
                 titleText.textContent = `SKUs to Pick and Pack (${SKU.length})`;
-                const togglesWrapper = document.createElement('div');
-                togglesWrapper.className = 'sku-toggles';
-                const darkModeToggle = document.createElement('label');
-                darkModeToggle.className = CONFIG.classNames.darkModeSwitch;
-                darkModeToggle.innerHTML = `<input type="checkbox" ${isDarkMode ? 'checked' : ''}><span class="${CONFIG.classNames.darkModeSlider}"></span>`;
-                const darkModeEmoji = document.createElement('span');
-                darkModeEmoji.textContent = isDarkMode ? '🌙' : '☀️';
-                darkModeEmoji.style.cssText = 'font-size: 16px; line-height: 1;';
-                togglesWrapper.append(darkModeToggle, darkModeEmoji);
-                title.append(titleText, togglesWrapper);
+                // Dark mode moved to the defaults-panel header in v4.37; the
+                // SKU title bar is now just the title.
+                title.append(titleText);
                 container.appendChild(title);
                 // The panel is rebuilt from scratch on every repaint, so the
                 // watch pill and status line have to be re-hung here or they
@@ -3997,7 +3999,6 @@
                 const contentWrapper = document.createElement('div');
                 contentWrapper.id = CONFIG.ids.skuContentWrapper;
                 container.appendChild(contentWrapper);
-                darkModeToggle.querySelector('input').addEventListener('change', (e) => { localStorage.setItem(CONFIG.localStorageKeys.darkMode, String(e.target.checked)); injectRadicalStyles(); PrintSKUTable(); });
 
                 if (SKU.length > 0) {
                     const flexContainer = document.createElement('div');
