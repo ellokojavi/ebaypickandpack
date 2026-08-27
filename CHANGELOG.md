@@ -1,5 +1,35 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.37
+- **Panel defaults now persist and stop overwriting per-order choices.**
+  `PrintSKUTable()` rebuilds the defaults panel from scratch, and it runs on
+  every order-checkbox change and every ship confirmation — but it rebuilt the
+  thank-you switch as a hardcoded `checked = true` and the ship-date control
+  as hardcoded "Tomorrow", then blanket-applied both to every card. Ticking a
+  single checkbox silently reverted the global ship date to Tomorrow, turned
+  thank-you messages back on, and undid any per-order override. Both are now
+  stored in GM storage (`ebay_thank_you_global`, `ebay_ship_when_tomorrow`)
+  and re-read on each rebuild.
+- **Repaints no longer touch cards the user has already set.** The trailing
+  `setTimeout` seeds only cards without a `data-cfg-seeded` flag, so new cards
+  from the combine-orders observer still get the defaults while hand-set cards
+  survive. An explicit click on a global control still applies to every card —
+  that is the one place overwriting is intended.
+- **Auto-send no longer force-enables itself on load.** The line in
+  `initializePageLayout` commented "Reset auto-send toggle to OFF at start for
+  safety" actually set it to `true` on every page load, so the toggle never
+  persisted and messages could auto-send after a reload you thought you had
+  turned off. Removed; the stored value is now authoritative.
+- Defaults panel renamed "Configuration" → "Defaults for all orders", the
+  permanent 50%-width help-text column replaced with `title=` tooltips and a
+  `ⓘ` marker (roughly halves the panel height), and the dark-mode switch moved
+  out of the SKU title bar into the panel header, where it stays reachable
+  while the panel is collapsed.
+- Adds `altheastixConfigReport()` (stored defaults + per-card state, flagging
+  which cards differ) and `altheastixConfigDryRun()` (reports which cards the
+  next repaint would seed, changing nothing) alongside the existing
+  SHIPDBG helpers.
+
 ## v4.36
 - Removes the `📦 label` pill from every order card, along with its styles, its
   click handler and its class names. The shipping-info row is just order IDs,
