@@ -4102,7 +4102,11 @@
                 contentWrapper.appendChild(customEnvLink);
                 // --- END CUSTOM ENVELOPE FEATURE (link) ---
 
-                // --- Configuration Section (separate floating panel) ---
+                // --- Defaults panel (separate floating panel) ---
+                // Every control here is persisted in GM storage and re-read on
+                // each rebuild. PrintSKUTable() runs on every checkbox change
+                // and every ship confirmation, so anything hardcoded here gets
+                // silently re-applied to the whole page several times a session.
                 const configSection = document.createElement('div');
                 configSection.id = 'altheastix-config-panel';
                 configSection.style.cssText = 'padding: 10px 15px;';
@@ -4111,116 +4115,154 @@
                 const cfgIsCollapsed = localStorage.getItem(CFG_COLLAPSED_KEY) !== 'false';
 
                 const cfgHeader = document.createElement('div');
-                cfgHeader.style.cssText = `display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 13px; color: ${isDarkMode ? '#e0e0e0' : '#333'}; cursor: pointer; user-select: none;`;
+                cfgHeader.style.cssText = `display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px; color: ${isDarkMode ? '#e0e0e0' : '#333'}; cursor: pointer; user-select: none;`;
                 const cfgTitle = document.createElement('span');
-                cfgTitle.textContent = 'Configuration';
+                cfgTitle.textContent = 'Defaults for all orders';
+                cfgTitle.style.cssText = 'flex: 1 1 auto;';
                 const cfgChevron = document.createElement('span');
                 cfgChevron.textContent = cfgIsCollapsed ? '▸' : '▾';
                 cfgChevron.style.cssText = 'font-size: 11px; opacity: 0.6;';
-                cfgHeader.append(cfgTitle, cfgChevron);
+
+                // Dark mode lives here now (was in the SKU title bar). It sits
+                // in the header, not the body, so it stays reachable while the
+                // panel is collapsed — which is its default state.
+                const darkWrap = document.createElement('div');
+                darkWrap.className = 'sku-toggles';
+                darkWrap.style.cssText = 'display:flex; align-items:center; gap:6px;';
+                const darkModeToggle = document.createElement('label');
+                darkModeToggle.className = CONFIG.classNames.darkModeSwitch;
+                darkModeToggle.title = 'Toggle dark mode';
+                darkModeToggle.innerHTML = `<input type="checkbox" ${isDarkMode ? 'checked' : ''}><span class="${CONFIG.classNames.darkModeSlider}"></span>`;
+                const darkModeEmoji = document.createElement('span');
+                darkModeEmoji.textContent = isDarkMode ? '🌙' : '☀️';
+                darkModeEmoji.style.cssText = 'font-size: 16px; line-height: 1;';
+                darkWrap.append(darkModeToggle, darkModeEmoji);
+                // Clicking the switch must not also collapse the panel.
+                darkWrap.addEventListener('click', (e) => e.stopPropagation());
+                darkModeToggle.querySelector('input').addEventListener('change', (e) => {
+                    localStorage.setItem(CONFIG.localStorageKeys.darkMode, String(e.target.checked));
+                    injectRadicalStyles();
+                    PrintSKUTable();
+                });
+
+                cfgHeader.append(cfgTitle, darkWrap, cfgChevron);
                 configSection.appendChild(cfgHeader);
 
                 const cfgBody = document.createElement('div');
                 cfgBody.style.cssText = `margin-top: 8px; display: ${cfgIsCollapsed ? 'none' : 'block'};`;
 
-                // Row: Auto-send messages slider (50/50 layout)
-                const row = document.createElement('div');
-                row.style.cssText = 'display:flex; align-items:center; gap:8px; margin-top: 16px;';
+                // Persisted defaults, read once per rebuild.
+                let thanksDefault = true;
+                let shipTomorrowDefault = true;
+                let autoSendDefault = true;
+                try { thanksDefault = !!GM_getValue(THANK_YOU_GLOBAL_KEY, true); } catch (e) {}
+                try { shipTomorrowDefault = !!GM_getValue(SHIP_WHEN_TOMORROW_KEY, true); } catch (e) {}
+                try { autoSendDefault = !!GM_getValue(AUTO_SEND_MESSAGES_KEY, true); } catch (e) {}
+                CFGDBG('panel:read', { thanks: thanksDefault, shipTomorrow: shipTomorrowDefault, autoSend: autoSendDefault });
 
-                const leftHalf = document.createElement('div');
-                leftHalf.style.cssText = 'flex: 0 0 50%; max-width: 50%; display:flex; align-items:center; gap:8px; min-width:0;';
-                const switchLabel = document.createElement('label');
-                switchLabel.className = CONFIG.classNames.darkModeSwitch; // reuse slider styles
-                const cb = document.createElement('input');
-                cb.type = 'checkbox';
-                cb.id = 'auto-send-messages-toggle';
-                try { cb.checked = !!GM_getValue(AUTO_SEND_MESSAGES_KEY, true); } catch(e) { cb.checked = true; }
-                const slider = document.createElement('span');
-                slider.className = CONFIG.classNames.darkModeSlider;
-                switchLabel.append(cb, slider);
-                const labelSpan = document.createElement('span');
-                labelSpan.textContent = 'auto-send messages';
-                labelSpan.style.cssText = `flex:1 3 auto; font-size: 12px; color: ${isDarkMode ? '#ccc' : '#333'}; white-space: normal; overflow-wrap: anywhere; line-height: 1.25;`;
-                leftHalf.append(switchLabel, labelSpan);
+                // Builds one "label + switch" row. The explanatory copy used to
+                // occupy a permanent 50% column beside every row; it is a
+                // tooltip now, which halves the panel height.
+                function buildToggleRow(id, labelText, helpText, checked) {
+                    const rowEl = document.createElement('div');
+                    rowEl.style.cssText = 'display:flex; align-items:center; gap:8px; margin-top: 14px;';
+                    rowEl.title = helpText;
+                    const switchLabel = document.createElement('label');
+                    switchLabel.className = CONFIG.classNames.darkModeSwitch;
+                    const input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.id = id;
+                    input.checked = checked;
+                    const sliderEl = document.createElement('span');
+                    sliderEl.className = CONFIG.classNames.darkModeSlider;
+                    switchLabel.append(input, sliderEl);
+                    const labelEl = document.createElement('span');
+                    labelEl.textContent = labelText;
+                    labelEl.style.cssText = `flex:1 1 auto; font-size: 12px; color: ${isDarkMode ? '#ccc' : '#333'}; line-height: 1.25;`;
+                    const helpMark = document.createElement('span');
+                    helpMark.textContent = 'ⓘ';
+                    helpMark.title = helpText;
+                    helpMark.style.cssText = `font-size: 11px; opacity: 0.45; cursor: help; color: ${isDarkMode ? '#aaa' : '#666'};`;
+                    rowEl.append(switchLabel, labelEl, helpMark);
+                    return { row: rowEl, input: input };
+                }
 
-                const rightHalf = document.createElement('div');
-                rightHalf.style.cssText = `flex: 0 0 50%; max-width: 50%; font-size: 10px; line-height: 1.25; color: ${isDarkMode ? '#aaa' : '#666'};`;
-                rightHalf.textContent = 'When ON, messages send automatically after drafting.';
+                // Row: thank-you master switch (shown first — it gates the rest).
+                const thanksRow = buildToggleRow(
+                    'thank-you-global-toggle',
+                    'Send thank you msg (all orders)',
+                    'Toggles "+ thank you msg" on every order.',
+                    thanksDefault
+                );
+                const rowThanks = thanksRow.row;
+                const cbThanks = thanksRow.input;
+                cfgBody.appendChild(rowThanks);
 
-                row.append(leftHalf, rightHalf);
+                // Row: auto-send.
+                const autoRow = buildToggleRow(
+                    'auto-send-messages-toggle',
+                    'auto-send messages',
+                    'When ON, messages send automatically after drafting.',
+                    autoSendDefault
+                );
+                const row = autoRow.row;
+                const cb = autoRow.input;
                 cfgBody.appendChild(row);
 
                 cb.addEventListener('change', (e) => {
-                    GM_setValue(AUTO_SEND_MESSAGES_KEY, !!e.target.checked);
+                    const on = !!e.target.checked;
+                    try { GM_setValue(AUTO_SEND_MESSAGES_KEY, on); } catch (err) {}
+                    CFGDBG('autoSend:set', on);
                 });
 
-                // Row: Ship date (global) - segmented Today/Tomorrow (50/50 layout)
+                // Row: ship date (global) — segmented Today/Tomorrow.
                 const rowShip = document.createElement('div');
-                rowShip.style.cssText = 'display:flex; align-items:center; gap:8px; margin-top: 16px;';
+                rowShip.style.cssText = 'display:flex; align-items:center; gap:8px; margin-top: 14px;';
+                rowShip.title = 'Sets every order to tell the buyer it ships today or tomorrow.';
 
                 const leftHalfShip = document.createElement('div');
-                leftHalfShip.style.cssText = 'flex: 0 0 50%; max-width: 50%; display:flex; flex-direction:column; align-items:flex-start; gap:5px; min-width:0;';
+                leftHalfShip.style.cssText = 'flex:1 1 auto; display:flex; flex-direction:column; align-items:flex-start; gap:5px; min-width:0;';
                 const segShip = document.createElement('div');
                 segShip.className = 'ship-when-seg';
                 segShip.setAttribute('role', 'group');
                 segShip.setAttribute('aria-label', 'Ship date for all orders');
                 segShip.innerHTML = `
-                    <button type="button" class="ship-when-btn" data-when="today" aria-pressed="false">Today</button>
-                    <button type="button" class="ship-when-btn ship-when-active" data-when="tomorrow" aria-pressed="true">Tomorrow</button>
+                    <button type="button" class="ship-when-btn${shipTomorrowDefault ? '' : ' ship-when-active'}" data-when="today" aria-pressed="${shipTomorrowDefault ? 'false' : 'true'}">Today</button>
+                    <button type="button" class="ship-when-btn${shipTomorrowDefault ? ' ship-when-active' : ''}" data-when="tomorrow" aria-pressed="${shipTomorrowDefault ? 'true' : 'false'}">Tomorrow</button>
                 `;
                 const labelSpanShip = document.createElement('span');
                 labelSpanShip.textContent = 'ship date (all orders)';
-                labelSpanShip.style.cssText = `font-size: 12px; color: ${isDarkMode ? '#ccc' : '#333'}; white-space: normal; overflow-wrap: anywhere; line-height: 1.25;`;
+                labelSpanShip.style.cssText = `font-size: 12px; color: ${isDarkMode ? '#ccc' : '#333'}; line-height: 1.25;`;
                 leftHalfShip.append(labelSpanShip, segShip);
 
-                const rightHalfShip = document.createElement('div');
-                rightHalfShip.style.cssText = `flex: 0 0 50%; max-width: 50%; font-size: 10px; line-height: 1.25; color: ${isDarkMode ? '#aaa' : '#666'};`;
-                rightHalfShip.textContent = 'Sets every order to tell the buyer it ships today or tomorrow.';
+                const shipHelp = document.createElement('span');
+                shipHelp.textContent = 'ⓘ';
+                shipHelp.title = 'Sets every order to tell the buyer it ships today or tomorrow.';
+                shipHelp.style.cssText = `font-size: 11px; opacity: 0.45; cursor: help; align-self: flex-start; margin-top: 2px; color: ${isDarkMode ? '#aaa' : '#666'};`;
 
-                rowShip.append(leftHalfShip, rightHalfShip);
+                rowShip.append(leftHalfShip, shipHelp);
                 cfgBody.appendChild(rowShip);
 
-                // Apply the chosen ship day to every order card.
+                // Choosing a ship day persists it AND applies it to every card.
+                // An explicit click is the one moment a global is allowed to
+                // overwrite per-card overrides.
                 segShip.addEventListener('click', (e) => {
                     const btn = e.target.closest('.ship-when-btn');
                     if (!btn) return;
                     const isTomorrow = btn.dataset.when === 'tomorrow';
+                    try { GM_setValue(SHIP_WHEN_TOMORROW_KEY, isTomorrow); } catch (err) {}
                     segShip.querySelectorAll('.ship-when-btn').forEach((b) => {
                         const active = (b.dataset.when === 'tomorrow') === isTomorrow;
                         b.classList.toggle('ship-when-active', active);
                         b.setAttribute('aria-pressed', String(active));
                     });
-                    document.querySelectorAll(CONFIG.selectors.orderItem).forEach((card) => setShipWhenState(card, isTomorrow));
+                    const cards = document.querySelectorAll(CONFIG.selectors.orderItem);
+                    cards.forEach((card) => {
+                        setShipWhenState(card, isTomorrow);
+                        card.dataset.cfgSeeded = '1';
+                    });
+                    CFGDBG('shipWhen:set', { tomorrow: isTomorrow, cards: cards.length });
                 });
-
-                // Row: Thank you msg (global) (50/50 layout)
-                const rowThanks = document.createElement('div');
-                rowThanks.style.cssText = 'display:flex; align-items:center; gap:8px; margin-top: 16px;';
-
-                const leftHalfThanks = document.createElement('div');
-                leftHalfThanks.style.cssText = 'flex: 0 0 50%; max-width: 50%; display:flex; align-items:center; gap:8px; min-width:0;';
-                const switchLabelThanks = document.createElement('label');
-                switchLabelThanks.className = CONFIG.classNames.darkModeSwitch;
-                const cbThanks = document.createElement('input');
-                cbThanks.type = 'checkbox';
-                cbThanks.id = 'thank-you-global-toggle';
-                cbThanks.checked = true;
-                const sliderThanks = document.createElement('span');
-                sliderThanks.className = CONFIG.classNames.darkModeSlider;
-                switchLabelThanks.append(cbThanks, sliderThanks);
-                const labelSpanThanks = document.createElement('span');
-                labelSpanThanks.textContent = 'Send thank you msg (all orders)';
-                labelSpanThanks.style.cssText = `flex:1 3 auto; font-size: 12px; color: ${isDarkMode ? '#ccc' : '#333'}; white-space: normal; overflow-wrap: anywhere; line-height: 1.25;`;
-                leftHalfThanks.append(switchLabelThanks, labelSpanThanks);
-
-                const rightHalfThanks = document.createElement('div');
-                rightHalfThanks.style.cssText = `flex: 0 0 50%; max-width: 50%; font-size: 10px; line-height: 1.25; color: ${isDarkMode ? '#aaa' : '#666'};`;
-                rightHalfThanks.textContent = 'Toggles "+ thank you msg" on every order.';
-
-                rowThanks.append(leftHalfThanks, rightHalfThanks);
-                cfgBody.appendChild(rowThanks);
-                // Thank-you is the master switch, so show it first.
-                cfgBody.insertBefore(rowThanks, cfgBody.firstChild);
 
                 // Grey out the message-dependent controls (auto-send + ship date)
                 // here and on every card when no thank-you message will be sent.
@@ -4230,13 +4272,17 @@
                     document.querySelectorAll(CONFIG.selectors.orderItem).forEach((card) => setCardMsgGating(card, on));
                 }
 
-                // Apply to all order cards when toggled
+                // Toggling the master switch persists it and applies it to all
+                // cards — again, an explicit click, so overwriting is intended.
                 cbThanks.addEventListener('change', (e) => {
                     const check = !!e.target.checked;
+                    try { GM_setValue(THANK_YOU_GLOBAL_KEY, check); } catch (err) {}
                     document.querySelectorAll('.thank-you-checkbox').forEach((box) => {
                         if (box instanceof HTMLInputElement) box.checked = check;
                     });
+                    document.querySelectorAll(CONFIG.selectors.orderItem).forEach((card) => { card.dataset.cfgSeeded = '1'; });
                     applyMsgGating(check);
+                    CFGDBG('thanks:set', check);
                 });
 
                 configSection.appendChild(cfgBody);
@@ -4255,15 +4301,25 @@
                 }
                 updateSkuPanelPosition();
 
-                // --- Auto-enable and propagate changes on load ---
+                // --- Seed new cards only ---
+                // This used to blanket-apply the globals to EVERY card on every
+                // repaint, which reverted per-card overrides (and, because the
+                // values were hardcoded, reverted the globals themselves). Now
+                // only cards that have never been seeded get the defaults, so a
+                // card the user changed by hand survives a repaint, while cards
+                // newly added by the combine-orders observer still start right.
                 setTimeout(() => {
-                    document.querySelectorAll(CONFIG.selectors.orderItem).forEach(card => setShipWhenState(card, true));
-                    if (cbThanks.checked) {
-                        document.querySelectorAll('.thank-you-checkbox').forEach(box => {
-                            if (box instanceof HTMLInputElement) box.checked = true;
-                        });
-                    }
+                    const fresh = Array.from(document.querySelectorAll(CONFIG.selectors.orderItem))
+                        .filter((card) => card.dataset.cfgSeeded !== '1');
+                    fresh.forEach((card) => {
+                        setShipWhenState(card, shipTomorrowDefault);
+                        const box = card.querySelector('.thank-you-checkbox');
+                        if (box instanceof HTMLInputElement) box.checked = thanksDefault;
+                        card.dataset.cfgSeeded = '1';
+                    });
+                    // Gating is presentation only — safe to re-derive every time.
                     applyMsgGating(cbThanks.checked);
+                    CFGDBG('seed', { seeded: fresh.length, skipped: document.querySelectorAll(CONFIG.selectors.orderItem).length - fresh.length });
                 }, 0);
             }
 
