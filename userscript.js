@@ -4187,7 +4187,6 @@
                 // panel is collapsed — which is its default state.
                 const darkWrap = document.createElement('div');
                 darkWrap.className = 'sku-toggles';
-                darkWrap.style.cssText = 'display:flex; align-items:center; gap:6px;';
                 const darkModeToggle = document.createElement('label');
                 darkModeToggle.className = CONFIG.classNames.darkModeSwitch;
                 darkModeToggle.title = 'Toggle dark mode';
