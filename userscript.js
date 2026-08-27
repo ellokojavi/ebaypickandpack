@@ -4288,7 +4288,6 @@
                 segShip.className = 'ship-when-seg';
                 segShip.setAttribute('role', 'group');
                 segShip.setAttribute('aria-label', 'Ship date for all orders');
-                segShip.style.cssText = 'flex: 0 0 auto;';
                 segShip.innerHTML = `
                     <button type="button" class="ship-when-btn${shipTomorrowDefault ? '' : ' ship-when-active'}" data-when="today" aria-pressed="${shipTomorrowDefault ? 'false' : 'true'}">Today</button>
                     <button type="button" class="ship-when-btn${shipTomorrowDefault ? ' ship-when-active' : ''}" data-when="tomorrow" aria-pressed="${shipTomorrowDefault ? 'true' : 'false'}">Tomorrow</button>
