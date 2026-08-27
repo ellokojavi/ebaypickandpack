@@ -1769,6 +1769,65 @@
             if (shipLogBuffer.length > 300) shipLogBuffer.shift();
             console.log(`[Altheastix][ship] ${stamp} ${event}`, data === undefined ? '' : data);
         }
+        // Defaults-panel diagnostics. Same shape as SHIPDBG, separate buffer,
+        // because the failure mode here is silent: a setting reverts and
+        // nothing on screen says so. Console helpers:
+        //   altheastixConfigReport()  → stored values + per-card state
+        //   altheastixConfigDryRun()  → what the NEXT repaint would change,
+        //                               without changing anything
+        const cfgLogBuffer = [];
+        function CFGDBG(event, data) {
+            const stamp = new Date().toLocaleTimeString('en-US', { hour12: false });
+            cfgLogBuffer.push({ t: stamp, event: event, data: data === undefined ? null : data });
+            if (cfgLogBuffer.length > 200) cfgLogBuffer.shift();
+            console.log(`[Altheastix][cfg] ${stamp} ${event}`, data === undefined ? '' : data);
+        }
+        function cfgStoredDefaults() {
+            let thanks = true, tomorrow = true, autoSend = true;
+            try { thanks = !!GM_getValue(THANK_YOU_GLOBAL_KEY, true); } catch (e) {}
+            try { tomorrow = !!GM_getValue(SHIP_WHEN_TOMORROW_KEY, true); } catch (e) {}
+            try { autoSend = !!GM_getValue(AUTO_SEND_MESSAGES_KEY, true); } catch (e) {}
+            return { thankYou: thanks, shipTomorrow: tomorrow, autoSend: autoSend };
+        }
+        function cfgCardState(card) {
+            const thanksBox = card.querySelector('.thank-you-checkbox');
+            const activeBtn = card.querySelector('.ship-when-btn.ship-when-active');
+            return {
+                card: card.id,
+                seeded: card.dataset.cfgSeeded === '1',
+                thankYou: thanksBox instanceof HTMLInputElement ? thanksBox.checked : null,
+                shipWhen: activeBtn ? activeBtn.dataset.when : null
+            };
+        }
+        function altheastixConfigReport() {
+            const stored = cfgStoredDefaults();
+            const cards = Array.from(document.querySelectorAll(CONFIG.selectors.orderItem)).map(cfgCardState);
+            const drift = cards.filter((c) => c.thankYou !== stored.thankYou || (c.shipWhen === 'tomorrow') !== stored.shipTomorrow);
+            console.log('[Altheastix][cfg] stored defaults:', stored);
+            console.log(`[Altheastix][cfg] ${cards.length} cards, ${drift.length} differing from defaults (per-card overrides):`);
+            console.table(cards);
+            return { stored: stored, cards: cards, overrides: drift };
+        }
+        // No-op simulator: reports exactly which cards the next repaint would
+        // touch. Before v4.37 this was "all of them" every single time.
+        function altheastixConfigDryRun() {
+            const stored = cfgStoredDefaults();
+            const all = Array.from(document.querySelectorAll(CONFIG.selectors.orderItem));
+            const wouldSeed = all.filter((c) => c.dataset.cfgSeeded !== '1');
+            const wouldPreserve = all.filter((c) => c.dataset.cfgSeeded === '1');
+            console.log('[Altheastix][cfg] DRY RUN — no changes made');
+            console.log(`  stored defaults      : thankYou=${stored.thankYou} shipTomorrow=${stored.shipTomorrow} autoSend=${stored.autoSend}`);
+            console.log(`  would seed (new)     : ${wouldSeed.length}`, wouldSeed.map((c) => c.id));
+            console.log(`  would leave untouched: ${wouldPreserve.length}`);
+            return { stored: stored, wouldSeed: wouldSeed.map((c) => c.id), wouldPreserve: wouldPreserve.map((c) => c.id) };
+        }
+        try {
+            unsafeWindow.altheastixConfigReport = altheastixConfigReport;
+            unsafeWindow.altheastixConfigDryRun = altheastixConfigDryRun;
+        } catch (e) {
+            window.altheastixConfigReport = altheastixConfigReport;
+            window.altheastixConfigDryRun = altheastixConfigDryRun;
+        }
         function shipCardState(card) {
             if (!card) return 'no-card';
             if (card.classList.contains(CONFIG.classNames.orderShipped)) return 'confirmed';
