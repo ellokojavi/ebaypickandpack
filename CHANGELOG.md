@@ -1,5 +1,11 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.38
+- Ship-date row in the defaults panel is now a single line: the Today/Tomorrow
+  pill sits beside the "ship date (all orders)" label instead of wrapping onto
+  a line below it. The `ⓘ` marker stays right-aligned with the two rows above,
+  so the panel keeps one clean help column.
+
 ## v4.37
 - **Panel defaults now persist and stop overwriting per-order choices.**
   `PrintSKUTable()` rebuilds the defaults panel from scratch, and it runs on

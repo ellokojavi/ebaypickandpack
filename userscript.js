@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260827-v4.37-persist-panel-defaults
+// @version      20260827-v4.38-ship-date-inline
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -4278,25 +4278,30 @@
                 rowShip.style.cssText = 'display:flex; align-items:center; gap:8px; margin-top: 14px;';
                 rowShip.title = 'Sets every order to tell the buyer it ships today or tomorrow.';
 
+                // Label and pill share one line. The label is flex:0 0 auto so
+                // the pill sits immediately beside it rather than being pushed
+                // to the far edge; the ⓘ takes the leftover space and stays in
+                // the same help column as the two toggle rows above.
                 const leftHalfShip = document.createElement('div');
-                leftHalfShip.style.cssText = 'flex:1 1 auto; display:flex; flex-direction:column; align-items:flex-start; gap:5px; min-width:0;';
+                leftHalfShip.style.cssText = 'flex:1 1 auto; display:flex; flex-direction:row; align-items:center; gap:10px; min-width:0;';
                 const segShip = document.createElement('div');
                 segShip.className = 'ship-when-seg';
                 segShip.setAttribute('role', 'group');
                 segShip.setAttribute('aria-label', 'Ship date for all orders');
+                segShip.style.cssText = 'flex: 0 0 auto;';
                 segShip.innerHTML = `
                     <button type="button" class="ship-when-btn${shipTomorrowDefault ? '' : ' ship-when-active'}" data-when="today" aria-pressed="${shipTomorrowDefault ? 'false' : 'true'}">Today</button>
                     <button type="button" class="ship-when-btn${shipTomorrowDefault ? ' ship-when-active' : ''}" data-when="tomorrow" aria-pressed="${shipTomorrowDefault ? 'true' : 'false'}">Tomorrow</button>
                 `;
                 const labelSpanShip = document.createElement('span');
                 labelSpanShip.textContent = 'ship date (all orders)';
-                labelSpanShip.style.cssText = `font-size: 12px; color: ${isDarkMode ? '#ccc' : '#333'}; line-height: 1.25;`;
+                labelSpanShip.style.cssText = `flex: 0 0 auto; font-size: 12px; color: ${isDarkMode ? '#ccc' : '#333'}; line-height: 1.25;`;
                 leftHalfShip.append(labelSpanShip, segShip);
 
                 const shipHelp = document.createElement('span');
                 shipHelp.textContent = 'ⓘ';
                 shipHelp.title = 'Sets every order to tell the buyer it ships today or tomorrow.';
-                shipHelp.style.cssText = `font-size: 11px; opacity: 0.45; cursor: help; align-self: flex-start; margin-top: 2px; color: ${isDarkMode ? '#aaa' : '#666'};`;
+                shipHelp.style.cssText = `font-size: 11px; opacity: 0.45; cursor: help; color: ${isDarkMode ? '#aaa' : '#666'};`;
 
                 rowShip.append(leftHalfShip, shipHelp);
                 cfgBody.appendChild(rowShip);
