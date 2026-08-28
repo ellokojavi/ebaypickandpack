@@ -111,6 +111,100 @@
         ]
     };
 
+    // --- Envelope print formats ---
+    // Every printing path (an order card's Print Envelope button, the bulk
+    // "Print N Envelopes" run, and the ad-hoc Custom Envelope modal) takes its
+    // page geometry from one of these. Orders tagged LG — SKU containing "lg",
+    // the ones already drawn with the blue highlight — print on the large
+    // format; everything else stays on #10.
+    //
+    // NOTE on `size`: the correct CSS is two lengths separated by a SPACE.
+    // Up to v4.38 this was written `size: 8.93in x 3.878in`, which is invalid
+    // and was silently dropped by the browser, so envelopes came out on
+    // whatever paper the print dialog happened to have selected. The syntax
+    // below is valid, which means the print dialog will now actually be driven
+    // by these numbers.
+    const ENVELOPE_FORMATS = {
+        standard: {
+            key: 'standard',
+            label: '#10 envelope',
+            sizeLabel: '8.93 × 3.878 in',
+            pageName: 'envstandard',
+            widthIn: 8.93,
+            heightIn: 3.878,
+            // Type scale is per-format: the large envelope is only 78% as wide,
+            // so the delivery address comes down a step or long street lines
+            // wrap in the middle.
+            returnFontPx: 14,
+            addressFontPx: 24,
+            addressIndent: '20%',
+            spacerTop: '10%',
+            spacerBottom: '30%',
+            stampTopPx: 40
+        },
+        large: {
+            key: 'large',
+            label: 'Large envelope',
+            sizeLabel: '7 × 5 in',
+            pageName: 'envlarge',
+            widthIn: 7,
+            heightIn: 5,
+            returnFontPx: 13,
+            addressFontPx: 21,
+            addressIndent: '12%',
+            spacerTop: '14%',
+            spacerBottom: '26%',
+            stampTopPx: 30
+        }
+    };
+
+    // One envelope's markup, sized for `format`. `stampReminderHTML` is the
+    // faint 🇨🇦 int'l-stamp box (empty for domestic orders).
+    function buildEnvelopeHTML(addressHTML, format, stampReminderHTML) {
+        const f = format || ENVELOPE_FORMATS.standard;
+        const stamp = stampReminderHTML || '';
+        return `<div class="envelope envelope--${f.key}" style="position:relative;">${stamp}` +
+            `<table style="font-family: Arial; width: 100%; height: 100%; border-collapse: collapse;">` +
+            `<tr style="vertical-align: top;"><td style="width: 100%; padding: 14px 0 0 18px; font-size: ${f.returnFontPx}px;">${USER_CONFIG.returnAddress}</td></tr>` +
+            `<tr style="height: ${f.spacerTop};"><td></td></tr>` +
+            `<tr style="vertical-align: top;"><td style="text-align: left; padding-left: ${f.addressIndent}; font-size: ${f.addressFontPx}px;">${addressHTML}</td></tr>` +
+            `<tr style="height: ${f.spacerBottom};"><td></td></tr>` +
+            `</table></div>`;
+    }
+
+    // The <style> for a print job containing `formats` (an array of format
+    // objects, possibly with repeats).
+    //
+    // A job that is all one size gets a plain unnamed `@page` — the simple,
+    // long-standing path. Only a genuinely mixed job reaches for CSS named
+    // pages (`@page envlarge { … }` + `page: envlarge`), which Firefox has
+    // supported since 110. The unnamed rule is still emitted in that case as
+    // the fallback, so on a browser that ignores named pages a mixed job comes
+    // out entirely at #10 rather than at some unrelated default paper size.
+    function envelopePrintCSS(formats) {
+        const used = [];
+        (formats || []).forEach(f => { if (f && !used.some(u => u.key === f.key)) used.push(f); });
+        if (used.length === 0) used.push(ENVELOPE_FORMATS.standard);
+
+        const boxRules = used.map(f =>
+            `.envelope--${f.key} { width: ${f.widthIn}in; height: ${f.heightIn}in; }`
+        ).join(' ');
+        const common = `html, body { margin: 0; padding: 0; } ` +
+            `.envelope { padding: 10px; font-family: Arial; box-sizing: border-box; overflow: hidden; } ` +
+            `${boxRules} .envelope + .envelope { break-before: page; page-break-before: always; }`;
+
+        if (used.length === 1) {
+            const f = used[0];
+            return `@page { size: ${f.widthIn}in ${f.heightIn}in; margin: 0; } ${common}`;
+        }
+        const named = used.map(f =>
+            `@page ${f.pageName} { size: ${f.widthIn}in ${f.heightIn}in; margin: 0; } ` +
+            `.envelope--${f.key} { page: ${f.pageName}; }`
+        ).join(' ');
+        const fallback = ENVELOPE_FORMATS.standard;
+        return `@page { size: ${fallback.widthIn}in ${fallback.heightIn}in; margin: 0; } ${named} ${common}`;
+    }
+
     // ===================================================================
     // LOGIC FOR THE PICK & PACK PAGE (BULK SHIPPING)
     // ===================================================================
@@ -1672,13 +1766,37 @@
             orderItem.style.opacity = '1';
         }
 
+        // Which envelope format an order card packs into. LG-tagged orders —
+        // SKU containing "lg", the blue-highlighted ones — need the large
+        // envelope; everything else is a #10. The class is the primary signal
+        // (processOrderCard sets it on every rebuild); the SKU scan is a
+        // fallback for a card that has somehow lost its highlight, so the
+        // format never silently degrades to #10 on a big item.
+        function envelopeFormatForCard(orderItem) {
+            if (!orderItem) return ENVELOPE_FORMATS.standard;
+            if (orderItem.classList.contains(CONFIG.classNames.highlightLg)) return ENVELOPE_FORMATS.large;
+            if (orderItem.classList.contains(CONFIG.classNames.highlightManila)) return ENVELOPE_FORMATS.standard;
+            const skuLis = Array.from(orderItem.querySelectorAll(`${CONFIG.selectors.itemDetailsContainer} li`))
+                .map(li => li.innerText)
+                .filter(t => t.startsWith('SKU: '));
+            if (skuLis.some(t => t.toLowerCase().includes('manila'))) return ENVELOPE_FORMATS.standard;
+            if (skuLis.some(t => t.toLowerCase().includes('lg'))) return ENVELOPE_FORMATS.large;
+            return ENVELOPE_FORMATS.standard;
+        }
+
         // --- Envelope Printing Helper ---
-        // Collects addresses from order cards and opens a single print window with all envelopes.
+        // Collects addresses from order cards and opens a single print window
+        // with all envelopes. A batch that mixes #10 and large orders still
+        // prints as ONE job — the page size is carried per envelope by a CSS
+        // named page (see envelopePrintCSS).
         function printEnvelopes(orderCards) {
             const envelopeHTMLs = [];
+            const usedFormats = [];
+            const debugRows = [];
             orderCards.forEach(orderItem => {
                 const addressEl = orderItem.querySelector(`.${CONFIG.classNames.addressContainer}`);
                 if (!addressEl) return;
+                const format = envelopeFormatForCard(orderItem);
                 const addrBadges = addressEl.querySelectorAll(`.${CONFIG.classNames.addrWarningBadge}, .${CONFIG.classNames.addrOkBadge}`);
                 addrBadges.forEach(b => b.style.display = 'none');
                 const addressHTML = addressEl.innerText.replaceAll("\n", "<br>");
@@ -1687,17 +1805,59 @@
                     || /canada/i.test(addressEl.innerText);
                 // Stamp reminder: sized to fit under a standard USPS international stamp (~1.25in × 1.5in)
                 const stampReminder = isCanadian
-                    ? `<div style="position:absolute;top:40px;right:0;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:5px 6px;border:1px dashed rgba(0,0,0,0.18);border-radius:2px;text-align:center;font-family:Arial;box-sizing:border-box;opacity:0.35;"><span style="font-size:22px;line-height:1;">🇨🇦</span><span style="font-size:10px;font-weight:bold;color:#444;line-height:1.2;white-space:nowrap;">Int'l Stamp</span></div>`
+                    ? `<div style="position:absolute;top:${format.stampTopPx}px;right:0;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:5px 6px;border:1px dashed rgba(0,0,0,0.18);border-radius:2px;text-align:center;font-family:Arial;box-sizing:border-box;opacity:0.35;"><span style="font-size:22px;line-height:1;">🇨🇦</span><span style="font-size:10px;font-weight:bold;color:#444;line-height:1.2;white-space:nowrap;">Int'l Stamp</span></div>`
                     : '';
-                envelopeHTMLs.push(`<div class="envelope" style="position:relative;">${stampReminder}<table style="font-family: Arial; width: 100%; height: 100%; border-collapse: collapse;"><tr style="vertical-align: top;"><td style="width: 100%; padding: 14px 0 0 18px; font-size: 14px;">${USER_CONFIG.returnAddress}</td></tr><tr style="height: 10%;"><td></td></tr><tr style="vertical-align: top;"><td style="text-align: left; padding-left: 20%; font-size: 24px;">${addressHTML}</td></tr><tr style="height: 30%;"><td></td></tr></table></div>`);
+                envelopeHTMLs.push(buildEnvelopeHTML(addressHTML, format, stampReminder));
+                usedFormats.push(format);
+                debugRows.push({ card: orderItem.id || '(no id)', format: format.key, size: format.sizeLabel, canada: isCanadian });
             });
             if (envelopeHTMLs.length === 0) return;
+            const css = envelopePrintCSS(usedFormats);
+            const largeCount = usedFormats.filter(f => f.key === 'large').length;
+            console.log(`[Altheastix][env] printing ${envelopeHTMLs.length} envelope(s): ${envelopeHTMLs.length - largeCount} standard, ${largeCount} large`);
+            console.table(debugRows);
+            console.debug('[Altheastix][env] page CSS →', css);
             const printwin = window.open("", "_blank");
-            printwin.document.write(`<html><head><style>@page { size: 8.93in x 3.878in; margin: 0; } html, body { margin: 0; padding: 0; } .envelope { width: 8.93in; height: 3.878in; padding: 10px; font-family: Arial; box-sizing: border-box; overflow: hidden; } .envelope + .envelope { break-before: page; }</style></head><body>` + envelopeHTMLs.join('') + '</body></html>');
+            printwin.document.write(`<html><head><style>${css}</style></head><body>` + envelopeHTMLs.join('') + '</body></html>');
             printwin.document.close();
             printwin.focus();
             printwin.print();
             printwin.close();
+        }
+
+        // Console diagnostic: what each order card on the page WOULD print on,
+        // without opening a print dialog. Run altheastixEnvelopeReport() in the
+        // console to check LG detection against the cards you can see.
+        function altheastixEnvelopeReport() {
+            const cards = Array.from(document.querySelectorAll(CONFIG.selectors.orderItem));
+            const rows = cards.map(card => {
+                const format = envelopeFormatForCard(card);
+                const skus = Array.from(card.querySelectorAll(`${CONFIG.selectors.itemDetailsContainer} li`))
+                    .map(li => li.innerText.trim())
+                    .filter(t => t.startsWith('SKU: '))
+                    .map(t => t.replace(/^SKU:\s*/, ''))
+                    .join(' | ');
+                return {
+                    card: card.id || '(no id)',
+                    order: card.dataset.orderId || '',
+                    format: format.key,
+                    size: format.sizeLabel,
+                    lgClass: card.classList.contains(CONFIG.classNames.highlightLg),
+                    manilaClass: card.classList.contains(CONFIG.classNames.highlightManila),
+                    skus: skus
+                };
+            });
+            console.log(`[Altheastix][env] ${rows.length} card(s); large=${rows.filter(r => r.format === 'large').length}`);
+            console.table(rows);
+            console.log('[Altheastix][env] CSS for printing all of them →', envelopePrintCSS(rows.map(r => ENVELOPE_FORMATS[r.format])));
+            return rows;
+        }
+        try {
+            unsafeWindow.altheastixEnvelopeReport = altheastixEnvelopeReport;
+        } catch (e) {
+            try {
+                window.altheastixEnvelopeReport = altheastixEnvelopeReport;
+            } catch (e2) { console.warn('[Altheastix][env] diagnostics not reachable from the page console.'); }
         }
 
         // Sets the "ship today vs tomorrow" state for one order card: the hidden
