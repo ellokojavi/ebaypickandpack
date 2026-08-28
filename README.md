@@ -86,6 +86,9 @@ Every order's shipping address is automatically linted against structural rules:
 - **Print All Envelopes** — consolidates all envelopes into a single print window with one envelope per page (no more N separate dialogs!) 🎉
 - **Label vs. envelope split** — orders above `trackingOrderAmountThreshold` ship with an eBay label (with tracking) rather than a hand-addressed envelope. The split is derived from the order total alone: those orders get a `+tracking` link and are excluded from the *Select standard envelope* filter, keeping them out of the bulk envelope run. (Up to v4.35 a clickable `📦 label` pill let each order be reclassified by hand; it was removed in v4.36.)
 - **Envelope #10 format** (9.5in × 4.125in) with auto-scaled content
+- **Large-envelope format** — orders tagged **LG** (SKU containing `lg`, the blue-highlighted cards) print on a **7in × 5in** landscape page instead, with a slightly smaller address block so long street lines don't wrap. Manila orders stay on #10. A batch mixing both sizes still prints as a single job via CSS named pages 📐
+- **Envelope size picker** in the Custom Envelope modal (`#10` / `Large`, defaulting to #10)
+- **`altheastixEnvelopeReport()`** — console diagnostic listing every order card with the envelope format it would print on, no dialog opened 🔍
 - **Buy shipping label** 🏷️ — a link under each card's Print Envelope button opens eBay's single-label page in a focused tab and auto-fills it for an **eBay Standard Envelope**: Custom size, 1 oz, 9 × 4.1 × 0.1 in. You just click "Buy shipping label" to confirm
 - **Custom Envelope modal** — paste any address block, auto-parse it into editable fields, and print a one-off envelope for orders not in the active queue
 - **Canadian envelopes** include a faint 🇨🇦 + "Int'l Stamp" reminder sized to be covered by an international stamp
