@@ -226,6 +226,13 @@ browser console on the bulk shipping page and run:
 | `altheastixWatchSimulate('fresh')` | Returns the status line to its quiet state |
 | `altheastixWatchSimulate('poll')` | Forces one real check right now and prints the report |
 
+On an **order-details** tab (`/mesh/ord/details`) rather than the bulk page:
+
+| Command | What it does |
+|---------|--------------|
+| `altheastixMsgProbe()` | Walks the auto-message path — opens the Message buyer panel, finds the composer, textarea and Send button, inserts a draft, watches the Send button's `disabled` flag — and names the first stage that fails. Clears the box afterwards and **never clicks Send** 🔍 |
+| `altheastixMsgProbe({ testClick: true })` | Also fires the real synthetic click with the composer's `fetch` / `XHR` / `sendBeacon` / form-submit stubbed out, to see whether eBay's handler responds to an untrusted click. Interception is best-effort — run it on an order you wouldn't mind messaging ⚠️ |
+
 The simulators and dry runs only inspect or manipulate the page's own state
 machine — they never open an automation tab, mark anything shipped on eBay, or
 message a buyer. 🧪
