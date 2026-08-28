@@ -103,7 +103,7 @@ Every order's shipping address is automatically linted against structural rules:
 - **Today / Tomorrow ship control** — an explicit segmented toggle (per order *and* globally, and remembered between sessions) that sets whether the buyer is told the order ships same-day or next-day. "Tomorrow" also adds the internal "Will be shipped on `<date>`" note. Each card shows a live ship-date preview (e.g. "Fri, Jun 27") 📅
 - **Sunday is never a ship date** 📆 — the computed "tomorrow" date rolls forward to Monday if it lands on a Sunday, so a Saturday batch tells the buyer Monday rather than a day nothing ships
 - **"Send thank you msg" master switch** — the top-level toggle for messaging; when off, the auto-send and ship-date controls are greyed out since no message will be sent ✉️
-- **Defaults that stick** 💾 — the *Defaults for all orders* panel (thank-you, auto-send, ship date) stores every setting and re-reads it on each rebuild. Changing a global applies it to every card; after that, per-order overrides survive repaints, so ticking a checkbox or confirming a shipment no longer silently reverts what you set. Only cards the script has never seen get the defaults applied
+- **Defaults that stick** 💾 — the *Defaults for all orders* panel — a floating panel under the SKU list, collapsed by default — holds the thank-you, auto-send and ship-date globals. It stores every setting and re-reads it on each rebuild. Changing a global applies it to every card; after that, per-order overrides survive repaints, so ticking a checkbox or confirming a shipment no longer silently reverts what you set. Only cards the script has never seen get the defaults applied
 - **Add Tracking** — supports both legacy and new eBay tracking systems (v1 + v2) 📬. On the v2 flow the tracking view is filled *and* Save is pressed automatically (auto-continuing past benign carrier/insurance warnings, but pausing on an invalid-number warning). An **"Auto-press Save on eBay"** checkbox in the tracking tooltip (checked by default) lets you turn the auto-submit off and fall back to fill-only
 - Tracking is automatically suggested for orders above the configurable dollar threshold (default: $25) 💰
 - **Show postage cost on label → No** is forced automatically whenever eBay's "Edit labels" modal opens, so the postage amount is never printed on the label 🏷️
@@ -122,8 +122,8 @@ Two different sets of templates, filled from two different variable sets:
 |----------|-------------|
 | `{BUYER_NAME}` / `{BUYER_FIRST}` | Buyer's full name / first name |
 | `{SHIP_DATE}` | The card's Today/Tomorrow ship date, e.g. "Fri, Jun 27" |
-| `{STICKER_WORD}` | "sticker" or "stickers", matching the order's quantity |
-| `{PRONOUN_SUBJ}` / `{PRONOUN_OBJ}` / `{DEMONSTRATIVE}` | "it/they", "it/them", "this/these" — agreeing with the same quantity |
+| `{STICKER_WORD}` | The product noun, matched to the order: "sticker"/"stickers", "magnet"/"magnets", or "goodies" for a mixed order |
+| `{PRONOUN_SUBJ}` / `{PRONOUN_OBJ}` / `{DEMONSTRATIVE}` | "it"/"they", "it"/"them", "this"/"these" — agreeing with that same quantity |
 | `{DELIVERY_NOTE}` | The Canada note for Canadian orders, otherwise the usual-arrival line plus a random patience variant |
 | `{TRACKING_NOTE}` | "To keep prices fair, orders at or under $25 ship without tracking." — **empty** for orders above `trackingOrderAmountThreshold`, since those ship with a label |
 
@@ -155,7 +155,7 @@ Edit the `USER_CONFIG` object near the top of the script to customize local pref
 | Key | Default | Description |
 |-----|---------|-------------|
 | `returnAddress` | Altheastix Seattle address | Return address printed on envelopes |
-| `trackingOrderAmountThreshold` | `25` | Orders at or above this dollar amount get a tracking suggestion 💰 |
+| `trackingOrderAmountThreshold` | `25` | Orders **above** this dollar amount ship with an eBay label: they get the `+tracking` link, a highlighted total, an empty `{TRACKING_NOTE}`, and are excluded from the *Select standard envelope* filter 💰 |
 | `useAlternativeTracking` | `true` | Use the newer eBay v2 tracking system |
 | `scriptLoadDelay` | `15000` | Startup delay in milliseconds before the script runs ⏱️ |
 | `defaultTrackingNumber` | pre-filled value | Default tracking number pre-filled in the tracking input |
@@ -169,7 +169,7 @@ Edit the `USER_CONFIG` object near the top of the script to customize local pref
 
 ### 🧩 External Config (`altheastix-ebay-config.js`)
 
-Templates, delivery notes, quotes, and quote keywords are loaded at runtime from `altheastix-ebay-config.js`, which lives in this repo and is pulled in via the script's `@require` line:
+Thank-you drafts, delivery notes, quotes, and quote keywords are loaded at runtime from `altheastix-ebay-config.js`, which lives in this repo and is pulled in via the script's `@require` line:
 
 ```
 https://raw.githubusercontent.com/ellokojavi/ebaypickandpack/main/altheastix-ebay-config.js
@@ -200,8 +200,8 @@ If the config file fails to load, the script falls back to built-in defaults and
 ## 🔧 Console Diagnostics
 
 Helpers are exposed on the pick-and-pack page for checking what the shipping
-logic and the order watch are actually doing. Open the browser console on the
-bulk shipping page and run:
+logic, the defaults panel and the order watch are actually doing. Open the
+browser console on the bulk shipping page and run:
 
 | Command | What it does |
 |---------|--------------|
@@ -213,6 +213,8 @@ bulk shipping page and run:
 | `altheastixShipSimulate('msgfail', 'order-item-3')` | Raises a real retryable "message not sent" pill on card 3 — **without contacting eBay** |
 | `altheastixShipSimulate('reset', 'order-item-3')` | Returns card 3 to its untouched state |
 | `altheastixShipSweepPreview()` | Lists which cards the end-of-batch message rescue sweep would retry, and which failed cards it would skip and why. Opens nothing |
+| `altheastixConfigReport()` | Prints the stored panel defaults (thank-you, auto-send, ship date) next to every card's live state, flagging which cards carry a per-order override |
+| `altheastixConfigDryRun()` | Reports which cards the **next** repaint would seed with the defaults and which it would leave alone — changes nothing |
 | `altheastixWatchReport()` | Prints the order-watch state — baseline size, last poll result, next poll countdown, ids seen since load — plus a rolling 200-entry event log |
 | `altheastixWatchReport(true)` | Same, and copies the report to the clipboard |
 | `altheastixWatchSimulate('new', 2)` | Fakes two new orders so the pill and tab title can be checked — **without contacting eBay** |
@@ -221,8 +223,9 @@ bulk shipping page and run:
 | `altheastixWatchSimulate('fresh')` | Returns the status line to its quiet state |
 | `altheastixWatchSimulate('poll')` | Forces one real check right now and prints the report |
 
-The simulator only manipulates the page's own state machine — it never opens an
-automation tab, marks anything shipped on eBay, or messages a buyer. 🧪
+The simulators and dry runs only inspect or manipulate the page's own state
+machine — they never open an automation tab, mark anything shipped on eBay, or
+message a buyer. 🧪
 
 ---
 
@@ -259,4 +262,6 @@ This repo is connected to a local folder via a launchd watcher (`autopush.sh` + 
 
 ## 💖 Credits
 
-Built by Javier, with modifications from Grok, Gemini, and GitHub Copilot ❤️
+Built by Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot ❤️
+
+Every release is written up in **[CHANGELOG.md](CHANGELOG.md)** — what changed, and why. 📝
