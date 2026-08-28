@@ -1,0 +1,3481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Checkmark That Lied — Altheastix eBay Order Manager</title>
+<meta name="description" content="How a 6,215-line Tampermonkey userscript rebuilt eBay's bulk shipping page into a pick-and-pack tool, and what 112 versions taught it about automation that admits when it fails.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,400&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>*,*::before,*::after{box-sizing:border-box}body{margin:0}img,svg,canvas{max-width:100%;display:block}</style>
+</head>
+<body>
+
+
+
+
+
+<style>
+/* ============================================================
+   TOKENS — palette lifted from the userscript's own semantics.
+   Manila border orange is the accent because manila is the
+   thing the tool is sorting for.
+   ============================================================ */
+:root {
+  --ground:      #FAF7F0;
+  --ground-deep: #F1EBDD;
+  --surface:     #FFFFFF;
+  --surface-2:   #F6F1E6;
+  --ink:         #1A1712;
+  --ink-2:       #4A4238;
+  --muted:       #7C7263;
+  --rule:        #E2DACA;
+  --rule-strong: #CFC4AE;
+
+  --accent:      #A8631A;
+  --accent-line: #DCBB8C;
+
+  --ok:          #1F7A38;
+  --ok-soft:     #E4F4E8;
+  --ok-line:     #A9DCB8;
+  --bad:         #C2261D;
+  --bad-soft:    #FDECEA;
+  --bad-line:    #F3BFB9;
+  --warn:        #A4620A;
+  --warn-soft:   #FCF2DF;
+  --warn-line:   #EBCF98;
+  --lg:          #14618F;
+  --lg-soft:     #E2F1FA;
+  --lg-line:     #A8D3EB;
+
+  --shadow: 0 1px 2px rgba(40,30,15,.05), 0 8px 28px -14px rgba(40,30,15,.22);
+  --shadow-lift: 0 2px 4px rgba(40,30,15,.06), 0 22px 50px -22px rgba(40,30,15,.32);
+
+  --display: "Archivo", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --body: "Newsreader", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --measure: 34rem;
+  --wide: 60rem;
+  --pad: clamp(1.15rem, 4vw, 2.5rem);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #14120E;
+    --ground-deep: #0D0B08;
+    --surface:     #1C1915;
+    --surface-2:   #23201A;
+    --ink:         #EDE7DB;
+    --ink-2:       #C3BAA9;
+    --muted:       #948A78;
+    --rule:        #2E2921;
+    --rule-strong: #443C31;
+
+    --accent:      #D9932F;
+    --accent-line: #6B4E22;
+
+    --ok:          #5FD98A;
+    --ok-soft:     rgba(95,217,138,.10);
+    --ok-line:     #2C5E3E;
+    --bad:         #F58F86;
+    --bad-soft:    rgba(248,113,113,.11);
+    --bad-line:    #6E3733;
+    --warn:        #E8AE4E;
+    --warn-soft:   rgba(232,174,78,.11);
+    --warn-line:   #6B5124;
+    --lg:          #78BFFF;
+    --lg-soft:     rgba(120,191,255,.10);
+    --lg-line:     #2A4C6B;
+
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -14px rgba(0,0,0,.7);
+    --shadow-lift: 0 2px 6px rgba(0,0,0,.45), 0 26px 60px -24px rgba(0,0,0,.8);
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:      #14120E;
+  --ground-deep: #0D0B08;
+  --surface:     #1C1915;
+  --surface-2:   #23201A;
+  --ink:         #EDE7DB;
+  --ink-2:       #C3BAA9;
+  --muted:       #948A78;
+  --rule:        #2E2921;
+  --rule-strong: #443C31;
+
+  --accent:      #D9932F;
+  --accent-line: #6B4E22;
+
+  --ok:          #5FD98A;
+  --ok-soft:     rgba(95,217,138,.10);
+  --ok-line:     #2C5E3E;
+  --bad:         #F58F86;
+  --bad-soft:    rgba(248,113,113,.11);
+  --bad-line:    #6E3733;
+  --warn:        #E8AE4E;
+  --warn-soft:   rgba(232,174,78,.11);
+  --warn-line:   #6B5124;
+  --lg:          #78BFFF;
+  --lg-soft:     rgba(120,191,255,.10);
+  --lg-line:     #2A4C6B;
+
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -14px rgba(0,0,0,.7);
+  --shadow-lift: 0 2px 6px rgba(0,0,0,.45), 0 26px 60px -24px rgba(0,0,0,.8);
+}
+
+/* ============================================================
+   BASE
+   ============================================================ */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 1.0625rem;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--display);
+  font-weight: 700;
+  letter-spacing: -0.022em;
+  line-height: 1.08;
+  text-wrap: balance;
+  margin: 0;
+}
+
+p { margin: 0 0 1.05em; }
+p:last-child { margin-bottom: 0; }
+
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+strong { font-weight: 600; color: var(--ink); }
+em { font-style: italic; }
+
+code, .mono { font-family: var(--mono); font-size: 0.86em; font-variant-ligatures: none; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+::selection { background: var(--accent); color: var(--ground); }
+
+/* Layout primitives */
+.wrap { width: 100%; max-width: var(--wide); margin-inline: auto; padding-inline: var(--pad); }
+.col  { width: 100%; max-width: var(--measure); margin-inline: auto; }
+.col-l { max-width: var(--measure); margin-inline: 0; }
+
+section { position: relative; }
+
+.rule { height: 1px; background: var(--rule); border: 0; margin: 0; }
+
+/* Eyebrow — version numbers are a real sequence, so they earn the slot */
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 0.7em;
+  margin-bottom: 1.15rem;
+}
+.eyebrow::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--rule);
+}
+.eyebrow .v {
+  color: var(--accent);
+  border: 1px solid var(--accent-line);
+  border-radius: 2px;
+  padding: 0.18em 0.45em;
+  letter-spacing: 0.06em;
+}
+
+.lede {
+  font-size: 1.25rem;
+  line-height: 1.5;
+  color: var(--ink-2);
+  font-weight: 300;
+}
+
+.note {
+  font-family: var(--display);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  font-weight: 500;
+  color: var(--muted);
+  letter-spacing: -0.005em;
+}
+
+blockquote {
+  margin: 1.6rem 0;
+  padding-left: 1.1rem;
+  border-left: 2px solid var(--accent-line);
+  font-style: italic;
+  color: var(--ink-2);
+}
+blockquote cite {
+  display: block;
+  margin-top: .5rem;
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: .7rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ============================================================
+   THEME TOGGLE
+   ============================================================ */
+.themebar {
+  position: fixed;
+  top: 0; right: 0;
+  z-index: 90;
+  padding: .75rem 1rem;
+}
+.themebtn {
+  font-family: var(--mono);
+  font-size: .68rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: .45em .9em;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: color .15s, border-color .15s;
+}
+.themebtn:hover { color: var(--ink); border-color: var(--rule-strong); }
+
+/* ============================================================
+   HERO
+   ============================================================ */
+.hero {
+  padding: clamp(4rem, 12vh, 8rem) 0 clamp(3rem, 7vh, 5rem);
+  border-bottom: 1px solid var(--rule);
+  background:
+    radial-gradient(120% 80% at 85% -10%, var(--warn-soft) 0%, transparent 60%),
+    var(--ground);
+}
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(2.5rem, 6vw, 4rem);
+  align-items: start;
+}
+@media (min-width: 62rem) {
+  .hero-grid { grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); }
+}
+
+.kicker {
+  font-family: var(--mono);
+  font-size: .7rem;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 1.6rem;
+}
+.kicker span { color: var(--muted); }
+
+h1.title {
+  font-size: clamp(2.6rem, 7.5vw, 4.6rem);
+  font-weight: 800;
+  letter-spacing: -0.038em;
+  line-height: .96;
+  margin-bottom: 1.4rem;
+}
+h1.title .lied {
+  color: var(--accent);
+  font-style: normal;
+  position: relative;
+  white-space: nowrap;
+}
+h1.title .lied::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: .17em;
+  height: 3px;
+  background: var(--accent);
+  opacity: .55;
+}
+
+.hero .lede { max-width: 32rem; }
+
+.herometa {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1.6rem;
+  margin-top: 2.2rem;
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--rule);
+  font-family: var(--mono);
+  font-size: .72rem;
+  letter-spacing: .04em;
+  color: var(--muted);
+}
+.herometa b { color: var(--ink); font-weight: 500; }
+
+/* ============================================================
+   INSTRUMENT — the shared chrome for every UI recreation
+   ============================================================ */
+.instrument {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lift);
+  overflow: hidden;
+}
+.instrument-head {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  padding: .6rem .85rem;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--mono);
+  font-size: .66rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.instrument-head .dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--rule-strong);
+  flex: none;
+}
+.instrument-head .live { color: var(--accent); }
+.instrument-head .spacer { flex: 1 1 auto; }
+.instrument-body { padding: 1rem; }
+
+.caption {
+  font-family: var(--display);
+  font-size: .78rem;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--muted);
+  margin-top: .8rem;
+  letter-spacing: -0.004em;
+}
+.caption b { color: var(--ink-2); font-weight: 600; }
+
+/* Fake-UI reset: the recreations use sans, like the real page */
+.ui, .ui * { font-family: var(--display); }
+.ui { font-size: 13px; line-height: 1.4; }
+
+/* ============================================================
+   HERO DEMO — the lie
+   ============================================================ */
+.liedemo .switch {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--rule-strong);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: .9rem;
+}
+.liedemo .switch button {
+  flex: 1 1 0;
+  font-family: var(--display);
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .02em;
+  padding: .55em .4em;
+  border: 0;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.liedemo .switch button + button { border-left: 1px solid var(--rule-strong); }
+.liedemo .switch button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--ground);
+}
+.liedemo .switch button:hover:not([aria-pressed="true"]) { color: var(--ink); }
+
+/* ============================================================
+   ORDER CARD — recreated from the real stylesheet
+   ============================================================ */
+.card {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: 8px;
+  padding: 11px 12px;
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 10px;
+  transition: opacity .25s, border-color .25s, background .25s;
+}
+.card + .card { margin-top: 9px; }
+.card.manila { background: var(--warn-soft); border: 3px solid #E09A3C; }
+.card.lg     { background: var(--lg-soft);   border: 2px solid #D9D98F; }
+.card.multi  { background: var(--multi-tint, rgba(46,125,50,.10)); }
+.card.multi.t1 { --multi-tint: rgba(46,125,50,.16); }
+.card.multi.t2 { --multi-tint: rgba(20,110,140,.16); }
+.card.multi.t3 { --multi-tint: rgba(120,90,160,.16); }
+.card.shipped { opacity: .62; border-left: 5px solid var(--ok); }
+.card.failed  { border-left: 5px solid var(--bad); }
+.card.dim { opacity: .18; }
+
+.card .thumb {
+  width: 54px; height: 54px;
+  border-radius: 5px;
+  background: var(--surface-2);
+  border: 1px solid var(--rule);
+  display: grid; place-items: center;
+  font-size: 20px;
+  user-select: none;
+  cursor: zoom-in;
+}
+.card .body { min-width: 0; }
+.card .who {
+  font-weight: 700;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.card .addr {
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.45;
+  margin-top: 1px;
+  font-variant-numeric: tabular-nums;
+}
+.card .titleline {
+  font-size: 12px;
+  color: var(--ink-2);
+  margin-top: 5px;
+}
+.card .meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.card .meta .oid { font-family: var(--mono); font-size: 10.5px; }
+.card .meta .total { font-weight: 700; color: var(--ink-2); }
+.card .meta .total.hot { color: var(--accent); }
+.card .meta a { color: var(--lg); text-decoration: none; font-weight: 600; }
+.card .meta a:hover { text-decoration: underline; }
+
+.qty {
+  font-size: 1.35em;
+  font-weight: 700;
+  color: var(--warn);
+}
+
+.badge {
+  display: inline-grid;
+  place-items: center;
+  width: 15px; height: 15px;
+  border-radius: 50%;
+  font-size: 10px;
+  cursor: help;
+  position: relative;
+  flex: none;
+}
+.badge.warn { background: var(--warn-soft); color: var(--warn); border: 1px solid var(--warn-line); }
+.badge.ok   { background: var(--ok-soft);   color: var(--ok);   border: 1px solid var(--ok-line); }
+.badge .tip {
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 230px;
+  background: var(--ink);
+  color: var(--ground);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: left;
+  padding: 7px 9px;
+  border-radius: 5px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .15s;
+  z-index: 20;
+  box-shadow: var(--shadow-lift);
+}
+.badge:hover .tip, .badge:focus-visible .tip { opacity: 1; }
+
+.notecallout {
+  margin-top: 6px;
+  padding: 6px 9px;
+  border-radius: 5px;
+  background: var(--surface-2);
+  border-left: 2px solid var(--rule-strong);
+  font-size: 11.5px;
+  color: var(--ink-2);
+  font-style: italic;
+}
+
+/* Card action row */
+.cardactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 9px;
+}
+.btn {
+  font-family: var(--display);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 5px 11px;
+  border-radius: 5px;
+  border: 1px solid var(--rule-strong);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s, border-color .15s, opacity .15s;
+}
+.btn:hover:not(:disabled) { background: var(--surface-2); border-color: var(--muted); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.primary { background: #3665f3; border-color: #3665f3; color: #fff; }
+.btn.primary:hover:not(:disabled) { background: #2b53ce; border-color: #2b53ce; }
+.btn.ghost { border-color: transparent; color: var(--muted); }
+.btn.ghost:hover:not(:disabled) { color: var(--ink); background: var(--surface-2); }
+
+/* Ship states — the real styles */
+.shipped-label {
+  display: block; width: 100%;
+  margin-top: 10px; padding: 8px 12px;
+  font-size: 13px; font-weight: 700; text-align: center;
+  color: #fff; background: #28a745; border-radius: 6px;
+}
+:root[data-theme="dark"] .shipped-label { background: #2e7d32; color: #e0e0e0; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .shipped-label { background: #2e7d32; color: #e0e0e0; }
+}
+
+.pending {
+  display: flex; align-items: center; gap: 9px;
+  width: 100%; margin-top: 10px; padding: 9px 12px;
+  border-radius: 6px;
+  background: var(--warn-soft);
+  border: 1px solid var(--warn-line);
+  color: var(--warn);
+  font-size: 12.5px; font-weight: 600;
+}
+.spinner {
+  width: 15px; height: 15px; border-radius: 50%; flex: none;
+  background: var(--warn);
+  border: 3px solid rgba(255,255,255,.35);
+  border-top-color: #fff;
+  animation: spin 900ms linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.pending .sub { font-size: 11px; font-weight: 400; opacity: .8; }
+.pending .undo {
+  margin-left: auto;
+  font-size: 11px; font-weight: 500;
+  padding: 3px 9px; border-radius: 4px;
+  border: 1px solid var(--warn-line);
+  background: transparent; color: inherit; cursor: pointer;
+}
+.pending .undo:hover { background: var(--surface); }
+
+.failbanner {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  width: 100%; margin-top: 10px; padding: 9px 12px; border-radius: 6px;
+  font-size: 12.5px; line-height: 1.4;
+  background: var(--bad-soft);
+  border: 1px solid var(--bad-line);
+  color: var(--bad);
+}
+.failbanner .txt { flex: 1 1 160px; min-width: 0; font-weight: 600; }
+.failbanner .why { display: block; font-size: 11px; opacity: .85; font-weight: 400; margin-top: 2px; }
+.failbanner button, .failbanner a {
+  font-size: 11.5px; font-weight: 700; padding: 4px 10px; border-radius: 5px;
+  cursor: pointer; text-decoration: none; white-space: nowrap;
+  border: 1px solid transparent;
+}
+.failbanner .retry { background: var(--bad); color: #fff; }
+.failbanner .open { background: transparent; color: inherit; border-color: var(--bad-line); }
+.failbanner .dismiss { background: transparent; color: inherit; border: none; opacity: .7; font-weight: 400; }
+
+.msgpill {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  width: 100%; margin-top: 8px; padding: 7px 10px; border-radius: 6px;
+  font-size: 11.5px; line-height: 1.4;
+  background: var(--warn-soft);
+  border: 1px solid var(--warn-line);
+  color: var(--warn);
+}
+.msgpill .txt { flex: 1 1 130px; font-weight: 600; }
+.msgpill .why { display: block; font-size: 10.5px; font-weight: 400; opacity: .85; margin-top: 1px; }
+.msgpill button {
+  font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 5px;
+  border: 1px solid transparent; background: var(--warn); color: #fff; cursor: pointer;
+}
+.msgpill .open {
+  font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 5px;
+  border: 1px solid var(--warn-line); background: transparent; color: inherit; cursor: pointer;
+}
+
+.queuedbadge {
+  display: block; width: 100%; margin-top: 10px; padding: 8px 12px;
+  font-size: 12.5px; font-weight: 700; text-align: center; border-radius: 6px;
+  background: var(--surface-2); color: var(--muted);
+  border: 1px dashed var(--rule-strong);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation: none; }
+  * { scroll-behavior: auto !important; }
+}
+</style>
+
+<style>
+/* ============================================================
+   SKU PANEL — the floating side panel
+   ============================================================ */
+.pplayout { display: grid; gap: 14px; grid-template-columns: minmax(0,1fr); align-items: start; }
+@media (min-width: 60rem) { .pplayout { grid-template-columns: 340px minmax(0,1fr); } }
+@media (min-width: 60rem) { .pplayout .skupanel { position: sticky; top: 1rem; max-height: calc(100vh - 3rem); overflow-y: auto; } }
+.skupanel {
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.skupanel .head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 13px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--rule);
+  font-size: 13.5px; font-weight: 700;
+}
+.skupanel .watchpill {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin: 8px 12px 2px; padding: 9px 12px;
+  border-radius: 8px; font-size: 12px; font-weight: 600; line-height: 1.3;
+  background: var(--lg-soft); color: var(--lg);
+  border: 1px solid var(--lg-line);
+  cursor: pointer;
+}
+.skupanel .watchpill .act { text-decoration: underline; font-weight: 700; white-space: nowrap; }
+.skupanel .watchstatus {
+  display: flex; align-items: center; gap: 5px;
+  margin: 5px 14px 8px; font-size: 10.5px; line-height: 1.4;
+  color: var(--muted); user-select: none;
+}
+.skupanel .watchstatus.warn { color: var(--warn); }
+.skupanel .watchstatus .act { text-decoration: underline; cursor: pointer; }
+.skupanel .filterrow { padding: 9px 13px 0; }
+.skupanel input[type="search"] {
+  width: 100%;
+  font-family: var(--display);
+  font-size: 12.5px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--rule-strong);
+  background: var(--ground);
+  color: var(--ink);
+}
+.skupanel input[type="search"]::placeholder { color: var(--muted); }
+.skulist {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  padding: 11px 13px 13px;
+}
+.sku {
+  padding: 4px 8px; border-radius: 4px; font-size: 12.5px;
+  background: var(--surface-2);
+  border: 1px solid var(--rule-strong);
+  line-height: 1.4; white-space: nowrap; cursor: pointer;
+  color: var(--ink);
+  transition: transform .18s, box-shadow .18s, border-color .18s, opacity .18s;
+}
+.sku:hover, .sku.hot {
+  transform: scale(1.06);
+  border-color: var(--lg);
+  box-shadow: 0 0 8px var(--lg-soft), 0 0 0 1px var(--lg);
+}
+.sku.manila { background: #FFD54F; color: #3a2c05; border-color: #E0B93C; }
+.sku.lg     { background: #B3E5FC; color: #0b2f42; border-color: #8CCBE8; }
+.sku.multiqty { background: var(--warn-soft); border-color: var(--warn-line); }
+.sku.done { opacity: .42; text-decoration: line-through; }
+.sku.hide { display: none; }
+.skusep { flex-basis: 100%; height: 0; margin-top: 6px; margin-bottom: 1px; border-top: 1px solid var(--rule); }
+
+/* ============================================================
+   BATCH BAR
+   ============================================================ */
+.batchbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+  padding: 10px 13px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  margin-bottom: 11px;
+}
+.bfilter {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 12.5px; font-weight: 500;
+  cursor: pointer; user-select: none;
+  color: var(--ink);
+  background: none; border: 0; padding: 0;
+  font-family: var(--display);
+}
+.bfilter:disabled { opacity: .42; cursor: not-allowed; }
+.bfilter .box {
+  width: 15px; height: 15px; border-radius: 3px;
+  border: 1.5px solid var(--muted);
+  display: grid; place-items: center;
+  flex: none;
+  transition: background .15s, border-color .15s;
+}
+.bfilter[data-state="on"] .box { background: #3665f3; border-color: #3665f3; }
+.bfilter[data-state="on"] .box::after { content: "✓"; color: #fff; font-size: 10px; font-weight: 700; line-height: 1; }
+.bfilter[data-state="mixed"] .box { background: var(--rule-strong); border-color: var(--muted); }
+.bfilter[data-state="mixed"] .box::after { content: ""; width: 8px; height: 1.5px; background: var(--ink-2); }
+.batchbar .sep { width: 1px; align-self: stretch; background: var(--rule); }
+.batchbar .grow { flex: 1 1 auto; }
+
+/* ============================================================
+   SHIP DOCK
+   ============================================================ */
+.dock {
+  border: 1px solid var(--rule-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 11px 13px;
+  box-shadow: var(--shadow);
+  max-width: 340px;
+}
+.dock .dtitle { font-size: 12.5px; font-weight: 700; margin-bottom: 5px; }
+.dock .dcounts {
+  font-size: 11.5px; color: var(--muted); margin-bottom: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.dock .dcounts .ok { color: var(--ok); font-weight: 600; }
+.dock .dcounts .bad { color: var(--bad); font-weight: 600; }
+.dock .dbar { height: 5px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.dock .dfill { height: 100%; background: var(--accent); width: 0%; transition: width .45s cubic-bezier(.4,0,.2,1); }
+.dock .dactions { display: flex; gap: 6px; margin-top: 9px; }
+.dock .sweepline {
+  margin-top: 8px; font-size: 11px; color: var(--muted); line-height: 1.45;
+  border-top: 1px dashed var(--rule); padding-top: 7px;
+}
+.dock .sweepline b { color: var(--ok); }
+
+/* ============================================================
+   CONSOLE
+   ============================================================ */
+.console {
+  background: var(--ground-deep);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: var(--shadow-lift);
+}
+.consoletabs {
+  display: flex; flex-wrap: wrap; gap: 0;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--rule);
+}
+.consoletabs button {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: .65em .9em;
+  border: 0; border-right: 1px solid var(--rule);
+  background: transparent; color: var(--muted);
+  cursor: pointer; white-space: nowrap;
+  transition: color .15s, background .15s;
+}
+.consoletabs button:hover { color: var(--ink); }
+.consoletabs button[aria-selected="true"] {
+  background: var(--ground-deep); color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+.consoleout {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.65;
+  padding: 14px 15px;
+  margin: 0;
+  white-space: pre;
+  overflow-x: auto;
+  color: var(--ink-2);
+  min-height: 15rem;
+  tab-size: 2;
+}
+.consoleout .c-dim { color: var(--muted); }
+.consoleout .c-ok  { color: var(--ok); }
+.consoleout .c-bad { color: var(--bad); }
+.consoleout .c-warn{ color: var(--warn); }
+.consoleout .c-key { color: var(--accent); }
+.consoleout .c-lg  { color: var(--lg); }
+
+/* ============================================================
+   VALIDATOR
+   ============================================================ */
+.valgrid {
+  display: grid; gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 46rem) { .valgrid { grid-template-columns: 1fr 1fr; } }
+.valgrid textarea {
+  width: 100%;
+  min-height: 9.5rem;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.65;
+  padding: 11px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--rule-strong);
+  background: var(--ground);
+  color: var(--ink);
+  resize: vertical;
+}
+.valout {
+  border-radius: 8px;
+  border: 1px solid var(--rule);
+  background: var(--surface-2);
+  padding: 11px 12px;
+  font-size: 12.5px;
+  font-family: var(--display);
+  min-height: 9.5rem;
+}
+.valout .verdict {
+  display: flex; align-items: center; gap: 7px;
+  font-weight: 700; font-size: 13px;
+  padding-bottom: 8px; margin-bottom: 8px;
+  border-bottom: 1px solid var(--rule);
+}
+.valout .verdict.pass { color: var(--ok); }
+.valout .verdict.fail { color: var(--warn); }
+.valout ul { margin: 0; padding-left: 1.1em; }
+.valout li { margin-bottom: .35em; color: var(--ink-2); line-height: 1.5; }
+.valout .skip { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.samples { display: flex; flex-wrap: wrap; gap: 6px; margin-top: .7rem; }
+.samples button {
+  font-family: var(--mono); font-size: 10.5px;
+  padding: .4em .7em; border-radius: 999px;
+  border: 1px solid var(--rule-strong);
+  background: var(--surface); color: var(--muted);
+  cursor: pointer; transition: color .15s, border-color .15s;
+}
+.samples button:hover { color: var(--accent); border-color: var(--accent-line); }
+
+/* ============================================================
+   FAVICON DEMO
+   ============================================================ */
+.favdemo {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 1.6rem;
+}
+.tabmock {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px 8px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--rule-strong);
+  border-radius: 9px 9px 0 0;
+  border-bottom: 0;
+  max-width: 21rem;
+  min-width: 0;
+}
+.tabmock canvas { width: 20px; height: 20px; flex: none; image-rendering: auto; }
+.tabmock .t {
+  font-family: var(--display); font-size: 12px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: var(--ink-2);
+}
+.favctl { display: flex; flex-direction: column; gap: .5rem; min-width: 12rem; }
+.favctl label {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--muted);
+}
+input[type="range"] { accent-color: var(--accent); width: 100%; }
+
+/* ============================================================
+   TIMELINE
+   ============================================================ */
+.timeline { display: grid; gap: 0; margin-top: 1.5rem; }
+.era {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  gap: 0 1.2rem;
+  padding: 1rem 0;
+  border-top: 1px solid var(--rule);
+  align-items: start;
+}
+.era:last-child { border-bottom: 1px solid var(--rule); }
+.era .vrange {
+  font-family: var(--mono); font-size: .7rem; letter-spacing: .02em;
+  color: var(--accent); padding-top: .28em;
+  font-variant-numeric: tabular-nums;
+}
+.era h4 { font-size: 1rem; margin-bottom: .3rem; letter-spacing: -0.012em; }
+.era p { font-size: .95rem; color: var(--ink-2); margin: 0; line-height: 1.55; }
+.era .bar {
+  grid-column: 1 / -1;
+  height: 3px; border-radius: 2px;
+  margin-top: .8rem;
+  background: linear-gradient(90deg, var(--accent-line), transparent);
+  opacity: .5;
+}
+@media (max-width: 34rem) {
+  .era { grid-template-columns: minmax(0, 1fr); gap: .35rem; }
+  .era .vrange { padding-top: 0; }
+}
+
+/* ============================================================
+   FEATURE REFERENCE
+   ============================================================ */
+.reftabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 1.4rem; }
+.reftabs button {
+  font-family: var(--display); font-size: .78rem; font-weight: 600;
+  padding: .45em .9em; border-radius: 999px;
+  border: 1px solid var(--rule-strong);
+  background: var(--surface); color: var(--muted);
+  cursor: pointer; transition: all .15s;
+}
+.reftabs button[aria-selected="true"] {
+  background: var(--ink); border-color: var(--ink); color: var(--ground);
+}
+.reftabs button:hover:not([aria-selected="true"]) { color: var(--ink); border-color: var(--muted); }
+
+.refgrid { display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 9px; overflow: hidden; }
+@media (min-width: 40rem) { .refgrid { grid-template-columns: 1fr 1fr; } }
+.refitem {
+  background: var(--surface);
+  padding: 1rem 1.1rem;
+}
+.refitem h5 {
+  font-family: var(--display); font-size: .875rem; font-weight: 700;
+  margin: 0 0 .35rem; letter-spacing: -0.01em;
+  display: flex; align-items: baseline; gap: .5rem;
+}
+.refitem h5 .vtag {
+  font-family: var(--mono); font-size: .62rem; font-weight: 400;
+  color: var(--muted); letter-spacing: .04em; flex: none;
+}
+.refitem p { font-size: .86rem; line-height: 1.5; color: var(--ink-2); margin: 0; font-family: var(--display); }
+.refitem code { background: var(--surface-2); padding: .1em .35em; border-radius: 3px; font-size: .78em; }
+
+/* ============================================================
+   PRINCIPLES
+   ============================================================ */
+.principles { display: grid; gap: 1px; background: var(--rule); border-block: 1px solid var(--rule); }
+@media (min-width: 48rem) { .principles { grid-template-columns: 1fr 1fr; } }
+.principle { background: var(--ground); padding: 1.3rem 0; }
+@media (min-width: 48rem) {
+  .principle { padding: 1.4rem 1.6rem; }
+  .principle:nth-child(odd) { padding-left: 0; }
+  .principle:nth-child(even) { padding-right: 0; }
+}
+.principle h4 {
+  font-size: 1.02rem; margin-bottom: .45rem; letter-spacing: -0.015em;
+  color: var(--ink);
+}
+.principle p { font-size: .92rem; line-height: 1.55; color: var(--ink-2); margin: 0; }
+.principle .src {
+  display: block; margin-top: .55rem;
+  font-family: var(--mono); font-size: .64rem; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--muted);
+}
+
+/* ============================================================
+   ENVELOPE
+   ============================================================ */
+.envelope {
+  position: relative;
+  aspect-ratio: 9.5 / 4.125;
+  background: #FBF7EC;
+  border: 1px solid #D8CDB4;
+  border-radius: 3px;
+  box-shadow: var(--shadow);
+  padding: 5% 6%;
+  color: #241d12;
+  font-family: var(--display);
+  container-type: inline-size;
+}
+.envelope .ret {
+  font-size: 3.1cqw; line-height: 1.35; color: #4c4130;
+}
+.envelope .to {
+  position: absolute;
+  left: 38%; top: 46%;
+  font-size: 4.1cqw; line-height: 1.42; font-weight: 500;
+}
+.envelope .stamp {
+  position: absolute; right: 5.5%; top: 8%;
+  width: 15%; aspect-ratio: 1 / 1.15;
+  border: 1px dashed #BCA98A;
+  border-radius: 2px;
+  display: grid; place-items: center; gap: 2%;
+  font-size: 2.6cqw; text-align: center; color: #8a7a5c;
+  line-height: 1.2;
+}
+.envelope .stamp .flag { font-size: 5cqw; }
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+.colophon {
+  border-top: 1px solid var(--rule);
+  background: var(--ground-deep);
+  padding: 3.5rem 0 4rem;
+}
+.colophon .grid {
+  display: grid; gap: 1.6rem;
+  grid-template-columns: minmax(0,1fr);
+}
+@media (min-width: 44rem) { .colophon .grid { grid-template-columns: 1.4fr 1fr 1fr; } }
+.colophon h5 {
+  font-family: var(--mono); font-size: .66rem; letter-spacing: .13em;
+  text-transform: uppercase; color: var(--muted);
+  margin: 0 0 .7rem; font-weight: 400;
+}
+.colophon p, .colophon li { font-size: .9rem; color: var(--ink-2); line-height: 1.6; }
+.colophon ul { list-style: none; margin: 0; padding: 0; }
+.colophon li { margin-bottom: .3rem; }
+
+/* utility */
+.stack-lg > * + * { margin-top: clamp(3.5rem, 9vh, 6rem); }
+.pad-y { padding-block: clamp(3.5rem, 9vh, 6rem); }
+.center { text-align: center; }
+.nowrap { white-space: nowrap; }
+.tnum { font-variant-numeric: tabular-nums; }
+.hidden { display: none !important; }
+</style>
+
+<div class="themebar">
+  <button class="themebtn" id="themebtn" type="button" aria-label="Switch colour theme">Theme</button>
+</div>
+
+<!-- ============================================================
+     HERO — the thesis, demonstrated
+     ============================================================ -->
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <div class="kicker">Altheastix eBay Order Manager <span>— a 6,215-line userscript</span></div>
+        <h1 class="title">The checkmark<br>that <span class="lied">lied</span></h1>
+        <p class="lede">
+          A sticker shop's shipping tool, rebuilt around one uncomfortable idea: the most expensive
+          bug is not the one that crashes. It's the one that reports success.
+        </p>
+        <div class="herometa">
+          <span><b>112</b> versions</span>
+          <span><b>228</b> commits</span>
+          <span><b>1</b> file</span>
+          <span>since <b>Mar 2026</b></span>
+        </div>
+      </div>
+
+      <div class="liedemo">
+        <div class="switch" role="group" aria-label="Compare behaviour before and after v4.21">
+          <button type="button" id="lie-before" aria-pressed="false">Before v4.21</button>
+          <button type="button" id="lie-after" aria-pressed="true">After v4.21</button>
+        </div>
+
+        <div class="instrument">
+          <div class="instrument-head">
+            <span class="dot"></span>
+            <span id="lie-label">order card</span>
+            <span class="spacer"></span>
+            <span class="live">interactive</span>
+          </div>
+          <div class="instrument-body ui">
+            <div class="card" id="lie-card">
+              <div class="thumb" aria-hidden="true">🦕</div>
+              <div class="body">
+                <div class="who">Marisol Vega</div>
+                <div class="addr">1188 Cascade Ave<br>Bellingham WA 98225</div>
+                <div class="titleline">Stegosaurus Vinyl Sticker — <span class="mono">B04</span></div>
+                <div class="meta">
+                  <span class="oid">14‑13299‑40871</span>
+                  <span class="total">$6.50</span>
+                  <span>USPS Ground</span>
+                </div>
+                <div class="cardactions">
+                  <button class="btn primary" id="lie-ship" type="button">Mark as Shipped &amp; Msg</button>
+                  <button class="btn" type="button" disabled>Print Envelope</button>
+                </div>
+                <div id="lie-slot"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="caption" id="lie-caption">
+          <b>Click the button.</b> eBay's tab is going to die silently — as it does perhaps once
+          in a ten-order batch. Watch what the card tells you.
+        </p>
+      </div>
+    </div>
+  </div>
+</header>
+<!-- ============================================================
+     THE JOB — the physical work the script is compressing
+     ============================================================ -->
+<section class="pad-y" style="background:var(--ground-deep);border-bottom:1px solid var(--rule);">
+  <div class="wrap">
+    <div class="col" style="margin-bottom:2.2rem;">
+      <div class="eyebrow">the job</div>
+      <h2 style="font-size:clamp(1.7rem,4vw,2.4rem);margin-bottom:1rem;">
+        Ten to fifteen orders a day, and every one of them is a physical object in a numbered box.
+      </h2>
+      <p>
+        Altheastix ships around <strong>350 items a month</strong> — mostly stickers. An order isn't
+        a database row; it's a trip to a container, a count, a ziplock, an envelope, a decision about
+        postage, and a walk to the mailbox. The eBay page is only the part where you find out what to
+        go and get.
+      </p>
+      <p>
+        Which is why the SKU on the card matters so much: <span class="mono">B04</span> is not an
+        identifier, it's <em>a drawer</em>. The panel isn't a list of orders. It's a picking list.
+      </p>
+    </div>
+
+    <div class="flowbar" role="list" id="flow">
+      <button class="flowstep" role="listitem" type="button" data-step="0" aria-pressed="true">
+        <span class="n">1</span><span class="lbl">Pick</span>
+      </button>
+      <button class="flowstep" role="listitem" type="button" data-step="1">
+        <span class="n">2</span><span class="lbl">Count</span>
+      </button>
+      <button class="flowstep" role="listitem" type="button" data-step="2">
+        <span class="n">3</span><span class="lbl">Bag</span>
+      </button>
+      <button class="flowstep" role="listitem" type="button" data-step="3">
+        <span class="n">4</span><span class="lbl">Address</span>
+      </button>
+      <button class="flowstep" role="listitem" type="button" data-step="4">
+        <span class="n">5</span><span class="lbl">Postage</span>
+      </button>
+      <button class="flowstep" role="listitem" type="button" data-step="5">
+        <span class="n">6</span><span class="lbl">Pack</span>
+      </button>
+      <button class="flowstep" role="listitem" type="button" data-step="6">
+        <span class="n">7</span><span class="lbl">Ship</span>
+      </button>
+      <button class="flowstep" role="listitem" type="button" data-step="7">
+        <span class="n">8</span><span class="lbl">Mailbox</span>
+      </button>
+    </div>
+
+    <div class="flowdetail" id="flowdetail">
+      <div class="fd-head">
+        <h3 id="fd-title">Pick</h3>
+        <span class="fd-tag" id="fd-tag">SKU panel</span>
+      </div>
+      <div class="fd-cols">
+        <div class="fd-col">
+          <h6>Without the script</h6>
+          <p id="fd-before"></p>
+        </div>
+        <div class="fd-col accent">
+          <h6>With it</h6>
+          <p id="fd-after"></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="valueband">
+      <div class="vb-fig">
+        <div class="vb-num tnum">≈70<span>%</span></div>
+        <div class="vb-cap">less work across picking, packing,<br>printing and shipping</div>
+      </div>
+      <div class="vb-bars" aria-hidden="true">
+        <div class="vb-row">
+          <span class="vb-lab">before</span>
+          <div class="vb-track"><div class="vb-fill full"></div></div>
+        </div>
+        <div class="vb-row">
+          <span class="vb-lab">after</span>
+          <div class="vb-track"><div class="vb-fill part"></div></div>
+        </div>
+      </div>
+      <p class="vb-note">
+        The saving isn't any single feature. It's that a batch of fifteen stops requiring fifteen
+        separate rounds of attention — and, more quietly, that the batch no longer needs re-checking
+        afterwards to find out what actually went out.
+      </p>
+    </div>
+  </div>
+</section>
+
+<style>
+/* ============================================================
+   FLOW — the physical workflow strip
+   ============================================================ */
+.flowbar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(5.2rem, 1fr));
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+  border-radius: 9px 9px 0 0;
+  overflow: hidden;
+}
+.flowstep {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: .3rem;
+  padding: .85rem .8rem;
+  border: 0;
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  transition: background .15s, color .15s;
+  position: relative;
+}
+.flowstep .n {
+  font-family: var(--mono);
+  font-size: .62rem;
+  letter-spacing: .1em;
+  color: var(--muted);
+  transition: color .15s;
+}
+.flowstep .lbl {
+  font-family: var(--display);
+  font-size: .875rem;
+  font-weight: 600;
+  color: var(--ink-2);
+  letter-spacing: -0.012em;
+  transition: color .15s;
+}
+.flowstep:hover { background: var(--surface-2); }
+.flowstep[aria-pressed="true"] { background: var(--surface-2); }
+.flowstep[aria-pressed="true"]::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 2px;
+  background: var(--accent);
+}
+.flowstep[aria-pressed="true"] .lbl { color: var(--ink); }
+.flowstep[aria-pressed="true"] .n { color: var(--accent); }
+
+.flowdetail {
+  border: 1px solid var(--rule);
+  border-top: 0;
+  border-radius: 0 0 9px 9px;
+  background: var(--surface);
+  padding: 1.2rem 1.25rem 1.35rem;
+}
+.fd-head {
+  display: flex; align-items: baseline; gap: .8rem; flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.fd-head h3 { font-size: 1.15rem; letter-spacing: -0.018em; }
+.fd-tag {
+  font-family: var(--mono); font-size: .64rem;
+  letter-spacing: .1em; text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid var(--accent-line);
+  border-radius: 2px;
+  padding: .2em .5em;
+}
+.fd-cols { display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 7px; overflow: hidden; }
+@media (min-width: 40rem) { .fd-cols { grid-template-columns: 1fr 1fr; } }
+.fd-col { background: var(--surface); padding: .95rem 1rem; }
+.fd-col.accent { background: var(--surface-2); }
+.fd-col h6 {
+  font-family: var(--mono); font-size: .62rem; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--muted);
+  margin: 0 0 .5rem; font-weight: 400;
+}
+.fd-col.accent h6 { color: var(--accent); }
+.fd-col p {
+  font-family: var(--display); font-size: .875rem; line-height: 1.55;
+  color: var(--ink-2); margin: 0;
+}
+
+/* ============================================================
+   VALUE BAND
+   ============================================================ */
+.valueband {
+  display: grid;
+  gap: 1.4rem 2.4rem;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  margin-top: 2.2rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--rule);
+}
+@media (min-width: 52rem) {
+  .valueband { grid-template-columns: auto minmax(9rem, 15rem) minmax(0, 1fr); }
+}
+.vb-fig { display: flex; align-items: baseline; gap: .9rem; }
+.vb-num {
+  font-family: var(--display);
+  font-size: clamp(2.8rem, 8vw, 4.2rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: .85;
+  color: var(--accent);
+}
+.vb-num span { font-size: .45em; font-weight: 600; margin-left: .04em; }
+.vb-cap {
+  font-family: var(--display); font-size: .78rem; line-height: 1.4;
+  color: var(--muted); font-weight: 500;
+}
+.vb-bars { display: flex; flex-direction: column; gap: .5rem; }
+.vb-row { display: flex; align-items: center; gap: .6rem; }
+.vb-lab {
+  font-family: var(--mono); font-size: .62rem; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--muted); width: 3.4rem; flex: none;
+}
+.vb-track { flex: 1 1 auto; height: 9px; border-radius: 2px; background: var(--surface-2); border: 1px solid var(--rule); overflow: hidden; }
+.vb-fill { height: 100%; border-radius: 1px; }
+.vb-fill.full { width: 100%; background: var(--rule-strong); }
+.vb-fill.part { width: 30%; background: var(--accent); }
+.vb-note {
+  font-family: var(--display); font-size: .84rem; line-height: 1.55;
+  color: var(--ink-2); margin: 0;
+}
+</style>
+
+
+<!-- ============================================================
+     THE PROBLEM
+     ============================================================ -->
+<section class="pad-y">
+  <div class="wrap">
+    <div class="col">
+      <div class="eyebrow"><span class="v">v4.21</span> the failure with no channel</div>
+      <h2 style="font-size:clamp(1.7rem,4vw,2.4rem);margin-bottom:1.2rem;">
+        Marking an order shipped opens a background tab. Sometimes that tab dies.
+      </h2>
+      <p>
+        Altheastix is a one-person sticker shop. Packing a batch means moving between eBay's
+        bulk shipping page, a stack of #10 envelopes, and a printer — forty times in an evening.
+        This userscript rebuilds that page into something you can actually work at speed in.
+      </p>
+      <p>
+        But the interesting part isn't the redesign. It's what happened once the tool started
+        doing things <em>on your behalf</em>. Marking an order shipped fires off a background tab
+        that talks to eBay. For a long stretch of this project's life, that automation had no way
+        to report a failure at all:
+      </p>
+      <blockquote>
+        a card whose ship tab died sat forever showing a green ✔ over the words
+        “Marked as Shipped” while the favicon counter dropped as if the order had gone out.
+        <cite>CHANGELOG.md — v4.21</cite>
+      </blockquote>
+      <p>
+        Worse: the tab-title counter of remaining work <em>also</em> counted the pending overlay,
+        so a silent failure made the batch look <strong>more finished than it was</strong>. The
+        tool wasn't merely failing to notice. It was actively arguing that everything was fine.
+      </p>
+      <p>
+        Fixing that took five versions and turned into the project's spine. Nearly every feature
+        below is downstream of it.
+      </p>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ============================================================
+     SHIP STATES
+     ============================================================ -->
+<section class="pad-y">
+  <div class="wrap">
+    <div class="col" style="margin-bottom:2rem;">
+      <div class="eyebrow"><span class="v">v4.21–4.25</span> three honest states</div>
+      <h2 style="font-size:clamp(1.55rem,3.6vw,2.1rem);margin-bottom:1rem;">
+        A card is pending, confirmed, or failed. Never a fourth thing wearing the face of the second.
+      </h2>
+      <p>
+        Pending is an amber spinner that says what it's actually doing. Confirmed is green, and
+        only arrives when eBay says so. Failed is a red banner that quotes eBay back at you and
+        leaves the tab open, because that is the one case where a human needs to look at the page.
+      </p>
+      <p class="note" style="margin-top:1.2rem;">
+        Drive the state machine yourself — these are the real styles, the real copy, and the real
+        transitions.
+      </p>
+    </div>
+
+    <div style="display:grid;gap:1.4rem;grid-template-columns:minmax(0,1fr);" id="statewrap">
+      <div class="instrument">
+        <div class="instrument-head">
+          <span class="dot"></span><span>ship state machine</span>
+          <span class="spacer"></span>
+          <span class="live" id="state-name">idle</span>
+        </div>
+        <div class="instrument-body ui">
+          <div class="card" id="state-card">
+            <div class="thumb" aria-hidden="true">🍄</div>
+            <div class="body">
+              <div class="who">
+                Dan Okonkwo
+                <span class="badge ok" tabindex="0">✔<span class="tip">Address looks correct</span></span>
+              </div>
+              <div class="addr">88 Rutherford St Apt 4C<br>Providence RI 02906<br>United States</div>
+              <div class="titleline">Morel Mushroom Sticker — <span class="mono">A07</span></div>
+              <div class="meta">
+                <span class="oid">21‑13402‑55190</span>
+                <span class="total">$4.25</span>
+                <span>Standard envelope</span>
+              </div>
+              <div class="cardactions" id="state-actions">
+                <button class="btn primary" type="button" data-state="pending">Mark as Shipped &amp; Msg</button>
+                <button class="btn" type="button" disabled>Print Envelope</button>
+              </div>
+              <div id="state-slot"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center;">
+        <span class="note" style="margin:0 .4rem 0 0;">Force a state:</span>
+        <button class="btn" type="button" data-force="idle">reset</button>
+        <button class="btn" type="button" data-force="pending">pending</button>
+        <button class="btn" type="button" data-force="confirmed">confirmed</button>
+        <button class="btn" type="button" data-force="failed">failed</button>
+        <button class="btn" type="button" data-force="msgfail">shipped, not messaged</button>
+        <button class="btn" type="button" data-force="queued">queued for batch</button>
+      </div>
+
+      <div class="col" style="margin-inline:0;">
+        <p class="caption" id="state-caption">
+          <b>Idle.</b> The button reads “Mark as Shipped &amp; Msg” because a thank-you message
+          will go out with this shipment. Turn the thank-you toggle off and it reads plain
+          “Mark as Shipped” — the label never overstates what the click does.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ============================================================
+     REASONING FROM AN ABSENCE
+     ============================================================ -->
+<section class="pad-y">
+  <div class="wrap">
+    <div class="col">
+      <div class="eyebrow"><span class="v">v4.24–4.25</span> how it knows</div>
+      <h2 style="font-size:clamp(1.55rem,3.6vw,2.1rem);margin-bottom:1rem;">
+        Confirmation is a positive signal, not the absence of a button.
+      </h2>
+      <p>
+        The first version of the confirmation logic waited twelve seconds for eBay's
+        “Mark as shipped” button. If it never appeared, it concluded the order must already be
+        shipped and wrote a success. The changelog's own verdict on that:
+      </p>
+      <blockquote>
+        which is true most of the time, and is also exactly what a slow page, a markup change
+        or a quietly logged-out session look like.
+        <cite>CHANGELOG.md — v4.24</cite>
+      </blockquote>
+      <p>
+        Now it reads eBay's own progress stepper. And eBay <em>renames</em> that step rather than
+        restyling it — an unshipped order reads <span class="mono">“Ship by Aug 26”</span>, and only
+        once it ships does the same step become <span class="mono">“Shipped Aug 23”</span>. So the
+        match anchors on the <span class="mono">ship</span> prefix and lets the icon decide state,
+        reading two independent signals and accepting either. When neither is legible the answer
+        is <span class="mono">unknown</span> — guessed in neither direction.
+      </p>
+      <p>
+        The failure message quotes the evidence: <em>eBay still shows this order as NOT shipped
+        (eBay shows “Ship by Aug 26”)</em>. You are told what the tool saw, not what it concluded.
+      </p>
+      <div style="margin-top:1.8rem;padding:1.1rem 1.2rem;border:1px solid var(--rule);border-left:2px solid var(--accent);border-radius:0 8px 8px 0;background:var(--surface);">
+        <p class="note" style="margin:0;">
+          The version after that is a post-mortem on its own tests. v4.24's suite passed only
+          because a fixture was invented — it kept the “Shipped” label and flipped the icon, a
+          combination eBay never renders. <b>A hand-made fixture confirmed the assumption it was
+          built from; the real markup did not.</b>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ============================================================
+     THE PAGE ITSELF — the big recreation
+     ============================================================ -->
+<section class="pad-y">
+  <div class="wrap">
+    <div class="col" style="margin-bottom:2rem;">
+      <div class="eyebrow"><span class="v">v3.26–4.36</span> the pick-and-pack page</div>
+      <h2 style="font-size:clamp(1.7rem,4vw,2.4rem);margin-bottom:1rem;">
+        Everything you need to pack an order, on the card for that order.
+      </h2>
+      <p>
+        eBay's bulk shipping page is a list of rows. Packing is a physical task — find the sticker,
+        match it to a name, get it into the right envelope. So the page becomes a set of cards
+        colour-coded by what they physically need, with a floating panel listing every SKU in the
+        batch.
+      </p>
+      <p class="note" style="margin-top:1.2rem;">
+        This is live. Type in the filter, click a SKU to jump to its card, click a batch filter to
+        select a subset, hover an address warning.
+      </p>
+    </div>
+
+    <div style="display:grid;gap:1.2rem;grid-template-columns:minmax(0,1fr);" id="ppwrap">
+      <div class="instrument">
+        <div class="instrument-head">
+          <span class="dot"></span><span>ebay.com/ship/bulk</span>
+          <span class="spacer"></span>
+          <span class="live">interactive</span>
+        </div>
+        <div class="instrument-body ui" style="background:var(--ground);">
+          <div class="pplayout" id="pplayout">
+
+            <!-- SKU PANEL -->
+            <div class="skupanel" id="skupanel">
+              <div class="head">
+                <span id="sku-title">SKUs to Pick and Pack (9)</span>
+                <span style="font-size:15px;" aria-hidden="true">🌙</span>
+              </div>
+              <div class="watchpill" id="watchpill" role="button" tabindex="0">
+                <span>🔔 2 new orders since load</span>
+                <span class="act">Reload</span>
+              </div>
+              <div class="watchstatus" id="watchstatus">
+                <span>· checked 2m ago ·</span><span class="act" id="checknow">check now</span>
+              </div>
+              <div class="filterrow">
+                <input type="search" id="skufilter" placeholder="Filter by SKU, buyer, or title…"
+                       aria-label="Filter SKUs, buyers and item titles">
+              </div>
+              <div class="skulist" id="skulist"></div>
+            </div>
+
+            <!-- ORDERS -->
+            <div style="min-width:0;">
+              <div class="batchbar" id="batchbar">
+                <button class="bfilter" type="button" data-filter="all" data-state="off">
+                  <span class="box"></span><span>Select all</span>
+                </button>
+                <span class="sep" aria-hidden="true"></span>
+                <button class="bfilter" type="button" data-filter="standard" data-state="off">
+                  <span class="box"></span><span>Select standard envelope <span class="tnum" data-count="standard">(0)</span></span>
+                </button>
+                <button class="bfilter" type="button" data-filter="canada" data-state="off">
+                  <span class="box"></span><span>Select 🇨🇦 Canada <span class="tnum" data-count="canada">(0)</span></span>
+                </button>
+                <span class="grow"></span>
+                <button class="btn primary" type="button" id="printbtn" disabled>Print 0 Selected</button>
+                <button class="btn" type="button" id="shipbtn" style="display:none;">Ship 0</button>
+              </div>
+              <div id="orders"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col" style="margin-inline:0;">
+        <p class="caption" id="pp-caption">
+          <b>Colour is physical, not decorative.</b> Orange border means the sticker needs a manila
+          envelope. Pale yellow means an LG item. A green wash means multiple items in one order,
+          each order getting its own tint from a 40-colour palette so two adjacent multi-item
+          orders never look like one. The amber <span class="qty" style="font-size:1em;">×2</span>
+          pill means one SKU, more than one of it — the single most common packing mistake.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ============================================================
+     DERIVED STATE
+     ============================================================ -->
+<section class="pad-y">
+  <div class="wrap">
+    <div class="col">
+      <div class="eyebrow"><span class="v">v4.29–4.34</span> filters that can't lie either</div>
+      <h2 style="font-size:clamp(1.55rem,3.6vw,2.1rem);margin-bottom:1rem;">
+        The checkbox answers “is this list filtered right now?” — not “did I click this a while ago?”
+      </h2>
+      <p>
+        Each batch filter carries its own checkbox. It is ticked only while the selection is
+        <em>exactly</em> what that filter would produce, indeterminate while the selection is a
+        subset, and clear the moment the selection reaches outside it. Untick one order by hand
+        in the demo above and the box drops immediately.
+      </p>
+      <p>
+        It reads correctly even where the sets overlap. Select 🇨🇦 Canada in the demo and the
+        <em>standard envelope</em> box goes indeterminate rather than clear — a Canadian order under
+        the threshold is still a hand-addressed envelope, just one that needs an international
+        stamp. The box is telling you the truth: what you have selected is <em>part</em> of that
+        filter's work, not all of it.
+      </p>
+      <blockquote>
+        The state is derived, never remembered. […] it answers “is this list filtered right now?”,
+        not “did I click this a while ago?”, and the second question is the one that lies.
+        <cite>CHANGELOG.md — v4.33</cite>
+      </blockquote>
+      <p>
+        Already-shipped orders are excluded from both the counts and the selection — before v4.29
+        a filter could quietly re-add envelopes you packed an hour ago to the print run. And a
+        filter matching nothing stays visible but disabled, showing <span class="mono">(0)</span>
+        and a tooltip: controls that vanish make the bar jump around and leave you guessing whether
+        the feature broke or the orders ran out.
+      </p>
+      <p>
+        Getting these to sit flush with eBay's own “Select all” took three attempts at pixel
+        alignment before the right answer turned out to be structural — stop reconstructing their
+        markup and <strong>clone it</strong>, inheriting whatever their DOM really is, including the
+        parts nobody had seen.
+      </p>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ============================================================
+     THE BATCH
+     ============================================================ -->
+<section class="pad-y">
+  <div class="wrap">
+    <div class="col" style="margin-bottom:2rem;">
+      <div class="eyebrow"><span class="v">v4.23–4.35</span> a batch you can walk away from</div>
+      <h2 style="font-size:clamp(1.55rem,3.6vw,2.1rem);margin-bottom:1rem;">
+        Forty orders, one at a time, each waiting for a real outcome before the next begins.
+      </h2>
+      <p>
+        Orders can't run in parallel: the thank-you message tab takes focus, so several at once
+        would fight over the browser. A pre-flight dialog tells you how many orders, how many
+        messages, and roughly how long — measured across real batches at 30s each, not guessed.
+      </p>
+    </div>
+
+    <div style="display:grid;gap:1.4rem;grid-template-columns:minmax(0,1fr);align-items:start;" id="batchdemo">
+      <div style="display:flex;flex-wrap:wrap;gap:1.4rem;align-items:flex-start;">
+        <div class="dock" id="dock">
+          <div class="dtitle" id="dock-title">Ready</div>
+          <div class="dcounts" id="dock-counts"><span class="ok">0 shipped</span> · 8 to go</div>
+          <div class="dbar"><div class="dfill" id="dock-fill"></div></div>
+          <div class="dactions">
+            <button class="btn" type="button" id="dock-run">Ship 8 selected</button>
+            <button class="btn ghost" type="button" id="dock-stop" disabled>Stop after this one</button>
+          </div>
+          <div class="sweepline hidden" id="dock-sweep"></div>
+        </div>
+
+        <div class="col" style="margin-inline:0;flex:1 1 18rem;min-width:0;">
+          <p class="caption" style="margin-top:0;">
+            <b>Run it.</b> One of these eight will fail to ship, and one will ship but fail to
+            message. Watch what the dock does at the end — the rescue sweep takes one more
+            automated swing at the un-messaged buyer, in the background, and then reports
+            exactly what it managed.
+          </p>
+        </div>
+      </div>
+
+      <div class="col" style="margin-inline:0;">
+        <p>
+          The sweep exists because message failures used to land as pills the seller had to notice
+          and clear by hand, one card at a time, after the batch they had already walked away from.
+          Its guardrails are the interesting part:
+        </p>
+        <ul style="padding-left:1.15em;margin:1rem 0;">
+          <li style="margin-bottom:.5em;">
+            <strong>Exactly one attempt per card, per batch.</strong> The marker is written
+            <em>before</em> the tab opens, so a throw, a reload or an eBay re-render can never turn
+            this into a loop that keeps mailing the same buyer.
+          </li>
+          <li style="margin-bottom:.5em;">
+            The draft's action is re-validated at the moment of use. An unknown action is
+            <em>skipped</em>, not defaulted to the auto path — which would peek the thank-you draft
+            and, with auto-send on, mail the buyer something the seller never chose.
+          </li>
+          <li style="margin-bottom:.5em;">
+            Two failures ends it. “Two automated failures is evidence that something needs eyes,
+            not that a third try would land.”
+          </li>
+          <li>
+            Retries open in the <strong>background</strong>, unlike the manual Retry button — that
+            one is a deliberate click and deserves focus; this is cleanup running after you've
+            looked away.
+          </li>
+        </ul>
+        <p>
+          And it says so out loud, because <em>“a silent recovery is indistinguishable from never
+          having tried, and a silent failure reads as success.”</em>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ============================================================
+     POSTAGE + ENVELOPES
+     ============================================================ -->
+<section class="pad-y">
+  <div class="wrap">
+    <div class="col" style="margin-bottom:2rem;">
+      <div class="eyebrow"><span class="v">v3.26–4.36</span> three kinds of postage</div>
+      <h2 style="font-size:clamp(1.7rem,4vw,2.4rem);margin-bottom:1rem;">
+        Every order is a hand-addressed envelope, an international one, or an eBay label with tracking.
+      </h2>
+      <p>
+        That decision drives almost everything else on the page. It comes from the order total
+        against one configurable threshold — above <span class="mono">$25</span>, the margin
+        carries a tracked label; at or under, it goes out as a plain #10 envelope, and the buyer is
+        told why in the message: <em>“To keep prices fair, orders at or under $25 ship without
+        tracking.”</em>
+      </p>
+      <p>
+        Because the split is derived from price rather than remembered, it stays consistent across
+        the three places it shows up: the <span class="mono">+tracking</span> link on the card, the
+        highlighted total, and whether the order is included in the
+        <em>Select standard envelope</em> batch filter.
+      </p>
+    </div>
+
+    <div style="display:grid;gap:1.5rem;grid-template-columns:minmax(0,1fr);" id="postagewrap">
+      <div class="postagetabs" role="group" aria-label="Postage class">
+        <button class="btn" type="button" data-post="us" aria-pressed="true">US standard envelope</button>
+        <button class="btn" type="button" data-post="ca" aria-pressed="false">🇨🇦 International</button>
+        <button class="btn" type="button" data-post="label" aria-pressed="false">eBay label · tracking</button>
+      </div>
+
+      <div class="instrument">
+        <div class="instrument-head">
+          <span class="dot"></span><span id="env-head">Envelope #10 — 9.5in × 4.125in</span>
+          <span class="spacer"></span>
+          <span class="live">preview</span>
+        </div>
+        <div class="instrument-body" style="background:var(--surface-2);padding:1.5rem;">
+          <div class="envelope" id="envelope">
+            <div class="ret">
+              Altheastix ⚡<br>3015 E Howell St.<br>Seattle, WA 98122<br>USA
+            </div>
+            <div class="to" id="env-to"></div>
+            <div class="stamp" id="env-stamp"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col" style="margin-inline:0;">
+        <p class="caption" id="env-caption"></p>
+      </div>
+    </div>
+
+    <div class="col" style="margin-top:2.5rem;">
+      <p>
+        Printing them used to be the worst part of the evening. eBay gives you one print dialog per
+        envelope; forty orders is forty dialogs. <strong>Print All Envelopes</strong> consolidates
+        the whole batch into a single print window, one envelope per page, auto-scaled to the #10
+        format. There's also a <strong>Custom Envelope</strong> modal for one-offs — paste any
+        address block, it parses into editable fields, and prints.
+      </p>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ============================================================
+     ADDRESS VALIDATION — live
+     ============================================================ -->
+<section class="pad-y">
+  <div class="wrap">
+    <div class="col" style="margin-bottom:2rem;">
+      <div class="eyebrow"><span class="v">v3.34–3.43</span> the address as data to be linted</div>
+      <h2 style="font-size:clamp(1.55rem,3.6vw,2.1rem);margin-bottom:1rem;">
+        A stamped envelope is an expensive place to discover a bad address.
+      </h2>
+      <p>
+        Every address is checked against structural rules before it can be printed: line count,
+        a buyer name that isn't a number, a street line that starts with a house number
+        (unless it's a PO Box), a valid <span class="mono">City ST 12345</span> line, and a real
+        state or territory code — all 59 of them, including the military ones.
+      </p>
+      <p>
+        Canada gets its own path: postal-code format and all thirteen province and territory
+        codes. Other international destinations are skipped rather than guessed at — there are too
+        many valid formats to lint honestly.
+      </p>
+      <p>
+        There is also one rule that exists purely because of an eBay quirk: a line after the name
+        that is <em>only</em> digits almost always means eBay split the street number away from the
+        street name, leaving it duplicated.
+      </p>
+      <p class="note" style="margin-top:1.3rem;">
+        The validator below is the real <span class="mono">validateAddress()</span> function, ported
+        verbatim from the userscript. Edit the address, or load a broken one.
+      </p>
+    </div>
+
+    <div class="instrument">
+      <div class="instrument-head">
+        <span class="dot"></span><span>validateAddress()</span>
+        <span class="spacer"></span>
+        <span class="live">running live</span>
+      </div>
+      <div class="instrument-body">
+        <div class="valgrid">
+          <div>
+            <textarea id="addrin" spellcheck="false" aria-label="Address to validate"></textarea>
+            <div class="samples">
+              <button type="button" data-sample="good">valid US</button>
+              <button type="button" data-sample="split">split street number</button>
+              <button type="button" data-sample="state">bad state code</button>
+              <button type="button" data-sample="nozip">no city/state/ZIP</button>
+              <button type="button" data-sample="pobox">PO Box</button>
+              <button type="button" data-sample="canada">🇨🇦 Canada</button>
+              <button type="button" data-sample="cabad">🇨🇦 bad province</button>
+              <button type="button" data-sample="intl">other international</button>
+            </div>
+          </div>
+          <div class="valout" id="addrout"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ============================================================
+     AMBIENT STATUS
+     ============================================================ -->
+<section class="pad-y">
+  <div class="wrap">
+    <div class="col" style="margin-bottom:2rem;">
+      <div class="eyebrow"><span class="v">v3.79–4.28</span> the tab as a dashboard</div>
+      <h2 style="font-size:clamp(1.55rem,3.6vw,2.1rem);margin-bottom:1rem;">
+        You are not looking at the browser. You are at the table with a ziplock bag.
+      </h2>
+      <p>
+        So the count of remaining work lives where you'll see it anyway: drawn onto the favicon
+        and prefixed to the tab title. The badge went through seven iterations to stay legible at
+        16 pixels — a corner balloon, then full-bleed, and finally eBay's own favicon with a
+        translucent white box across the bottom-right at 65% of the icon's width. When the batch is
+        done, the box becomes a green check.
+      </p>
+      <p class="note" style="margin-top:1.2rem;">
+        Drag the slider. This is the actual canvas drawing routine from the script.
+      </p>
+    </div>
+
+    <div class="instrument" style="margin-bottom:2.5rem;">
+      <div class="instrument-head">
+        <span class="dot"></span><span>drawFaviconCounter()</span>
+        <span class="spacer"></span><span class="live">canvas</span>
+      </div>
+      <div class="instrument-body">
+        <div class="favdemo">
+          <div style="display:flex;flex-direction:column;gap:0;min-width:0;">
+            <div class="tabmock">
+              <canvas id="favcanvas" width="128" height="128" aria-hidden="true"></canvas>
+              <span class="t" id="tabtitle">(6) Ship — Seller Hub</span>
+            </div>
+            <div style="height:6px;background:var(--surface-2);border-inline:1px solid var(--rule-strong);"></div>
+          </div>
+          <div class="favctl">
+            <label for="favrange">Orders still to pack</label>
+            <input type="range" id="favrange" min="0" max="14" value="6">
+            <div style="display:flex;gap:1rem;">
+              <canvas id="favbig" width="128" height="128"
+                      style="width:56px;height:56px;border-radius:9px;border:1px solid var(--rule);"
+                      aria-label="Favicon at large size"></canvas>
+              <p class="note" style="margin:0;align-self:center;">
+                Counts <em>confirmed</em> shipments only — a pending or failed order still counts as
+                work to do.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col">
+      <h3 style="font-size:1.15rem;margin-bottom:.8rem;">The page never refreshes itself. So it watches instead.</h3>
+      <p>
+        The bulk shipping page is a snapshot from the moment it loaded. A sale that lands twenty
+        minutes into a packing session is simply invisible. Every five minutes the script asks
+        eBay's own awaiting-shipment endpoint what it thinks the list is, and if new order ids
+        appear, a pill offers a reload.
+      </p>
+      <p>
+        Almost all of the design here is restraint. It <strong>never</strong> reloads on its own —
+        automation tabs may be in flight and an address may be half-edited. It refuses mid-batch.
+        It counts additions only, since an id leaving the list means shipped or cancelled and is
+        never a reason to nag. And any response that isn't a well-formed list — a sign-in redirect,
+        an interstitial, a shape change — is treated as inconclusive and backed off from rather
+        than badged as news.
+      </p>
+      <blockquote>
+        v4.26 was completely invisible until it had news, which made its silence ambiguous:
+        “no new orders” and “this died an hour ago” looked exactly the same from the outside.
+        <cite>CHANGELOG.md — v4.27</cite>
+      </blockquote>
+      <p>
+        Hence the thin status line under the pill — <span class="mono">· checked 2m ago · check now</span>
+        — which goes amber when a check has failed or hasn't succeeded in more than two intervals.
+        Deliberately not a countdown: a per-second timer would turn an ambient watcher into
+        something you watch.
+      </p>
+    </div>
+  </div>
+</section>
+
+<style>
+.postagetabs { display: flex; flex-wrap: wrap; gap: 7px; }
+.postagetabs .btn[aria-pressed="true"] {
+  background: var(--ink); border-color: var(--ink); color: var(--ground);
+}
+</style>
+
+<hr class="rule">
+
+<!-- ============================================================
+     MESSAGING
+     ============================================================ -->
+<section class="pad-y">
+  <div class="wrap">
+    <div class="col" style="margin-bottom:2rem;">
+      <div class="eyebrow"><span class="v">v4.15–4.23</span> what the buyer is told</div>
+      <h2 style="font-size:clamp(1.55rem,3.6vw,2.1rem);margin-bottom:1rem;">
+        A thank-you note that reads like a person wrote it, sent exactly once.
+      </h2>
+      <p>
+        Every shipment can carry a message. The drafts live in an external config file the script
+        pulls at runtime, so the wording can change without touching the code — and they're filled
+        from the order itself, not from a fixed template.
+      </p>
+    </div>
+
+    <div class="instrument" style="margin-bottom:1.6rem;">
+      <div class="instrument-head">
+        <span class="dot"></span><span>thank-you draft</span>
+        <span class="spacer"></span><span class="live">interactive</span>
+      </div>
+      <div class="instrument-body">
+        <div class="msggrid">
+          <div class="msgctl">
+            <label>Buyer name<input type="text" id="m-name" value="GEORGE MCDONALD" spellcheck="false"></label>
+            <label>Quantity
+              <select id="m-qty"><option value="1">1 sticker</option><option value="3">3 stickers</option></select>
+            </label>
+            <label>Destination
+              <select id="m-dest"><option value="us">United States</option><option value="ca">Canada</option></select>
+            </label>
+            <label>Order total
+              <select id="m-total"><option value="6.5">$6.50</option><option value="41">$41.00</option></select>
+            </label>
+            <label>Ships
+              <select id="m-when"><option value="tom">Tomorrow</option><option value="today">Today</option></select>
+            </label>
+          </div>
+          <div class="msgout" id="m-out"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col">
+      <p class="caption" style="margin-top:0;margin-bottom:1.8rem;">
+        <b>Note the small things.</b> <span class="mono">GEORGE</span> becomes “George” — eBay hands
+        over ALL-CAPS names, and a machine-looking greeting undoes the point of writing one. The
+        product noun and every pronoun agree with the quantity. The tracking sentence disappears
+        entirely above the threshold. And “tomorrow” rolls to Monday if it would land on a Sunday,
+        because nothing ships on a Sunday.
+      </p>
+
+      <h3 style="font-size:1.15rem;margin-bottom:.8rem;">Sending it turned out to be the hard part</h3>
+      <p>
+        For a long time the thank-you automation intermittently left the draft sitting in the box,
+        unsent. Four separate timing bugs, all of which made a failure look identical to a success:
+        the “Message buyer” button was clicked once before eBay had hydrated it; the composer
+        textarea was grabbed before its iframe had bound a submit handler; the Send button was taken
+        the first time it merely <em>looked</em> enabled — a server-rendered button carries no
+        <span class="mono">disabled</span> attribute until JS adds one — and clicked exactly once,
+        with the retry interval cleared immediately after; and nothing verified the outcome before
+        the tab closed itself 1.2 seconds later.
+      </p>
+      <p>
+        Now every step retries, and <strong>the tab only closes on positive evidence that the
+        message went out.</strong> If it can't confirm, it stays open with the draft intact and a
+        red banner explaining what went wrong.
+      </p>
+
+      <h3 style="font-size:1.15rem;margin:2rem 0 .8rem;">Retry can never double-send</h3>
+      <p>
+        This is the constraint that shapes the whole messaging design. The “will ship” note and the
+        thank-you message are one-shot side effects guarded by per-order flags, so retrying a failed
+        <em>shipment</em> never mails the buyer twice.
+      </p>
+      <p>
+        And the draft's lifecycle is split in two — <span class="mono">peekBuyerMessage()</span>
+        reads it, <span class="mono">consumeBuyerMessage()</span> deletes it — with the delete moved
+        to the moment the text actually lands in the box. An earlier version read and deleted as its
+        first action, before the composer had even opened, so a failure discarded the message
+        entirely: the order shipped, the buyer heard nothing, and there was nothing left to retry.
+      </p>
+      <blockquote>
+        Everything before that point is now retryable; everything after it would double-paste,
+        so it isn't.
+        <cite>CHANGELOG.md — v4.23</cite>
+      </blockquote>
+      <p>
+        Retry is also only <em>offered</em> where it can work. If a card has lost the anchor the
+        button rebuilds from, Retry renders disabled with an explanation rather than looking
+        clickable and doing nothing — and the Open link stays as the working escape hatch.
+      </p>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ============================================================
+     DIAGNOSTICS
+     ============================================================ -->
+<section class="pad-y">
+  <div class="wrap">
+    <div class="col" style="margin-bottom:2rem;">
+      <div class="eyebrow">diagnostics</div>
+      <h2 style="font-size:clamp(1.55rem,3.6vw,2.1rem);margin-bottom:1rem;">
+        Every risky subsystem ships with a report, a dry run, and a simulator.
+      </h2>
+      <p>
+        Not scaffolding left behind — a feature. Each of these can drive the UI into any state
+        <strong>without contacting eBay</strong>, so a failure banner can be checked without
+        breaking a real order, and the end-of-batch sweep can be inspected before it runs.
+      </p>
+      <p>
+        They pay for themselves directly. The v4.22 bug — a card that became permanently
+        unshippable, silently, because two legitimate code paths removed its button and nothing put
+        it back — was caught by the dry run built one version earlier.
+      </p>
+    </div>
+
+    <div class="console">
+      <div class="consoletabs" role="tablist" aria-label="Console diagnostics">
+        <button role="tab" aria-selected="true" data-cmd="ship">altheastixShipReport()</button>
+        <button role="tab" aria-selected="false" data-cmd="sim">altheastixShipSimulate('fail', …)</button>
+        <button role="tab" aria-selected="false" data-cmd="sweep">altheastixShipSweepPreview()</button>
+        <button role="tab" aria-selected="false" data-cmd="watch">altheastixWatchReport()</button>
+        <button role="tab" aria-selected="false" data-cmd="cfg">altheastixConfigDryRun()</button>
+      </div>
+      <pre class="consoleout" id="consoleout" tabindex="0"></pre>
+    </div>
+    <p class="caption" style="max-width:var(--measure);">
+      <b>The simulators never touch eBay.</b> They manipulate the page's own state machine only —
+      no automation tab opens, nothing is marked shipped, no buyer is messaged.
+    </p>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ============================================================
+     PRINCIPLES
+     ============================================================ -->
+<section class="pad-y">
+  <div class="wrap">
+    <div class="col" style="margin-bottom:2.2rem;">
+      <div class="eyebrow">what 112 versions taught it</div>
+      <h2 style="font-size:clamp(1.7rem,4vw,2.4rem);margin-bottom:1rem;">
+        The rules this thing keeps rediscovering.
+      </h2>
+      <p>
+        None of these were decided up front. Each one is the residue of a specific evening where
+        something went quietly wrong.
+      </p>
+    </div>
+
+    <div class="principles">
+      <div class="principle">
+        <h4>A silent failure reads as success.</h4>
+        <p>
+          If an automation can fail without saying so, the interface is not neutral — it is actively
+          reporting a success. Every automated path needs a failure channel, and a way to be told
+          about it that survives the tab that was supposed to do the telling.
+        </p>
+        <span class="src">v4.16 · v4.17 · v4.21 · v4.35</span>
+      </div>
+      <div class="principle">
+        <h4>Never reason from an absence.</h4>
+        <p>
+          A missing button is not evidence the work is done. It is equally consistent with a slow
+          page, a markup change, and a logged-out session. Require a positive signal; when there
+          isn't one, the answer is <span class="mono">unknown</span>, not a guess in the
+          convenient direction.
+        </p>
+        <span class="src">v4.24 · v4.16</span>
+      </div>
+      <div class="principle">
+        <h4>Derive state; don't remember it.</h4>
+        <p>
+          Remembered state answers “did I click this a while ago?” Derived state answers “is this
+          true right now?” The second question is the only one worth asking, and the first one lies
+          the moment anything changes underneath it.
+        </p>
+        <span class="src">v4.33 · v3.88 · v4.36</span>
+      </div>
+      <div class="principle">
+        <h4>Guard every side effect that reaches a buyer.</h4>
+        <p>
+          Anything that messages a person is one-shot and flagged before the attempt, not after —
+          so a crash, a reload or a re-render can never turn a retry into a second email to
+          somebody's actual inbox.
+        </p>
+        <span class="src">v4.21 · v4.23 · v4.35</span>
+      </div>
+      <div class="principle">
+        <h4>Silence must be distinguishable from death.</h4>
+        <p>
+          An ambient feature that only speaks when it has news is indistinguishable from one that
+          died an hour ago. Show the heartbeat, not just the alarm — and make a control that has
+          nothing to do render disabled rather than vanishing.
+        </p>
+        <span class="src">v4.27 · v4.29</span>
+      </div>
+      <div class="principle">
+        <h4>Know where automation stops and a person starts.</h4>
+        <p>
+          Two automated failures is evidence that something needs eyes, not that a third try would
+          land. An invalid tracking number leaves the tab open rather than submitting a bad one.
+          The escape hatch is a feature, not a fallback.
+        </p>
+        <span class="src">v4.24 · v4.35 · v3.78</span>
+      </div>
+      <div class="principle">
+        <h4>Don't steal attention you haven't earned.</h4>
+        <p>
+          Cleanup that runs after the seller has looked away opens its tabs in the background. A
+          deliberate click gets focus; automated recovery doesn't. And an ambient watcher gets no
+          countdown, because a per-second timer turns it into something you watch.
+        </p>
+        <span class="src">v4.35 · v4.27 · v4.23</span>
+      </div>
+      <div class="principle">
+        <h4>Measure. Don't infer.</h4>
+        <p>
+          The batch time estimate was corrected from 20s to 30s per order across two real batches —
+          the old figure under-promised a ten-order run by 40%. Three attempts at pixel alignment
+          were resolved by measuring the type scale rather than eyeballing the gap.
+        </p>
+        <span class="src">v4.23 · v4.32 · v3.94</span>
+      </div>
+      <div class="principle">
+        <h4>Copy the platform's real markup — don't imitate it.</h4>
+        <p>
+          A hand-built lookalike of eBay's checkbox rendered nothing at all, because eBay hides the
+          raw input and draws the visible control from sibling icon markup. Cloning inherits
+          whatever their structure really is, including the parts you haven't seen — which is the
+          point, since guessing is what failed.
+        </p>
+        <span class="src">v4.34 · v4.33</span>
+      </div>
+      <div class="principle">
+        <h4>State what a removal costs.</h4>
+        <p>
+          When the hand-reclassify pill was cut, the changelog names the one behaviour genuinely
+          lost rather than describing the change as pure simplification. A feature removed without
+          an accounting is a feature that comes back as a bug report.
+        </p>
+        <span class="src">v4.36 · v4.30</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+.msggrid { display: grid; gap: 1rem; grid-template-columns: minmax(0,1fr); }
+@media (min-width: 44rem) { .msggrid { grid-template-columns: minmax(0,14rem) minmax(0,1fr); } }
+.msgctl { display: flex; flex-direction: column; gap: .6rem; }
+.msgctl label {
+  display: flex; flex-direction: column; gap: .25rem;
+  font-family: var(--mono); font-size: .62rem; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--muted);
+}
+.msgctl input, .msgctl select {
+  font-family: var(--display); font-size: 12.5px;
+  padding: 6px 8px; border-radius: 5px;
+  border: 1px solid var(--rule-strong);
+  background: var(--ground); color: var(--ink);
+  text-transform: none; letter-spacing: 0;
+}
+.msgout {
+  background: var(--surface-2);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 13px 15px;
+  font-family: var(--display);
+  font-size: 13px;
+  line-height: 1.62;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  min-height: 12rem;
+}
+.msgout mark {
+  background: var(--warn-soft);
+  color: var(--accent);
+  padding: 0;
+  border-radius: 0;
+  box-shadow: 0 1px 0 var(--accent-line);
+}
+</style>
+
+<hr class="rule">
+
+<!-- ============================================================
+     TIMELINE
+     ============================================================ -->
+<section class="pad-y">
+  <div class="wrap">
+    <div class="col" style="margin-bottom:1rem;">
+      <div class="eyebrow">v3.26 → v4.38</div>
+      <h2 style="font-size:clamp(1.7rem,4vw,2.4rem);margin-bottom:1rem;">
+        Make the page readable, then the data trustworthy, then the automation honest.
+      </h2>
+      <p>
+        Twelve eras, in order. The version numbers are the only structural device on this page that
+        encodes something real — they're a sequence, and the sequence is the argument.
+      </p>
+    </div>
+
+    <div class="timeline">
+      <div class="era">
+        <div class="vrange">3.26–3.33</div>
+        <div>
+          <h4>Make it legible</h4>
+          <p>Envelope #10 print layout, one print window instead of N dialogs, SKU pill consolidation, a 40-colour palette for multi-item orders. Already accessibility-literate: one entry swaps an orange at contrast ratio 1.97 for one at 5.02.</p>
+        </div>
+      </div>
+      <div class="era">
+        <div class="vrange">3.34–3.43</div>
+        <div>
+          <h4>The address as data</h4>
+          <p><span class="mono">validateAddress()</span> as a pure function, ⚠ and ✔ badges inline with the recipient name, then Canada, then PO Boxes, then eBay's habit of splitting a street number onto its own line. Three consecutive versions are pure DOM archaeology about where a badge is allowed to sit.</p>
+        </div>
+      </div>
+      <div class="era">
+        <div class="vrange">3.55–3.68</div>
+        <div>
+          <h4>Panel furniture</h4>
+          <p>The configuration panel splits into its own floating box, an address-warning banner gets jump-links, scroll-to-top arrives. Includes the project's one full reversion — an elevation reskin backed out the next version because “the skin didn't render in practice.”</p>
+        </div>
+      </div>
+      <div class="era">
+        <div class="vrange">3.69–3.78</div>
+        <div>
+          <h4>What the buyer is told</h4>
+          <p>An ambiguous “ship tomorrow” toggle becomes an explicit Today | Tomorrow control with a live preview of the resolved date. The button is relabelled “Mark as Shipped &amp; Msg” so it's clear a message rides along. The concern shifts from layout to promises made to a person.</p>
+        </div>
+      </div>
+      <div class="era">
+        <div class="vrange">3.79–3.88</div>
+        <div>
+          <h4>The tab becomes a dashboard</h4>
+          <p>Seven iterations on the favicon badge for legibility at 16px, then two more to make it <em>correct</em> — first so the number moves the instant you click, then so that selecting orders stops changing the count.</p>
+        </div>
+      </div>
+      <div class="era">
+        <div class="vrange">3.90–3.98</div>
+        <div>
+          <h4>Fighting a React form</h4>
+          <p>Six versions to make three dimension fields hold their values against eBay's debounced rate-refetch. The root cause was set <em>order</em>, not timing — and eBay clamps a 4.125in length because the longest side must go in the length box.</p>
+        </div>
+      </div>
+      <div class="era">
+        <div class="vrange">4.00–4.14</div>
+        <div>
+          <h4>Surviving re-renders</h4>
+          <p>The US country line inferred from eBay <em>omitting</em> a country span; buyer notes rescued from a hidden summary element; a MutationObserver watchdog for combined-order cards that eBay re-renders after the initial pass, wiping everything injected into them.</p>
+        </div>
+      </div>
+      <div class="era">
+        <div class="vrange">4.15–4.20</div>
+        <div>
+          <h4>Messaging honesty</h4>
+          <p>A send becomes verifiable. A crash that killed the manual path is traced to a temporal dead zone — masked on the auto path by a single <span class="mono">await</span> that yielded long enough for the file to finish evaluating. The dispatcher stops swallowing exceptions.</p>
+        </div>
+      </div>
+      <div class="era" style="background:var(--surface);margin-inline:calc(var(--pad) * -0.5);padding-inline:calc(var(--pad) * 0.5);">
+        <div class="vrange" style="color:var(--accent);font-weight:700;">4.21–4.25</div>
+        <div>
+          <h4>Shipping honesty <span style="font-family:var(--mono);font-size:.6rem;letter-spacing:.1em;color:var(--accent);text-transform:uppercase;vertical-align:middle;margin-left:.5rem;">the core</span></h4>
+          <p>Failure channels, three card states, dual failure detection, button recovery, a message-failure channel, the death of “assume shipped after 12 seconds” — and finally a post-mortem that indicts its own test fixture. v4.21 states the remaining gap out loud; v4.24 closes it three versions later.</p>
+        </div>
+      </div>
+      <div class="era">
+        <div class="vrange">4.26–4.28</div>
+        <div>
+          <h4>Ambient awareness</h4>
+          <p>A background order watch with more restraint written into it than feature. The next version gives it a face so its silence isn't ambiguous; the one after fixes its colours, because amber already means LG on this page and a notification has no business borrowing a colour that carries packing meaning.</p>
+        </div>
+      </div>
+      <div class="era">
+        <div class="vrange">4.29–4.36</div>
+        <div>
+          <h4>Batch safety</h4>
+          <p>Filters with counts and shipped-order exclusion, three rounds of alignment chasing resolved by adopting eBay's own markup, derived checkbox states, the end-of-batch message rescue sweep, and one deliberate feature removal with its cost stated plainly.</p>
+        </div>
+      </div>
+      <div class="era">
+        <div class="vrange">4.37–4.38</div>
+        <div>
+          <h4>Defaults that persist</h4>
+          <p>The last real bug in the file is a repaint quietly overwriting the seller's own choices — plus a line commented “Reset auto-send toggle to OFF at start for safety” that set it to <em>true</em> on every page load.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ============================================================
+     FULL REFERENCE
+     ============================================================ -->
+<section class="pad-y">
+  <div class="wrap">
+    <div class="col" style="margin-bottom:1.8rem;">
+      <div class="eyebrow">complete inventory</div>
+      <h2 style="font-size:clamp(1.7rem,4vw,2.4rem);margin-bottom:1rem;">
+        Everything else it does.
+      </h2>
+      <p>
+        The features that don't need a demonstration to explain themselves.
+      </p>
+    </div>
+
+    <div class="reftabs" role="tablist" aria-label="Feature categories">
+      <button role="tab" aria-selected="true" data-ref="all">All</button>
+      <button role="tab" aria-selected="false" data-ref="ui">Layout</button>
+      <button role="tab" aria-selected="false" data-ref="sku">SKU panel</button>
+      <button role="tab" aria-selected="false" data-ref="print">Printing</button>
+      <button role="tab" aria-selected="false" data-ref="auto">Automation</button>
+      <button role="tab" aria-selected="false" data-ref="msg">Messages</button>
+      <button role="tab" aria-selected="false" data-ref="cfg">Config</button>
+    </div>
+
+    <div class="refgrid" id="refgrid"></div>
+
+    <div class="col" style="margin-top:2.5rem;">
+      <h3 style="font-size:1.15rem;margin-bottom:.8rem;">Two companion scripts</h3>
+      <p>
+        Both cover jobs that happen outside the bulk shipping page, and both install on their own.
+      </p>
+      <div class="refgrid" style="margin-top:1rem;">
+        <div class="refitem">
+          <h5>Offer Msg Picker <span class="vtag">eBay active listings</span></h5>
+          <p>Ten marketing message templates in the Send Offer modal, with the discount read from the offer form itself rather than hard-coded — so a message can never promise a discount the offer doesn't send. Mounts as a sibling of eBay's React container, because mounting inside it meant the character counter re-created the textarea on every keystroke and stole focus.</p>
+        </div>
+        <div class="refitem">
+          <h5>Print Address from Gmail <span class="vtag">mail.google.com</span></h5>
+          <p>A 🖨 Print address button on Etsy and eBay order emails that prints a #10 envelope from the Gmail tab itself. Parses the address out of the rendered message, because Gmail's sanitiser strips <span class="mono">&lt;address&gt;</span> entirely. No <span class="mono">innerHTML</span> anywhere — Gmail enforces Trusted Types, which made an earlier version throw a CSP violation and do nothing at all.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     COLOPHON
+     ============================================================ -->
+<footer class="colophon">
+  <div class="wrap">
+    <div class="grid">
+      <div>
+        <h5>Altheastix eBay Order Manager</h5>
+        <p>
+          A single Tampermonkey userscript that rebuilds eBay's bulk shipping page into a
+          pick-and-pack tool. Built by Javier for a sticker shop that ships about 350 items a month,
+          with modifications from Grok, Gemini, Claude and GitHub Copilot.
+        </p>
+      </div>
+      <div>
+        <h5>By the numbers</h5>
+        <ul class="tnum">
+          <li>6,215 lines, one file</li>
+          <li>112 versions</li>
+          <li>228 commits</li>
+          <li>7 eBay pages matched</li>
+          <li>13 console diagnostics</li>
+          <li>59 US + 13 CA region codes</li>
+        </ul>
+      </div>
+      <div>
+        <h5>Repository</h5>
+        <ul>
+          <li><a href="https://github.com/ellokojavi/ebaypickandpack">github.com/ellokojavi/ebaypickandpack</a></li>
+          <li><a href="https://github.com/ellokojavi/ebaypickandpack/blob/main/CHANGELOG.md">CHANGELOG.md</a></li>
+          <li><a href="https://github.com/ellokojavi/ebaypickandpack/blob/main/README.md">README.md</a></li>
+        </ul>
+        <p class="note" style="margin-top:1rem;">
+          Every quotation on this page is from the project's own changelog.
+        </p>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  var $  = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  var esc = function (s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  };
+
+  /* ==========================================================
+     THEME
+     ========================================================== */
+  (function () {
+    var btn = $("#themebtn");
+    if (!btn) return;
+    var root = document.documentElement;
+    function current() {
+      var t = root.getAttribute("data-theme");
+      if (t) return t;
+      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    function label() { btn.textContent = current() === "dark" ? "Light" : "Dark"; }
+    label();
+    btn.addEventListener("click", function () {
+      root.setAttribute("data-theme", current() === "dark" ? "light" : "dark");
+      label();
+      drawFavicons();
+    });
+    try {
+      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
+        if (!root.getAttribute("data-theme")) { label(); drawFavicons(); }
+      });
+    } catch (e) {}
+  })();
+
+  /* ==========================================================
+     HERO — the checkmark that lied
+     ========================================================== */
+  (function () {
+    var before = $("#lie-before"), after = $("#lie-after");
+    var card = $("#lie-card"), slot = $("#lie-slot"), btn = $("#lie-ship");
+    var cap = $("#lie-caption"), lbl = $("#lie-label");
+    if (!before || !card) return;
+
+    var mode = "after", timers = [];
+    function clear() { timers.forEach(clearTimeout); timers = []; }
+    function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
+
+    function reset() {
+      clear();
+      slot.innerHTML = "";
+      card.className = "card";
+      btn.style.display = "";
+      btn.disabled = false;
+      btn.textContent = "Mark as Shipped & Msg";
+      lbl.textContent = "order card";
+      cap.innerHTML = mode === "after"
+        ? "<b>Click the button.</b> eBay's tab is going to die silently — as it does perhaps once in a ten-order batch. Watch what the card tells you."
+        : "<b>Click the button.</b> Same failure, same dead tab — this is what the card used to say about it.";
+    }
+
+    function setMode(m) {
+      mode = m;
+      before.setAttribute("aria-pressed", String(m === "before"));
+      after.setAttribute("aria-pressed", String(m === "after"));
+      reset();
+    }
+
+    before.addEventListener("click", function () { setMode("before"); });
+    after.addEventListener("click", function () { setMode("after"); });
+
+    btn.addEventListener("click", function () {
+      clear();
+      if (mode === "before") {
+        btn.style.display = "none";
+        slot.innerHTML = '<div class="shipped-label">✔ Marked as Shipped</div>';
+        card.className = "card shipped";
+        lbl.textContent = "shipped";
+        cap.innerHTML =
+          '<b style="color:var(--bad)">This order did not ship.</b> The tab died three seconds ago. ' +
+          "Nothing on this card will ever say so, the favicon counter has already dropped, and you " +
+          "will find out in four days when the buyer asks where their sticker is.";
+        return;
+      }
+
+      btn.style.display = "none";
+      lbl.textContent = "pending";
+      slot.innerHTML =
+        '<div class="pending"><span class="spinner"></span>' +
+        '<span>marked as shipped — confirming…<span class="sub" id="lie-sub"> waiting for eBay · 45s deadline</span></span>' +
+        '<button class="undo" type="button" id="lie-undo">Undo</button></div>';
+      cap.innerHTML =
+        "<b>Pending.</b> Not a checkmark. The card says exactly what it is doing, and offers an " +
+        "Undo for the click you regretted a second later.";
+
+      $("#lie-undo").addEventListener("click", reset);
+
+      var n = 45;
+      var tick = setInterval(function () {
+        n -= 3;
+        var sub = $("#lie-sub");
+        if (!sub) { clearInterval(tick); return; }
+        sub.textContent = " waiting for eBay · " + Math.max(0, n) + "s deadline";
+        if (n <= 0) clearInterval(tick);
+      }, 260);
+
+      later(function () {
+        clearInterval(tick);
+        card.className = "card failed";
+        lbl.textContent = "failed";
+        slot.innerHTML =
+          '<div class="failbanner"><span class="txt">Not confirmed as shipped' +
+          '<span class="why">eBay still shows this order as NOT shipped (eBay shows “Ship by Aug 26”). Tab left open.</span>' +
+          '</span><button class="retry" type="button" id="lie-retry">Retry</button>' +
+          '<button class="open" type="button">Open</button>' +
+          '<button class="dismiss" type="button" id="lie-x">Dismiss</button></div>';
+        cap.innerHTML =
+          "<b>Failed — and it says why.</b> Two independent things can raise this: the automation " +
+          "tab reports its own timeout, and the page runs a deadline that still fires if the tab " +
+          "was closed or never loaded. A confirmation arriving late always wins, so a merely-slow " +
+          "eBay still resolves to shipped.";
+        $("#lie-retry").addEventListener("click", reset);
+        $("#lie-x").addEventListener("click", reset);
+      }, 4200);
+    });
+
+    reset();
+  })();
+
+  /* ==========================================================
+     SHIP STATE MACHINE
+     ========================================================== */
+  (function () {
+    var card = $("#state-card"), slot = $("#state-slot"), actions = $("#state-actions");
+    var name = $("#state-name"), cap = $("#state-caption");
+    if (!card) return;
+
+    var CAPS = {
+      idle: "<b>Idle.</b> The button reads “Mark as Shipped &amp; Msg” because a thank-you message will go out with this shipment. Turn the thank-you toggle off and it reads plain “Mark as Shipped” — the label never overstates what the click does.",
+      pending: "<b>Pending.</b> An amber spinner, not a green tick. Before v4.21 this moment drew a green ✔ and the words “Marked as Shipped” the instant you clicked, which is indistinguishable from a real confirmation.",
+      confirmed: "<b>Confirmed.</b> eBay's own progress stepper was read and says “Shipped Aug 23”. The card dims, the left border goes green, its SKUs strike through in the panel, and only now does the favicon counter drop.",
+      failed: "<b>Failed.</b> The banner quotes eBay back at you rather than reporting a generic error. Retry is safe to press — the note and the thank-you message are one-shot side effects guarded per order, so retrying a shipment can never mail the buyer twice.",
+      msgfail: "<b>Shipped, but the buyer got nothing.</b> An order can ship perfectly and still leave the composer unopened. This is an amber qualification on a green outcome, not a failure — and the queued draft survived, so Retry sends the same message rather than an empty one.",
+      queued: "<b>Queued.</b> During a batch the card says it is waiting its turn. Manual clicks are blocked while the queue runs, because two ship tabs in flight would race over a single-slot storage key and the loser would ride its deadline to a red banner on an order eBay actually shipped."
+    };
+
+    function render(state) {
+      card.className = "card";
+      slot.innerHTML = "";
+      actions.style.display = "";
+      name.textContent = state;
+
+      if (state === "pending") {
+        actions.style.display = "none";
+        slot.innerHTML =
+          '<div class="pending"><span class="spinner"></span>' +
+          '<span>marked as shipped — confirming…<span class="sub"> waiting for eBay · 45s deadline</span></span>' +
+          '<button class="undo" type="button" data-force="idle">Undo</button></div>';
+      } else if (state === "confirmed") {
+        actions.style.display = "none";
+        card.className = "card shipped";
+        slot.innerHTML = '<div class="shipped-label">✓ Shipped</div>';
+      } else if (state === "failed") {
+        actions.style.display = "none";
+        card.className = "card failed";
+        slot.innerHTML =
+          '<div class="failbanner"><span class="txt">Not confirmed as shipped' +
+          '<span class="why">eBay still shows this order as NOT shipped (eBay shows “Ship by Aug 26”).</span>' +
+          '</span><button class="retry" type="button" data-force="pending">Retry</button>' +
+          '<button class="open" type="button">Open</button>' +
+          '<button class="dismiss" type="button" data-force="idle">Dismiss</button></div>';
+      } else if (state === "msgfail") {
+        actions.style.display = "none";
+        card.className = "card shipped";
+        slot.innerHTML =
+          '<div class="shipped-label">✓ Shipped</div>' +
+          '<div class="msgpill"><span class="txt">✉ Message not sent' +
+          '<span class="why">eBay\'s composer never opened. The draft is still queued.</span>' +
+          '</span><button type="button" data-force="confirmed">Retry</button>' +
+          '<button class="open" type="button">Open</button></div>';
+      } else if (state === "queued") {
+        actions.style.display = "none";
+        slot.innerHTML = '<div class="queuedbadge">⏳ Queued for batch shipping</div>';
+      }
+      cap.innerHTML = CAPS[state] || CAPS.idle;
+    }
+
+    document.addEventListener("click", function (e) {
+      var t = e.target.closest("[data-force],[data-state]");
+      if (!t) return;
+      if (!t.closest("#statewrap")) return;
+      e.preventDefault();
+      render(t.getAttribute("data-force") || t.getAttribute("data-state"));
+    });
+
+    render("idle");
+  })();
+
+  /* ==========================================================
+     THE JOB — workflow steps
+     ========================================================== */
+  (function () {
+    var STEPS = [
+      { t: "Pick", tag: "SKU panel",
+        b: "Read forty rows of eBay's table to work out which sticker sets you actually need, then walk the containers once per order.",
+        a: "One panel lists every SKU in the batch, alphabetically grouped. Click any SKU to jump straight to its card. Pick the whole batch in one pass through the containers." },
+      { t: "Count", tag: "×N pills",
+        b: "Quantity hides in eBay's item details as “Qty: 2”, in the same grey as everything else. Sending one when they bought two is the classic error.",
+        a: "Multi-quantity SKUs get an amber pill at 1.5× size — “B01 ×2” — on both the card and the panel. Multi-item orders get a green wash and their own tint from a 40-colour palette." },
+      { t: "Bag", tag: "colour coding",
+        b: "Nothing on the page tells you what an order physically needs until you've opened it and read the item titles.",
+        a: "The border is the instruction. Orange means a manila envelope. Pale yellow means an LG item. You can sort the whole batch into piles before opening anything." },
+      { t: "Address", tag: "validation + print",
+        b: "Copy each address by hand, hope eBay didn't split the house number onto its own line, and print one envelope at a time — one dialog per order.",
+        a: "Every address is linted and badged before printing, US orders get their missing country line added back, and the whole batch prints from a single dialog, one envelope per page." },
+      { t: "Postage", tag: "threshold",
+        b: "Decide per order whether it's cheap enough to hand-stamp or needs a tracked label, then hunt through eBay's label flow filling in dimensions it keeps resetting.",
+        a: "The split is derived from the order total. Above the threshold the card grows a +tracking link that opens eBay's label page pre-filled for an eBay Standard Envelope; below it, the order joins the plain-envelope filter." },
+      { t: "Pack", tag: "batch filters",
+        b: "Work out by eye which of the forty orders are the plain-envelope ones, and keep track of which you've already done.",
+        a: "One click selects exactly the plain-envelope orders, or exactly the Canadian ones. Already-shipped orders are excluded from the count and the selection, so a filter can't re-add work you finished an hour ago." },
+      { t: "Ship", tag: "batch ship",
+        b: "Open each order, click through eBay's mark-as-shipped flow, then open the messaging pane and write a thank-you note. Forty times.",
+        a: "Select the orders and run them as a queue — one at a time, each waiting for a real outcome before the next starts, with a progress dock you can stop. Notes and thank-you messages go out with them." },
+      { t: "Mailbox", tag: "favicon counter",
+        b: "Re-check the page afterwards to work out what actually went out, because a failed automation looked exactly like a successful one.",
+        a: "The tab title and favicon carry the count of orders still to pack — confirmed shipments only. When it reads zero and shows a green check, the batch is genuinely done." }
+    ];
+    var bar = $("#flow");
+    if (!bar) return;
+    function show(i) {
+      $$(".flowstep", bar).forEach(function (b, j) { b.setAttribute("aria-pressed", String(i === j)); });
+      $("#fd-title").textContent = STEPS[i].t;
+      $("#fd-tag").textContent = STEPS[i].tag;
+      $("#fd-before").textContent = STEPS[i].b;
+      $("#fd-after").textContent = STEPS[i].a;
+    }
+    bar.addEventListener("click", function (e) {
+      var b = e.target.closest(".flowstep");
+      if (b) show(parseInt(b.getAttribute("data-step"), 10));
+    });
+    show(0);
+  })();
+
+  /* ==========================================================
+     PICK-AND-PACK RECREATION
+     ========================================================== */
+  var ORDERS = [
+    { id: "14-13299-40871", who: "Marisol Vega", city: "Bellingham WA 98225", street: "1188 Cascade Ave",
+      items: [{ sku: "B04", title: "Stegosaurus Vinyl Sticker", qty: 1 }], total: 6.5, kind: "plain", ok: true },
+    { id: "21-13402-55190", who: "Dan Okonkwo", city: "Providence RI 02906", street: "88 Rutherford St Apt 4C",
+      items: [{ sku: "A07", title: "Morel Mushroom Sticker", qty: 2 }], total: 8.0, kind: "plain", ok: true },
+    { id: "09-13455-11204", who: "Priya Raman", city: "Toronto ON M5V 2T6", street: "410 Queens Quay W",
+      items: [{ sku: "C12", title: "Luna Moth Holographic", qty: 1 }], total: 7.25, kind: "canada", ok: true },
+    { id: "33-13471-88320", who: "Kev Brannigan", city: "Tulsa OK 74104", street: "2201 S Utica Ave",
+      items: [{ sku: "M02", title: "Field Guide Pack — manila set", qty: 1 }], total: 11.0, kind: "manila", ok: true },
+    { id: "55-13488-22019", who: "Aurelia Fontaine", city: "Ann Arbor MI 48104", street: "715 Packard St",
+      items: [{ sku: "L04", title: "LG Fern Print — 8in", qty: 1 }], total: 14.5, kind: "lg", ok: true },
+    { id: "72-13501-99614", who: "Tomás Beltrán", city: "Santa Fe NM 87501", street: "24 Camino del Monte",
+      items: [{ sku: "D03", title: "Roadrunner Sticker", qty: 1 }, { sku: "D09", title: "Yucca Bloom Sticker", qty: 1 }, { sku: "D11", title: "Desert Moon Sticker", qty: 2 }],
+      total: 41.0, kind: "label", ok: true, tint: 1 },
+    { id: "18-13512-30447", who: "Georgia Whitlock", city: "Savannah GA 31401", street: "608 Habersham",
+      items: [{ sku: "C04", title: "Spanish Moss Sticker", qty: 1 }], total: 5.75, kind: "plain",
+      ok: false, warn: ["“608” is a number on its own line — street number may be duplicated"], note: "Please no bend! Last one arrived creased 🙏" },
+    { id: "62-13518-40255", who: "Wes Ferraro", city: "Missoula MT 59801", street: "1902 S 6th St W",
+      items: [{ sku: "A02", title: "Chanterelle Sticker", qty: 1 }, { sku: "A07", title: "Morel Mushroom Sticker", qty: 1 }],
+      total: 9.5, kind: "plain", ok: true, tint: 3 },
+    { id: "27-13519-61130", who: "Noor Haddad", city: "Vancouver BC V6B 1H4", street: "55 Water St",
+      items: [{ sku: "C12", title: "Luna Moth Holographic", qty: 2 }], total: 12.0, kind: "canada", ok: true },
+    { id: "81-13521-04478", who: "Ruth Okafor", city: "Asheville NC 28801", street: "PO Box 2244",
+      items: [{ sku: "B09", title: "Blue Ridge Ridgeline Sticker", qty: 1 }], total: 6.0, kind: "plain", ok: true },
+    { id: "40-13523-19007", who: "Silas Pham", city: "Ypsilanti MI 48197", street: "331 N Huron St",
+      items: [{ sku: "M07", title: "Botanical Set — manila", qty: 1 }], total: 13.25, kind: "manila", ok: true },
+    { id: "44-13520-70882", who: "Hal Nordstrom", city: "Duluth MN 55805", street: "1417 E 4th St",
+      items: [{ sku: "B01", title: "Great Lakes Sticker", qty: 3 }], total: 9.0, kind: "plain", ok: true, shipped: true }
+  ];
+
+  (function () {
+    var wrap = $("#orders"), list = $("#skulist");
+    if (!wrap) return;
+
+    var selected = {};
+
+    function money(n) { return "$" + n.toFixed(2); }
+
+    function cardClass(o) {
+      var c = ["card"];
+      if (o.shipped) c.push("shipped");
+      else if (o.kind === "manila") c.push("manila");
+      else if (o.kind === "lg") c.push("lg");
+      else if (o.items.length > 1) { c.push("multi"); c.push("t" + o.tint); }
+      return c.join(" ");
+    }
+
+    function renderOrders() {
+      wrap.innerHTML = ORDERS.map(function (o, i) {
+        var hot = o.total > 25;
+        var badge = o.ok
+          ? '<span class="badge ok" tabindex="0">✔<span class="tip">Address looks correct</span></span>'
+          : '<span class="badge warn" tabindex="0">⚠<span class="tip">' +
+            o.warn.map(function (w) { return "• " + esc(w); }).join("<br>") + "</span></span>";
+        var titles = o.items.map(function (it) {
+          return esc(it.title) + ' — <span class="mono">' + it.sku + "</span>" +
+            (it.qty > 1 ? ' <span class="qty">×' + it.qty + "</span>" : "");
+        }).join("<br>");
+        return (
+          '<div class="' + cardClass(o) + '" data-i="' + i + '" id="ord-' + i + '">' +
+            '<div class="thumb" aria-hidden="true">' + ["🦕","🍄","🌙","📗","🌿","🌵","🌾","🍂","🦋","⛰️","🌱","💧"][i % 12] + "</div>" +
+            '<div class="body">' +
+              '<div class="who">' +
+                '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:700;">' +
+                  '<input type="checkbox" data-sel="' + i + '"' + (o.shipped ? " disabled" : "") + '>' +
+                  esc(o.who) +
+                "</label>" + badge +
+                (o.kind === "canada" ? ' <span style="font-size:12px;">🇨🇦</span>' : "") +
+              "</div>" +
+              '<div class="addr">' + esc(o.street) + "<br>" + esc(o.city) +
+                (o.kind === "canada" ? "<br>Canada" : "<br>United States") + "</div>" +
+              '<div class="titleline">' + titles + "</div>" +
+              '<div class="meta">' +
+                '<span class="oid">' + o.id + "</span>" +
+                '<span class="total' + (hot ? " hot" : "") + '">' + money(o.total) + "</span>" +
+                (hot ? '<a href="#" onclick="return false">+tracking</a>' : "") +
+                '<a href="#" onclick="return false">+note</a>' +
+              "</div>" +
+              (o.note ? '<div class="notecallout">💬 ' + esc(o.note) + "</div>" : "") +
+              (o.shipped ? '<div class="shipped-label">✓ Shipped</div>' : "") +
+            "</div>" +
+          "</div>"
+        );
+      }).join("");
+    }
+
+    function renderSkus() {
+      var rows = [];
+      ORDERS.forEach(function (o, i) {
+        o.items.forEach(function (it) {
+          rows.push({ sku: it.sku, qty: it.qty, i: i, kind: o.kind, done: !!o.shipped,
+                      hay: (it.sku + " " + it.title + " " + o.who).toLowerCase() });
+        });
+      });
+      rows.sort(function (a, b) { return a.sku < b.sku ? -1 : a.sku > b.sku ? 1 : 0; });
+
+      var html = "", prev = null;
+      rows.forEach(function (r) {
+        if (prev !== null && r.sku[0] !== prev) html += '<span class="skusep"></span>';
+        prev = r.sku[0];
+        var cls = ["sku"];
+        if (r.kind === "manila") cls.push("manila");
+        if (r.kind === "lg") cls.push("lg");
+        if (r.qty > 1) cls.push("multiqty");
+        if (r.done) cls.push("done");
+        html += '<button class="' + cls.join(" ") + '" type="button" data-jump="' + r.i +
+          '" data-hay="' + esc(r.hay) + '">' + (r.done ? "✔️ " : "") + r.sku +
+          (r.qty > 1 ? " ×" + r.qty : "") + "</button>";
+      });
+      list.innerHTML = html;
+      $("#sku-title").textContent = "SKUs to Pick and Pack (" + rows.length + ")";
+    }
+
+    /* --- batch filters --- */
+    var FILTERS = {
+      standard: function (o) { return !o.shipped && o.total <= 25 && o.kind !== "manila" && o.kind !== "lg"; },
+      canada:   function (o) { return !o.shipped && o.kind === "canada"; },
+      all:      function (o) { return !o.shipped; }
+    };
+
+    function matching(key) {
+      var out = [];
+      ORDERS.forEach(function (o, i) { if (FILTERS[key](o)) out.push(i); });
+      return out;
+    }
+
+    function selectedIdx() {
+      return Object.keys(selected).filter(function (k) { return selected[k]; }).map(Number);
+    }
+
+    function refreshBar() {
+      $$("#batchbar .bfilter").forEach(function (b) {
+        var key = b.getAttribute("data-filter");
+        var set = matching(key);
+        var counter = b.querySelector("[data-count]");
+        if (counter) counter.textContent = "(" + set.length + ")";
+        b.disabled = set.length === 0;
+        if (set.length === 0) {
+          b.title = "Nothing to select: no " + (key === "canada" ? "Canadian" : "plain-envelope") +
+                    " orders left to pack";
+        } else {
+          b.title = key === "canada" ? "Check every order shipping to Canada"
+                  : key === "standard" ? "Check only plain-envelope orders: no eBay label, no manila, no LG"
+                  : "Select every unshipped order";
+        }
+        /* derived, never remembered */
+        var sel = selectedIdx();
+        var inSet = sel.filter(function (i) { return set.indexOf(i) > -1; });
+        var state = "off";
+        if (sel.length > 0 && inSet.length === sel.length) {
+          state = sel.length === set.length ? "on" : "mixed";
+        }
+        b.setAttribute("data-state", state);
+      });
+
+      var n = selectedIdx().length;
+      var pb = $("#printbtn"), sb = $("#shipbtn");
+      pb.textContent = "Print " + n + " Selected";
+      pb.disabled = n === 0;
+      sb.style.display = n > 0 ? "" : "none";
+      sb.textContent = "Ship " + n;
+
+      $$("#orders [data-sel]").forEach(function (cb) {
+        cb.checked = !!selected[cb.getAttribute("data-sel")];
+      });
+    }
+
+    $("#batchbar").addEventListener("click", function (e) {
+      var b = e.target.closest(".bfilter");
+      if (!b || b.disabled) return;
+      var key = b.getAttribute("data-filter");
+      var set = matching(key);
+      if (b.getAttribute("data-state") === "on") {
+        selected = {};                       /* clicking a ticked filter clears */
+      } else {
+        selected = {};                       /* replaces, never adds */
+        set.forEach(function (i) { selected[i] = true; });
+      }
+      refreshBar();
+    });
+
+    wrap.addEventListener("change", function (e) {
+      var cb = e.target.closest("[data-sel]");
+      if (!cb) return;
+      selected[cb.getAttribute("data-sel")] = cb.checked;
+      refreshBar();
+    });
+
+    /* --- SKU filter + jump --- */
+    var filterInput = $("#skufilter");
+    filterInput.addEventListener("input", function () {
+      var q = filterInput.value.trim().toLowerCase();
+      var shown = {};
+      $$(".sku", list).forEach(function (s) {
+        var hit = !q || s.getAttribute("data-hay").indexOf(q) > -1;
+        s.classList.toggle("hide", !hit);
+        if (hit) shown[s.getAttribute("data-jump")] = true;
+      });
+      $$("#orders .card").forEach(function (c) {
+        c.classList.toggle("dim", !!q && !shown[c.getAttribute("data-i")]);
+      });
+    });
+
+    list.addEventListener("click", function (e) {
+      var s = e.target.closest(".sku");
+      if (!s) return;
+      var card = $("#ord-" + s.getAttribute("data-jump"));
+      if (!card) return;
+      card.scrollIntoView({ behavior: "smooth", block: "center" });
+      card.animate(
+        [{ boxShadow: "0 0 0 0 rgba(0,0,0,0)" },
+         { boxShadow: "0 0 0 3px var(--lg)" },
+         { boxShadow: "0 0 0 0 rgba(0,0,0,0)" }],
+        { duration: 1100, easing: "ease-out" }
+      );
+    });
+
+    list.addEventListener("mouseover", function (e) {
+      var s = e.target.closest(".sku");
+      if (s) s.classList.add("hot");
+    });
+    list.addEventListener("mouseout", function (e) {
+      var s = e.target.closest(".sku");
+      if (s) s.classList.remove("hot");
+    });
+
+    /* --- order watch pill --- */
+    var pill = $("#watchpill"), status = $("#watchstatus");
+    function dismissPill() {
+      pill.style.display = "none";
+      status.innerHTML = "<span>· checked just now ·</span>";
+      setTimeout(function () {
+        status.innerHTML = '<span>· checked 1m ago ·</span><span class="act" id="checknow">check now</span>';
+      }, 2600);
+    }
+    pill.addEventListener("click", dismissPill);
+    pill.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); dismissPill(); }
+    });
+    status.addEventListener("click", function (e) {
+      if (!e.target.closest(".act")) return;
+      status.classList.remove("warn");
+      status.innerHTML = "<span>· checking… ·</span>";
+      setTimeout(function () {
+        status.innerHTML = '<span>· checked just now ·</span><span class="act">check now</span>';
+      }, 900);
+    });
+
+    renderOrders();
+    renderSkus();
+    refreshBar();
+  })();
+
+  /* ==========================================================
+     BATCH DOCK
+     ========================================================== */
+  (function () {
+    var run = $("#dock-run"), stop = $("#dock-stop");
+    var title = $("#dock-title"), counts = $("#dock-counts"), fill = $("#dock-fill"), sweep = $("#dock-sweep");
+    if (!run) return;
+
+    var TOTAL = 8, timer = null, stopping = false;
+
+    function paint(done, failed, msgfail, cur, label) {
+      var settled = done + failed;
+      title.textContent = label || ("Shipping " + cur + " of " + TOTAL);
+      var html = '<span class="ok">' + done + " shipped</span>";
+      if (failed) html += ' · <span class="bad">' + failed + " failed</span>";
+      html += " · " + Math.max(0, TOTAL - settled) + " to go";
+      counts.innerHTML = html;
+      fill.style.width = Math.round((settled / TOTAL) * 100) + "%";
+    }
+
+    function reset() {
+      clearTimeout(timer); stopping = false;
+      run.disabled = false; run.textContent = "Ship 8 selected";
+      stop.disabled = true; stop.textContent = "Stop after this one";
+      sweep.classList.add("hidden");
+      paint(0, 0, 0, 0, "Ready");
+    }
+
+    run.addEventListener("click", function () {
+      if (run.disabled) return;
+      run.disabled = true; stop.disabled = false;
+      run.textContent = "Running…";
+      sweep.classList.add("hidden");
+
+      var i = 0, done = 0, failed = 0, msgfail = 0;
+      function step() {
+        if (stopping) {
+          paint(done, failed, msgfail, i, "Stopped after " + i + " of " + TOTAL);
+          run.disabled = false; run.textContent = "Reset"; stop.disabled = true;
+          run.onclick = null;
+          return;
+        }
+        i++;
+        paint(done, failed, msgfail, i);
+        timer = setTimeout(function () {
+          if (i === 5) { failed++; }
+          else { done++; if (i === 3) msgfail++; }
+          paint(done, failed, msgfail, i);
+          if (i < TOTAL) { timer = setTimeout(step, 260); }
+          else {
+            title.textContent = "Batch finished";
+            stop.disabled = true;
+            sweep.classList.remove("hidden");
+            sweep.innerHTML = "Sweeping 1 un-messaged order…";
+            timer = setTimeout(function () {
+              sweep.innerHTML = "· <b>1/1 message recovered</b>, 0 still need you";
+              counts.innerHTML =
+                '<span class="ok">' + done + " shipped</span> · " +
+                '<span class="bad">' + failed + " failed</span> · 0 to go";
+              run.disabled = false;
+              run.textContent = "Run again";
+            }, 1500);
+          }
+        }, 420);
+      }
+      step();
+    });
+
+    stop.addEventListener("click", function () {
+      stopping = true;
+      stop.textContent = "Stopping…";
+      stop.disabled = true;
+    });
+
+    reset();
+  })();
+
+  /* ==========================================================
+     POSTAGE + ENVELOPE
+     ========================================================== */
+  (function () {
+    var tabs = $$(".postagetabs .btn");
+    if (!tabs.length) return;
+    var to = $("#env-to"), stamp = $("#env-stamp"), head = $("#env-head"), cap = $("#env-caption");
+
+    var DATA = {
+      us: {
+        to: "Marisol Vega<br>1188 Cascade Ave<br>Bellingham WA 98225<br>United States",
+        stamp: "<span>stamp</span>",
+        head: "Envelope #10 — 9.5in × 4.125in",
+        cap: "<b>The country line is added back.</b> eBay renders a country only for international destinations, so a US address arrives with none at all. Its absence is the reliable US signal — the script appends “United States” explicitly, and because Copy and Print both read the address block's text, they pick it up automatically."
+      },
+      ca: {
+        to: "Priya Raman<br>410 Queens Quay W<br>Toronto ON M5V 2T6<br>Canada",
+        stamp: '<span class="flag">🇨🇦</span><span>Int’l<br>Stamp</span>',
+        head: "Envelope #10 — international",
+        cap: "<b>A reminder sized to be covered.</b> Canadian envelopes carry a faint 🇨🇦 and “Int’l Stamp” note in the stamp corner — deliberately drawn to sit under the stamp that answers it, so the finished envelope doesn't carry a note to yourself. The address itself is validated against Canadian postal format and all thirteen province codes."
+      },
+      label: {
+        to: "Tomás Beltrán<br>24 Camino del Monte<br>Santa Fe NM 87501<br>United States",
+        stamp: "<span>eBay<br>label</span>",
+        head: "eBay Standard Envelope — with tracking",
+        cap: "<b>This one never gets hand-addressed.</b> At $41.00 it's above the threshold, so it's excluded from the plain-envelope filter and the card grows a +tracking link instead. That link opens eBay's single-label page and pre-fills it for an eBay Standard Envelope — custom size, 1 oz, 9 × 4.1 × 0.1in — leaving you one confirming click. Getting those three dimension fields to survive eBay's debounced re-render took six versions, and the answer was set order, not timing."
+      }
+    };
+
+    function show(k) {
+      tabs.forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-post") === k)); });
+      to.innerHTML = DATA[k].to;
+      stamp.innerHTML = DATA[k].stamp;
+      head.textContent = DATA[k].head;
+      cap.innerHTML = DATA[k].cap;
+    }
+    tabs.forEach(function (b) {
+      b.addEventListener("click", function () { show(b.getAttribute("data-post")); });
+    });
+    show("us");
+  })();
+
+  /* ==========================================================
+     ADDRESS VALIDATOR — ported verbatim from userscript.js
+     ========================================================== */
+  function validateAddress(lines) {
+    var warnings = [];
+    if (!lines || lines.length === 0) { warnings.push("Address is empty"); return warnings; }
+
+    var isCanadian = lines.some(function (l) { return /^canada$/i.test(l.trim()); });
+
+    var otherInternationalPattern = /^(united kingdom|uk|australia|germany|france|japan|mexico|italy|spain|netherlands|sweden|norway|denmark|finland|new zealand|ireland|portugal|belgium|austria|switzerland|south korea|poland|israel|philippines|singapore|hong kong|taiwan|china|colombia|argentina|chile|peru|costa rica|brazil|india)$/i;
+    if (!isCanadian && lines.some(function (l) { return otherInternationalPattern.test(l.trim()); })) return warnings;
+
+    if (lines.length < 3) { warnings.push("Address looks incomplete — fewer than 3 lines"); return warnings; }
+
+    var nameLine = lines[0].trim();
+    if (nameLine.length < 2) warnings.push("Buyer name is missing or too short");
+    else if (/^\d+$/.test(nameLine)) warnings.push("Buyer name line appears to be a number");
+
+    var streetLine = lines[1].trim();
+    var isPOBox = /^p\.?o\.?\s*box\b/i.test(streetLine);
+    if (!isPOBox && !/^\d/.test(streetLine)) warnings.push("Street line doesn't start with a house/building number");
+
+    var bareNumberLine = lines.slice(1).find(function (l) { return /^\d+$/.test(l.trim()); });
+    if (bareNumberLine) warnings.push('"' + bareNumberLine.trim() + '" is a number on its own line — street number may be duplicated');
+
+    if (isCanadian) {
+      var caPat = /^(.+?)\s+([A-Z]{2})\s+([A-Z]\d[A-Z]\s?\d[A-Z]\d)$/i;
+      var caLine = lines.find(function (l) { return caPat.test(l.trim()); });
+      if (!caLine) warnings.push('No city/province/postal code line found (expected: "City ON A1A 1A1")');
+      else {
+        var m = caLine.trim().match(caPat);
+        if (m) {
+          var CA = ["AB","BC","MB","NB","NL","NS","NT","NU","ON","PE","QC","SK","YT"];
+          var prov = m[2].toUpperCase();
+          if (CA.indexOf(prov) === -1) warnings.push('Unrecognized Canadian province/territory code: "' + prov + '"');
+        }
+      }
+    } else {
+      var usPat = /^(.+?)(?:,)?\s+([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/i;
+      var usLine = lines.find(function (l) { return usPat.test(l.trim()); });
+      if (!usLine) warnings.push('No city/state/ZIP line found (expected: "City ST 12345")');
+      else {
+        var m2 = usLine.trim().match(usPat);
+        if (m2) {
+          var US = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD",
+                    "MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC",
+                    "SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC","PR","GU","VI","AS","MP","AA","AE","AP"];
+          var st = m2[2].toUpperCase();
+          if (US.indexOf(st) === -1) warnings.push('Unrecognized state/territory code: "' + st + '"');
+        }
+      }
+    }
+    return warnings;
+  }
+
+  (function () {
+    var ta = $("#addrin"), out = $("#addrout");
+    if (!ta) return;
+
+    var SAMPLES = {
+      good:   "Marisol Vega\n1188 Cascade Ave\nBellingham WA 98225\nUnited States",
+      split:  "Georgia Whitlock\n608\n608 Habersham St\nSavannah GA 31401",
+      state:  "Dan Okonkwo\n88 Rutherford St Apt 4C\nProvidence XQ 02906",
+      nozip:  "Hal Nordstrom\n1417 E 4th St\nDuluth Minnesota",
+      pobox:  "Aurelia Fontaine\nPO Box 4471\nAnn Arbor MI 48104",
+      canada: "Priya Raman\n410 Queens Quay W\nToronto ON M5V 2T6\nCanada",
+      cabad:  "Priya Raman\n410 Queens Quay W\nToronto ZZ M5V 2T6\nCanada",
+      intl:   "Sofia Marchetti\nVia Roma 14\n50123 Firenze\nItaly"
+    };
+
+    function run() {
+      var lines = ta.value.split("\n").map(function (l) { return l.trim(); }).filter(Boolean);
+      var isIntl = /^(united kingdom|uk|australia|germany|france|japan|mexico|italy|spain|netherlands|sweden|norway|denmark|finland|new zealand|ireland|portugal|belgium|austria|switzerland|south korea|poland|israel|philippines|singapore|hong kong|taiwan|china|colombia|argentina|chile|peru|costa rica|brazil|india)$/i;
+      var skipped = !lines.some(function (l) { return /^canada$/i.test(l); }) &&
+                    lines.some(function (l) { return isIntl.test(l); });
+      var w = validateAddress(lines);
+
+      if (skipped) {
+        out.innerHTML =
+          '<div class="verdict pass"><span>—</span> Skipped</div>' +
+          '<p class="skip">Not US or Canadian. Other international destinations are deliberately not linted — there are too many valid formats to check honestly, and a false warning on a good address is worse than no warning at all.</p>';
+        return;
+      }
+      if (!w.length) {
+        out.innerHTML =
+          '<div class="verdict pass"><span>✔</span> Address looks correct</div>' +
+          '<p class="skip">The card shows a green ✔ beside the recipient name. This address is cleared to print.</p>';
+        return;
+      }
+      out.innerHTML =
+        '<div class="verdict fail"><span>⚠</span> ' + w.length + " issue" + (w.length > 1 ? "s" : "") + " found</div>" +
+        "<ul>" + w.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>";
+    }
+
+    ta.addEventListener("input", run);
+    $$(".samples button").forEach(function (b) {
+      b.addEventListener("click", function () {
+        ta.value = SAMPLES[b.getAttribute("data-sample")];
+        run();
+      });
+    });
+    ta.value = SAMPLES.split;
+    run();
+  })();
+
+  /* ==========================================================
+     FAVICON — the real canvas routine
+     ========================================================== */
+  function drawFaviconCounter(canvas, pendingCount) {
+    var size = 128;
+    var ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, size, size);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    /* Stand-in for eBay's favicon */
+    ctx.fillStyle = "#ffffff";
+    if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(0, 0, size, size, 22); ctx.fill(); }
+    else ctx.fillRect(0, 0, size, size);
+    var letters = [["e", "#E53238"], ["b", "#0064D2"], ["a", "#F5AF02"], ["y", "#86B817"]];
+    ctx.font = "bold 46px Archivo, sans-serif";
+    letters.forEach(function (l, i) {
+      ctx.fillStyle = l[1];
+      ctx.fillText(l[0], 22 + i * 28, 52);
+    });
+
+    if (pendingCount > 0) {
+      var bw = 83, bh = 72, bx = size - bw, by = size - bh, r = 16;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, r); else ctx.rect(bx, by, bw, bh);
+      ctx.fillStyle = "rgba(255,255,255,0.7)";
+      ctx.fill();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "#999999";
+      ctx.stroke();
+      var label = pendingCount > 99 ? "99+" : String(pendingCount);
+      ctx.fillStyle = "#000000";
+      ctx.font = "bold " + (label.length >= 3 ? 36 : label.length === 2 ? 50 : 60) + "px Archivo, sans-serif";
+      ctx.fillText(label, bx + bw / 2, by + bh / 2 + 2);
+    } else {
+      var cw = 76, cx = size - cw, cy = size - cw;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(cx, cy, cw, cw, 18); else ctx.rect(cx, cy, cw, cw);
+      ctx.fillStyle = "rgba(46,125,50,0.92)";
+      ctx.fill();
+      ctx.strokeStyle = "#1b5e20";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 9;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      ctx.moveTo(cx + 18, cy + 39);
+      ctx.lineTo(cx + 32, cy + 53);
+      ctx.lineTo(cx + 58, cy + 22);
+      ctx.stroke();
+    }
+  }
+
+  function drawFavicons() {
+    var range = $("#favrange");
+    if (!range) return;
+    var n = parseInt(range.value, 10);
+    [$("#favcanvas"), $("#favbig")].forEach(function (c) { if (c) drawFaviconCounter(c, n); });
+    var t = $("#tabtitle");
+    if (t) t.textContent = (n > 0 ? "(" + n + ") " : "") + "Ship — Seller Hub" + (n === 0 ? " · all shipped" : "");
+  }
+
+  (function () {
+    var range = $("#favrange");
+    if (!range) return;
+    range.addEventListener("input", drawFavicons);
+    drawFavicons();
+  })();
+
+  /* ==========================================================
+     MESSAGE PREVIEW
+     ========================================================== */
+  (function () {
+    var out = $("#m-out");
+    if (!out) return;
+
+    function humanizeName(name) {
+      if (!name) return name;
+      return String(name).replace(/\S+/g, function (word) {
+        if (/[a-z]/.test(word)) return word;
+        if (!/[A-Z]/.test(word)) return word;
+        return word.toLowerCase().replace(/(^|[\s'’\-])([a-z])/g, function (m, sep, ch) {
+          return sep + ch.toUpperCase();
+        });
+      });
+    }
+
+    function shipDate(when) {
+      var d = new Date();
+      d.setHours(0, 0, 0, 0);
+      if (when === "tom") {
+        d.setDate(d.getDate() + 1);
+        if (d.getDay() === 0) d.setDate(d.getDate() + 1);   /* never a Sunday */
+      }
+      return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+    }
+
+    function render() {
+      var raw = $("#m-name").value;
+      var first = humanizeName(raw).split(/\s+/)[0] || "there";
+      var qty = parseInt($("#m-qty").value, 10);
+      var plural = qty > 1;
+      var dest = $("#m-dest").value;
+      var total = parseFloat($("#m-total").value);
+      var when = $("#m-when").value;
+
+      var word = plural ? "stickers" : "sticker";
+      var subj = plural ? "they" : "it";
+      var obj = plural ? "them" : "it";
+      var dem = plural ? "these" : "this";
+
+      var delivery = dest === "ca"
+        ? "Orders to Canada may take several weeks to arrive, so please be patient."
+        : (plural ? "They usually arrive within 5–7 business days" : "It usually arrives within 5–7 business days") +
+          ", thanks for your patience.";
+
+      var tracking = total > 25 ? "" : "To keep prices fair, orders at or under $25 ship without tracking.";
+
+      var text =
+        "Hi <mark>" + esc(first) + "</mark>, thanks so much for your order!\n\n" +
+        "I'm packing " + esc(dem) + " <mark>" + word + "</mark> up and " + esc(subj) +
+        " " + (plural ? "go" : "goes") + " out on <mark>" +
+        (when === "today" ? "today, " : "") + esc(shipDate(when)) + "</mark>. " +
+        "<mark>" + esc(delivery) + "</mark>" +
+        (tracking ? "\n\n<mark>" + esc(tracking) + "</mark>" : "") +
+        "\n\nHope " + esc(subj) + " " + (plural ? "brighten" : "brightens") +
+        " something up. Let me know if " + esc(subj) + " " +
+        (plural ? "don't" : "doesn't") + " arrive and I'll sort " + esc(obj) + " out.\n\nA.";
+
+      out.innerHTML = text;
+    }
+
+    ["#m-name", "#m-qty", "#m-dest", "#m-total", "#m-when"].forEach(function (s) {
+      var el = $(s);
+      if (el) { el.addEventListener("input", render); el.addEventListener("change", render); }
+    });
+    render();
+  })();
+
+  /* ==========================================================
+     CONSOLE
+     ========================================================== */
+  (function () {
+    var out = $("#consoleout");
+    if (!out) return;
+
+    var D = {
+      ship:
+'<span class="c-key">&gt; altheastixShipReport()</span>\n\n' +
+'<span class="c-dim">[Altheastix][ship] queue</span>  running=<span class="c-ok">false</span>  total=8  done=6  failed=1  skipped=1\n' +
+'<span class="c-dim">[Altheastix][ship] cards</span>\n' +
+'  order-item-0   state=<span class="c-ok">confirmed</span>  shippable=0  msg=<span class="c-ok">sent</span>     ebayShipDate="Aug 27"\n' +
+'  order-item-1   state=<span class="c-ok">confirmed</span>  shippable=0  msg=<span class="c-ok">sent</span>     ebayShipDate="Aug 27"\n' +
+'  order-item-2   state=<span class="c-ok">confirmed</span>  shippable=0  msg=<span class="c-warn">failed</span>   retryable=<span class="c-ok">true</span>\n' +
+'  order-item-3   state=<span class="c-ok">confirmed</span>  shippable=0  msg=<span class="c-ok">sent</span>\n' +
+'  order-item-4   state=<span class="c-bad">failed</span>     shippable=1  why="eBay shows “Ship by Aug 29”"\n' +
+'  order-item-5   state=<span class="c-ok">confirmed</span>  shippable=0  msg=<span class="c-ok">sent</span>\n' +
+'  order-item-6   state=<span class="c-ok">confirmed</span>  shippable=0  msg=<span class="c-ok">sent</span>\n' +
+'  order-item-7   state=<span class="c-dim">idle</span>       shippable=0  <span class="c-dim">already shipped — skipped</span>\n\n' +
+'<span class="c-dim">[Altheastix][ship] log (last 6 of 300)</span>\n' +
+'  14:22:08  queue:start           {total: 8}\n' +
+'  14:24:51  order:confirmed       {card: "order-item-3", via: "stepper"}\n' +
+'  14:25:19  msg:failed            {card: "order-item-2", why: "composer never opened"}\n' +
+'  14:25:44  order:deadline-fired  {card: "order-item-4"}\n' +
+'  14:25:44  order:failed          {card: "order-item-4", via: "page-deadline"}\n' +
+'  14:27:02  queue:done            {done: 6, failed: 1, skipped: 1}',
+
+      sim:
+'<span class="c-key">&gt; altheastixShipSimulate(\'fail\', \'order-item-3\')</span>\n\n' +
+'<span class="c-warn">[Altheastix][ship] SIMULATE — no eBay contact, no tab opened</span>\n' +
+'  card              : order-item-3\n' +
+'  before            : state=<span class="c-dim">idle</span>  shippable=1\n' +
+'  writing           : SHIP_FAILED_KEY (local only)\n' +
+'  after             : state=<span class="c-bad">failed</span>  shippable=1\n' +
+'  rendered          : red banner · Retry · Open · Dismiss\n' +
+'  favicon counter   : 6 → 6 <span class="c-dim">(unchanged — failed is not done)</span>\n\n' +
+'<span class="c-dim">Available:</span>\n' +
+'  altheastixShipSimulate(<span class="c-ok">\'confirm\'</span>, id)   drive to confirmed\n' +
+'  altheastixShipSimulate(<span class="c-warn">\'pending\'</span>, id)   show the queued badge\n' +
+'  altheastixShipSimulate(<span class="c-warn">\'msgfail\'</span>, id)   raise a real retryable message pill\n' +
+'  altheastixShipSimulate(<span class="c-dim">\'reset\'</span>, id)     return to untouched\n\n' +
+'<span class="c-dim">The simulator only manipulates the page\'s own state machine.\nIt never opens an automation tab, marks anything shipped on\neBay, or messages a buyer.</span>',
+
+      sweep:
+'<span class="c-key">&gt; altheastixShipSweepPreview()</span>\n\n' +
+'<span class="c-dim">[Altheastix][ship] SWEEP PREVIEW — opens nothing</span>\n\n' +
+'  <span class="c-ok">would retry (1)</span>\n' +
+'    order-item-2   action=auto_message   draft=<span class="c-ok">present</span>   attempts=0\n\n' +
+'  <span class="c-dim">would skip (3)</span>\n' +
+'    order-item-4   <span class="c-dim">ship failed — never shipped, so nothing to message</span>\n' +
+'    order-item-5   <span class="c-dim">already swept once this batch</span>\n' +
+'    order-item-6   <span class="c-dim">draft consumed — a retry would double-paste</span>\n\n' +
+'  <span class="c-dim">batch marker</span> : cleared at queue:start, one attempt per card\n' +
+'  <span class="c-dim">opens in</span>     : background (cleanup, not a deliberate click)',
+
+      watch:
+'<span class="c-key">&gt; altheastixWatchReport()</span>\n\n' +
+'<span class="c-dim">[Altheastix][watch] state</span>\n' +
+'  enabled        : <span class="c-ok">true</span>\n' +
+'  baseline       : 8 ids captured at load (14:19:02)\n' +
+'  interval       : 5 min          backoff=<span class="c-dim">none</span>\n' +
+'  last poll      : <span class="c-ok">ok</span> · 14:26:41 · 10 ids · <span class="c-lg">2 new</span>\n' +
+'  next poll      : in 3m 12s\n' +
+'  suspended      : <span class="c-dim">no</span>\n' +
+'  new since load : 62-13544-10093, 17-13545-77120\n\n' +
+'<span class="c-dim">[Altheastix][watch] log (last 5 of 200)</span>\n' +
+'  14:19:02  watch:baseline     {ids: 8}\n' +
+'  14:21:40  watch:poll-ok      {ids: 8, new: 0}\n' +
+'  14:24:11  watch:inconclusive {reason: "non-list response"}  <span class="c-warn">← not badged</span>\n' +
+'  14:24:11  watch:backoff      {next: "15 min"}\n' +
+'  14:26:41  watch:poll-ok      {ids: 10, new: 2}  <span class="c-dim">backoff cleared</span>',
+
+      cfg:
+'<span class="c-key">&gt; altheastixConfigDryRun()</span>\n\n' +
+'<span class="c-warn">[Altheastix][cfg] DRY RUN — no changes made</span>\n' +
+'  stored defaults      : thankYou=<span class="c-ok">true</span> shipTomorrow=<span class="c-ok">true</span> autoSend=<span class="c-bad">false</span>\n' +
+'  would seed (new)     : 2  ["order-item-8", "order-item-9"]\n' +
+'  would leave untouched: 8\n\n' +
+'<span class="c-dim">Before v4.37 this was "all of them", every single time —\n' +
+'ticking one checkbox silently reverted the global ship date\n' +
+'and turned thank-you messages back on.</span>\n\n' +
+'<span class="c-key">&gt; altheastixConfigReport()</span>\n\n' +
+'  stored               : {thankYou: true, shipTomorrow: true, autoSend: false}\n' +
+'  10 cards, <span class="c-warn">2 differing</span> from defaults <span class="c-dim">(per-card overrides)</span>\n' +
+'    order-item-1   seeded=true   thankYou=<span class="c-bad">false</span>   shipWhen=tomorrow\n' +
+'    order-item-6   seeded=true   thankYou=true    shipWhen=<span class="c-bad">today</span>'
+    };
+
+    var tabs = $$(".consoletabs button");
+    function show(k) {
+      tabs.forEach(function (b) { b.setAttribute("aria-selected", String(b.getAttribute("data-cmd") === k)); });
+      out.innerHTML = D[k];
+    }
+    tabs.forEach(function (b) {
+      b.addEventListener("click", function () { show(b.getAttribute("data-cmd")); });
+    });
+    show("ship");
+  })();
+
+  /* ==========================================================
+     FEATURE REFERENCE
+     ========================================================== */
+  (function () {
+    var grid = $("#refgrid");
+    if (!grid) return;
+
+    var F = [
+      ["ui", "Full page redesign", "v3.26+", "eBay's grouping summary, delivery-service cells, proof-of-delivery column and pay actions are hidden outright; the logo moves into a single header row with quick links to Seller Hub, Orders, Listings and Feedback."],
+      ["ui", "Dark / light mode", "v3.55+", "Defaults to dark. The switch lives in the header of the defaults panel so it stays reachable while that panel is collapsed — which is its default state."],
+      ["ui", "Startup countdown", "", "The script waits 15s for eBay to finish rendering before it touches anything. An overlay counts down and offers <code>Run Now</code> to skip the wait."],
+      ["ui", "Click-to-zoom images", "", "Thumbnails render at 130px for identification at a glance, and open at 3× in a full-screen overlay on click."],
+      ["ui", "Buyer notes surfaced", "v4.01", "A note the buyer left on their order is normally buried inside the grouping summary the script hides. It's pulled out and shown as a soft callout under the shipping line."],
+      ["ui", "Back to top", "v3.62", "A floating ↑ appears once you scroll past 200px. The SKU panel, defaults panel and ship dock all reposition as you scroll so they never overlap the cards."],
+      ["sku", "Live filter", "", "Filters by SKU, buyer name or item title, and dims non-matching order cards at the same time — the panel and the list stay in agreement."],
+      ["sku", "Click-to-scroll", "", "Any SKU in the panel scrolls to and flashes its order card."],
+      ["sku", "Alphabetical grouping", "", "Separators between letter groups, so a panel of forty pills is still scannable."],
+      ["sku", "Shipped SKUs strike through", "", "Confirmed shipments mark their SKUs done in the panel rather than removing them, so the picking list stays stable."],
+      ["sku", "Favicon + tab-title badge", "v3.79–3.88", "The count of orders still to pack, drawn onto the favicon and prefixed to the tab title. Counts confirmed shipments only."],
+      ["sku", "New-order watch", "v4.26–4.28", "Polls eBay's awaiting-shipment endpoint every 5 minutes. Never reloads on its own, refuses mid-batch, pauses during automation, and stays silent on any inconclusive response."],
+      ["print", "Print All Envelopes", "v3.27", "The whole batch in one print window, one envelope per page, instead of one dialog per order."],
+      ["print", "Envelope #10 format", "", "9.5in × 4.125in with auto-scaled content and a fully configurable return address."],
+      ["print", "Custom Envelope modal", "", "Paste any address block for an order not in the queue; it parses into editable fields — name, street, unit, city/state/ZIP, country — and prints."],
+      ["print", "Canadian stamp reminder", "", "A faint 🇨🇦 and “Int'l Stamp” note sized to sit under the international stamp that answers it."],
+      ["print", "Postage cost hidden", "v4.03", "eBay's “Show postage cost on label” dropdown is forced to No whenever the Edit labels modal opens, so the amount never prints on a label a buyer will see."],
+      ["auto", "Mark as Shipped", "v4.21+", "Three honest states, dual failure detection, and a deadline on the page that fires even if the automation tab was closed or never loaded."],
+      ["auto", "Status read from eBay", "v4.24–4.25", "Reads eBay's own progress stepper via two independent signals and accepts either; returns <code>unknown</code> rather than guessing when neither is legible."],
+      ["auto", "Ship N Selected", "v4.21", "Batch shipping as a queue, one at a time, with a pre-flight dialog and a progress dock. There is deliberately no “Ship All”."],
+      ["auto", "Undo in flight", "", "The confirming overlay carries an Undo that returns the card to untouched and cancels its deadline."],
+      ["auto", "Button recovery", "v4.22", "Two legitimate paths remove the ship button and nothing put it back, leaving cards permanently unshippable. It now rebuilds from the card's own order id, wired into all three recovery paths."],
+      ["auto", "Add Tracking (v1 + v2)", "v3.75+", "On the v2 flow the tracking view is filled and Save pressed automatically — auto-continuing past benign carrier warnings, pausing on an invalid number. A checkbox turns the auto-submit off."],
+      ["auto", "Buy shipping label", "v3.90–3.98", "Opens eBay's single-label page pre-filled for an eBay Standard Envelope: custom size, 1oz, 9 × 4.1 × 0.1in. One confirming click left."],
+      ["auto", "Combined-order watchdog", "v4.14", "eBay re-renders combined cards after the initial pass, wiping every injected control. A MutationObserver re-processes them, stripping stale injections first so nothing duplicates."],
+      ["msg", "Verified auto-send", "v4.16", "Every step retries; the tab closes only on positive evidence the message went out. Otherwise it stays open with the draft intact and a red banner."],
+      ["msg", "Message outcome channel", "v4.23", "An order that ships but can't message shows an amber pill rather than an unqualified green tick. The draft survives, so Retry re-sends the same text."],
+      ["msg", "End-of-batch rescue sweep", "v4.35", "One background attempt per un-messaged card, exactly once per batch, with the result reported in the closing dock line."],
+      ["msg", "Today / Tomorrow control", "v3.69", "Per order and globally, remembered between sessions, with a live preview of the resolved date. Tomorrow also adds the internal “will be shipped on” note."],
+      ["msg", "Canned drafts", "", "Late + Gift, Late (no gift), and Preorder, with an editable live preview — you can hand-edit the interpolated text before sending, and a reset link restores template sync."],
+      ["msg", "Random quotes", "", "An optional musician quote appended to outgoing messages, keyed off the item title where a keyword matches."],
+      ["cfg", "USER_CONFIG", "", "Return address, tracking threshold, load delay, dark-mode default, automation tab timeout, watch interval, the 40-colour palette and the header links."],
+      ["cfg", "External config", "", "Thank-you drafts, delivery notes, quotes and quote keywords are pulled at runtime from a file in the repo, so messaging changes ship without touching the script. Falls back to built-in defaults if it can't load."],
+      ["cfg", "Defaults that persist", "v4.37", "Thank-you, auto-send and ship date are stored and re-read on every rebuild; repaints seed only cards the script has never seen, so hand-set overrides survive."],
+      ["cfg", "Self-updating", "", "<code>@updateURL</code> and <code>@downloadURL</code> point at the repo, so Tampermonkey offers each new version. A launchd watcher commits and pushes local saves automatically."]
+    ];
+
+    function render(cat) {
+      grid.innerHTML = F.filter(function (f) { return cat === "all" || f[0] === cat; })
+        .map(function (f) {
+          return '<div class="refitem"><h5>' + esc(f[1]) +
+            (f[2] ? '<span class="vtag">' + f[2] + "</span>" : "") +
+            "</h5><p>" + f[3] + "</p></div>";
+        }).join("");
+    }
+
+    $$(".reftabs button").forEach(function (b) {
+      b.addEventListener("click", function () {
+        $$(".reftabs button").forEach(function (x) { x.setAttribute("aria-selected", "false"); });
+        b.setAttribute("aria-selected", "true");
+        render(b.getAttribute("data-ref"));
+      });
+    });
+    render("all");
+  })();
+})();
+</script>
+
+</body>
+</html>
