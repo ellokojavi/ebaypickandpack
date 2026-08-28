@@ -151,8 +151,8 @@
             heightIn: 5,
             returnFontPx: 13,
             addressFontPx: 21,
-            addressIndent: '12%',
-            spacerTop: '14%',
+            addressIndent: '18%',
+            spacerTop: '16%',
             spacerBottom: '26%',
             stampTopPx: 30
         }
