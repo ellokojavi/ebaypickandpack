@@ -1,5 +1,29 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.40
+- **New diagnostic `altheastixMsgProbe()`** for the "draft pastes but never
+  sends" failure. Run it in the console on any `/mesh/ord/details` tab: it walks
+  the exact path the auto-message automation takes — open panel, find composer,
+  find textarea, find Send, insert a draft, watch the Send button's `disabled`
+  flag — reports the first stage that fails, then clears the box. It never
+  clicks Send.
+- `altheastixMsgProbe({ testClick: true })` additionally fires the real
+  synthetic click with `fetch` / `XHR` / `sendBeacon` / form-submit stubbed out
+  inside the composer, so it can tell whether eBay's handler responds to an
+  untrusted MouseEvent at all without a message going out. Opt-in, because
+  intercepting someone else's network calls is best-effort — run it on an order
+  you would not mind messaging.
+- **Documented what changed on eBay's side.** The panel iframe still points at
+  `/contact/sendmsg`, but that now 302s to `/cnt/ViewMessage`. On that page the
+  Send control is `<button id="imageupload__send--button"
+  aria-label="Send message" type="button">` — an **icon button with no text**,
+  matchable only through its `aria-label`, and `disabled` until eBay's own
+  asynchronous input handler runs. Verified by hand against a live composer:
+  `insertComposerText`'s synthetic events *do* clear that flag, so the paste
+  path and the button locator are both still sound — which narrows the fault to
+  the click itself or the post-click evidence check. `findComposerSendButton`
+  and `findComposerTextarea` are unchanged; nothing was altered on a guess.
+
 ## v4.39
 - **Large-envelope print format.** Orders tagged **LG** (SKU containing `lg` —
   the blue-highlighted cards) now print on a **7 × 5 in** landscape page
