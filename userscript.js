@@ -4695,6 +4695,43 @@
             });
             modal.appendChild(fieldsContainer);
 
+            // --- Envelope size picker ---
+            // Defaults to #10. `selectedFormat` is what the Print button reads;
+            // the two buttons are a plain segmented control so the choice is
+            // visible without opening a dropdown.
+            let selectedFormat = ENVELOPE_FORMATS.standard;
+            const sizeRow = document.createElement('div');
+            sizeRow.style.cssText = 'display:flex;align-items:center;gap:8px;margin-top:14px;';
+            const sizeLabel = document.createElement('label');
+            sizeLabel.textContent = 'Envelope';
+            sizeLabel.style.cssText = `font-size:12px;font-weight:600;color:${mutedFg};width:110px;flex-shrink:0;text-align:right;`;
+            const sizeSeg = document.createElement('div');
+            sizeSeg.style.cssText = `display:inline-flex;border:1px solid ${inputBorder};border-radius:6px;overflow:hidden;`;
+            const sizeButtons = [];
+            const paintSizeButtons = () => {
+                sizeButtons.forEach(btn => {
+                    const active = btn.dataset.format === selectedFormat.key;
+                    btn.style.background = active ? accent : (isDarkMode ? '#2c2c2c' : '#f5f5f5');
+                    btn.style.color = active ? '#fff' : fg;
+                    btn.style.fontWeight = active ? '700' : '500';
+                    btn.setAttribute('aria-pressed', String(active));
+                });
+            };
+            [ENVELOPE_FORMATS.standard, ENVELOPE_FORMATS.large].forEach(fmt => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.dataset.format = fmt.key;
+                btn.textContent = `${fmt.label} (${fmt.sizeLabel})`;
+                btn.title = `Print at ${fmt.sizeLabel}`;
+                btn.style.cssText = 'border:none;padding:6px 12px;font-size:12px;cursor:pointer;font-family:inherit;';
+                btn.addEventListener('click', () => { selectedFormat = fmt; paintSizeButtons(); });
+                sizeButtons.push(btn);
+                sizeSeg.appendChild(btn);
+            });
+            paintSizeButtons();
+            sizeRow.append(sizeLabel, sizeSeg);
+            modal.appendChild(sizeRow);
+
             // Live parsing: debounced, fires on every textarea change
             let parseTimer = null;
             const runParse = () => {
@@ -4735,9 +4772,11 @@
                     .filter(v => v.length > 0);
                 if (parts.length === 0) { alert('Please paste an address first.'); return; }
                 const addressHTML = parts.join('<br>');
-                const envelopeHTML = `<div class="envelope"><table style="font-family: Arial; width: 100%; height: 100%; border-collapse: collapse;"><tr style="vertical-align: top;"><td style="width: 100%; padding: 14px 0 0 18px; font-size: 14px;">${USER_CONFIG.returnAddress}</td></tr><tr style="height: 10%;"><td></td></tr><tr style="vertical-align: top;"><td style="text-align: left; padding-left: 20%; font-size: 24px;">${addressHTML}</td></tr><tr style="height: 30%;"><td></td></tr></table></div>`;
+                const envelopeHTML = buildEnvelopeHTML(addressHTML, selectedFormat, '');
+                const css = envelopePrintCSS([selectedFormat]);
+                console.log(`[Altheastix][env] custom envelope → ${selectedFormat.key} (${selectedFormat.sizeLabel})`);
                 const printwin = window.open("", "_blank");
-                printwin.document.write(`<html><head><style>@page { size: 8.93in x 3.878in; margin: 0; } html, body { margin: 0; padding: 0; } .envelope { width: 8.93in; height: 3.878in; padding: 10px; font-family: Arial; box-sizing: border-box; overflow: hidden; }</style></head><body>${envelopeHTML}</body></html>`);
+                printwin.document.write(`<html><head><style>${css}</style></head><body>${envelopeHTML}</body></html>`);
                 printwin.document.close();
                 printwin.focus();
                 printwin.print();
