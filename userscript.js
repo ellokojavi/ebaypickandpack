@@ -6066,6 +6066,151 @@
         }
     }
 
+    // ===================================================================
+    // BUYER-MESSAGE PROBE (console diagnostic, sends nothing)
+    // ===================================================================
+    // Run altheastixMsgProbe() in the console on any /mesh/ord/details tab.
+    // It walks the exact path the auto-message automation takes — open panel,
+    // find composer, find textarea, find Send, insert a draft, watch the Send
+    // button's disabled flag — and reports which stage fails. It NEVER clicks
+    // Send, and it clears the box afterwards.
+    //
+    // Background (2026-08-28): eBay migrated the composer. The panel iframe is
+    // pointed at /contact/sendmsg, which now 302s to /cnt/ViewMessage. On that
+    // page the Send control is <button id="imageupload__send--button"
+    // aria-label="Send message" type="button">, an ICON button with NO text —
+    // it is reachable only via aria-label, and it is `disabled` until eBay's
+    // own (asynchronous, debounced) input handler runs. Confirmed by hand:
+    // insertComposerText's synthetic events DO clear that flag, but only after
+    // a delay, so anything reading `disabled` synchronously reads stale state.
+    //
+    // altheastixMsgProbe({ testClick: true }) additionally dispatches the real
+    // click sequence with fetch/XHR/sendBeacon/submit stubbed out inside the
+    // composer, to see whether eBay's handler even fires on a synthetic click.
+    // The stubs record and BLOCK the outgoing request, so no message is sent —
+    // but that is best-effort interception of someone else's code, so it is
+    // opt-in and should be run on an order you would not mind messaging.
+    async function altheastixMsgProbe(opts) {
+        const options = Object.assign({ testClick: false, text: 'Altheastix probe draft — not sent.' }, opts || {});
+        const steps = [];
+        const note = (stage, ok, detail) => {
+            steps.push({ stage: stage, ok: ok, detail: detail === undefined ? '' : detail });
+            console.log(`[Altheastix][msgprobe] ${ok ? 'OK  ' : 'FAIL'} ${stage}${detail ? ' — ' + detail : ''}`);
+        };
+        const result = { steps: steps, sent: false, clickTested: false, networkAttempts: [] };
+
+        if (!location.pathname.startsWith('/mesh/ord/details')) {
+            note('page', false, 'not an order-details page — open one first');
+            return result;
+        }
+        note('page', true, location.pathname);
+
+        const doc = await openMessageBuyerPanel();
+        if (!doc) { note('composer panel opens', false, 'panel never produced a reachable document'); return result; }
+        let composerPath = '(unreadable)';
+        try { composerPath = doc.location.pathname; } catch (e) {}
+        note('composer panel opens', true, 'composer document at ' + composerPath);
+
+        const ready = await waitForComposerReady();
+        if (!ready) { note('composer ready', false, 'readyState/textarea never settled'); return result; }
+        note('composer ready', true);
+
+        const textarea = ready.textarea;
+        note('textarea found', true, '#' + (textarea.id || '(no id)'));
+
+        const btnBefore = findComposerSendButton(ready.doc);
+        if (!btnBefore) {
+            const all = Array.from(ready.doc.querySelectorAll('button, input[type="submit"]'));
+            note('Send button found', false, all.length + ' candidate control(s), none matched the locator');
+            console.table(all.slice(0, 40).map(b => ({
+                tag: b.tagName, type: b.type, id: b.id,
+                text: (b.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 30),
+                aria: b.getAttribute('aria-label') || '', disabled: b.disabled
+            })));
+            return result;
+        }
+        note('Send button found', true, '#' + (btnBefore.id || '(no id)') +
+            ' aria="' + (btnBefore.getAttribute('aria-label') || '') + '" disabled=' + btnBefore.disabled);
+
+        insertComposerText(textarea, options.text);
+        note('draft inserted', textarea.value.length > 0, textarea.value.length + ' chars in the box');
+
+        // Watch the disabled flag rather than sampling it once — eBay's handler
+        // is debounced, and a single synchronous read reports stale state.
+        let enabledAfterMs = null;
+        const watchStart = Date.now();
+        while (Date.now() - watchStart < 8000) {
+            const b = findComposerSendButton(ready.doc);
+            if (b && !b.disabled && b.getAttribute('aria-disabled') !== 'true') { enabledAfterMs = Date.now() - watchStart; break; }
+            await msgSleep(200);
+        }
+        if (enabledAfterMs === null) note('Send button enables', false, 'still disabled 8s after the draft went in');
+        else note('Send button enables', true, 'took ' + enabledAfterMs + 'ms');
+
+        if (options.testClick && enabledAfterMs !== null) {
+            result.clickTested = true;
+            const win = ready.doc.defaultView;
+            const attempts = result.networkAttempts;
+            const realFetch = win.fetch;
+            const realSend = win.XMLHttpRequest && win.XMLHttpRequest.prototype.send;
+            const realOpen = win.XMLHttpRequest && win.XMLHttpRequest.prototype.open;
+            const realBeacon = win.navigator && win.navigator.sendBeacon;
+            const blockSubmit = (e) => { e.preventDefault(); e.stopImmediatePropagation(); attempts.push({ kind: 'form submit (blocked)' }); };
+            try {
+                win.fetch = function (input) {
+                    attempts.push({ kind: 'fetch (blocked)', url: String((input && input.url) || input).slice(0, 120) });
+                    return Promise.reject(new Error('altheastix probe: blocked'));
+                };
+                if (realOpen) win.XMLHttpRequest.prototype.open = function (m, u) { this.__probeUrl = String(u).slice(0, 120); this.__probeMethod = m; return realOpen.apply(this, arguments); };
+                if (realSend) win.XMLHttpRequest.prototype.send = function () { attempts.push({ kind: 'XHR (blocked)', url: this.__probeUrl || '', method: this.__probeMethod || '' }); throw new Error('altheastix probe: blocked'); };
+                if (realBeacon) win.navigator.sendBeacon = function (u) { attempts.push({ kind: 'sendBeacon (blocked)', url: String(u).slice(0, 120) }); return false; };
+                win.document.addEventListener('submit', blockSubmit, true);
+
+                const btn = findComposerSendButton(ready.doc);
+                ['mousedown', 'mouseup', 'click'].forEach(type => {
+                    try { btn.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: win })); } catch (e) {}
+                });
+                await msgSleep(2500);
+            } finally {
+                try { win.fetch = realFetch; } catch (e) {}
+                try { if (realOpen) win.XMLHttpRequest.prototype.open = realOpen; } catch (e) {}
+                try { if (realSend) win.XMLHttpRequest.prototype.send = realSend; } catch (e) {}
+                try { if (realBeacon) win.navigator.sendBeacon = realBeacon; } catch (e) {}
+                try { win.document.removeEventListener('submit', blockSubmit, true); } catch (e) {}
+            }
+            if (attempts.length) {
+                note('synthetic click reaches eBay', true, attempts.length + ' outgoing request(s) intercepted and blocked');
+                console.table(attempts);
+            } else {
+                note('synthetic click reaches eBay', false,
+                    'the click fired but eBay attempted no request — its handler ignores untrusted MouseEvents');
+            }
+        }
+
+        // Leave the box exactly as we found it.
+        try {
+            textarea.focus({ preventScroll: true });
+            textarea.setSelectionRange(0, textarea.value.length);
+            const cleared = ready.doc.execCommand && ready.doc.execCommand('delete');
+            if (!cleared || textarea.value.length) insertComposerText(textarea, '');
+        } catch (e) { try { insertComposerText(textarea, ''); } catch (e2) {} }
+        note('draft cleared', textarea.value.length === 0, textarea.value.length + ' chars left');
+
+        console.table(steps);
+        const firstFail = steps.find(s => !s.ok);
+        console.log('[Altheastix][msgprobe] ' + (firstFail
+            ? 'FIRST FAILING STAGE → ' + firstFail.stage + ' (' + firstFail.detail + ')'
+            : 'every stage passed — if a real send still fails, the fault is in the post-click evidence check.'));
+        return result;
+    }
+    try {
+        unsafeWindow.altheastixMsgProbe = altheastixMsgProbe;
+    } catch (e) {
+        try { window.altheastixMsgProbe = altheastixMsgProbe; } catch (e2) {
+            console.warn('[Altheastix][msgprobe] not reachable from the page console.');
+        }
+    }
+
     // --- eBay's order progress stepper ---
     // A POSITIVE read of what eBay itself says about an order, used where the
     // ship automation previously reasoned from an absence ("no Mark as shipped
