@@ -23,11 +23,13 @@ The script self-updates via `@updateURL` / `@downloadURL` pointing to this repo,
 
 ### 🎨 UI & Layout
 - Full redesign of eBay's bulk shipping page with a clean, modern layout
-- **Dark / light mode** toggle 🌙☀️ with preference saved across sessions
+- **Dark / light mode** toggle 🌙☀️ with preference saved across sessions — the switch lives in the header of the *Defaults for all orders* panel, so it stays reachable while that panel is collapsed
 - **Custom header navigation** with quick links to Seller Hub, All Orders, Listings, Feedback, and Help
-- **Larger product images** (130px) for faster visual identification 🔍
+- **Larger product images** (130px) for faster visual identification 🔍, with **click-to-zoom** — clicking a thumbnail opens it at 3× in a full-screen overlay, dismissed by the × or by clicking the backdrop
 - **Startup countdown overlay** with a "Run Now" shortcut to skip the delay ⏱️
 - **Buyer notes surfaced** 💬 — any note a buyer left on their order (normally hidden with eBay's grouping summary) is shown as a soft callout under the card's shipping info line
+- **Back-to-top button** ⬆️ — a floating ↑ appears beside the order list once you scroll past 200px and returns you to the top of the batch
+- **Floating panels track the page** — the SKU panel, the defaults panel and the batch-ship dock reposition themselves as you scroll and as the order column resizes, so they never overlap the cards
 
 ### 🎨 Color-Coded Order Cards
 Orders are visually flagged by type at a glance:
@@ -91,12 +93,15 @@ Every order's shipping address is automatically linted against structural rules:
 
 ### 🤖 Order Automation
 - **Mark as Shipped** with optional auto-notes and thank-you messages — the button reads **"Mark as Shipped & Msg"** when a thank-you message will go out with the shipment, and **"Mark as Shipped"** when it won't
+- **Undo while it's in flight** ↩️ — the "marked as shipped — confirming…" overlay carries an **Undo** button that returns the card to its untouched state and cancels its confirmation deadline, for the click you regretted a second later
 - **Status read from eBay, not inferred** 🔎 — when the "Mark as shipped" button doesn't appear, the script reads eBay's own order **progress stepper** rather than assuming the order already shipped. eBay renames that step as the order progresses ("Ship by Aug 26" → "Shipped Aug 23"), and both states are recognised. Shipped → confirmed, with eBay's ship date recorded. Not shipped → a genuine failure that quotes eBay back at you (*eBay shows "Ship by Aug 26"*), with the tab left open so you can look
 - **Three honest ship states** 🚦 — a card is *pending* (amber spinner, "marked as shipped — confirming…"), *confirmed* (green **✓ Shipped**), or *failed* (red banner with **Retry**, **Open** and dismiss). A shipment that never comes back from eBay can no longer sit looking like a success: the automation tab reports its own timeout, and the pick-and-pack page runs an independent deadline that still fires if the tab was closed or never loaded. A confirmation arriving late always wins, so a merely-slow eBay resolves to shipped. The favicon/tab counter now counts only *confirmed* shipments
 - **Ship N Selected Orders** 🚚 — batch shipping driven by the same checkboxes as *Print N Selected*. Orders run **one at a time**, each waiting for a real outcome before the next begins (the thank-you message tab takes focus, so several at once would fight over the browser). A pre-flight dialog shows how many orders, how many messages and roughly how long before anything happens, and a progress dock tracks shipped / failed / skipped with **Stop after this one** and **Retry N failed**. The button appears only when orders are checked — there is no "Ship All". Turn the global **thank you msg** toggle off to keep every tab in the background and the browser usable during a run
 - **Retry is safe** — the "will ship" note and the thank-you message are sent once per order and guarded, so retrying a failed *shipment* never sends the buyer a duplicate message
+- **End-of-batch message rescue sweep** 🧹 — when a batch finishes with orders shipped but buyers un-messaged, the script reopens the message tab once for each card still showing a retryable failure, in the **background** so it doesn't drag you back to the browser. Exactly one attempt per card per batch (the marker is written before the tab opens, so nothing can loop into mailing the same buyer twice), skipped entirely if you stopped the batch by hand, and the closing dock line reports what it did — `· 2/3 messages recovered, 1 still needs you`. Anything that fails a second time keeps its pill and is yours to finish
 - **Message outcomes are reported too** ✉️ — an order can ship perfectly and still leave the buyer with nothing if eBay's composer fails to open. A card that shipped but couldn't message now shows an amber **"✉ Message not sent"** pill with **Retry** and **Open**, instead of an unqualified green tick. The queued draft survives a failed attempt (it's only consumed once the text is actually in the box), so Retry genuinely re-sends the same message — and a message tab whose composer never opens reloads itself once and tries again before giving up
 - **Today / Tomorrow ship control** — an explicit segmented toggle (per order *and* globally, and remembered between sessions) that sets whether the buyer is told the order ships same-day or next-day. "Tomorrow" also adds the internal "Will be shipped on `<date>`" note. Each card shows a live ship-date preview (e.g. "Fri, Jun 27") 📅
+- **Sunday is never a ship date** 📆 — the computed "tomorrow" date rolls forward to Monday if it lands on a Sunday, so a Saturday batch tells the buyer Monday rather than a day nothing ships
 - **"Send thank you msg" master switch** — the top-level toggle for messaging; when off, the auto-send and ship-date controls are greyed out since no message will be sent ✉️
 - **Defaults that stick** 💾 — the *Defaults for all orders* panel (thank-you, auto-send, ship date) stores every setting and re-reads it on each rebuild. Changing a global applies it to every card; after that, per-order overrides survive repaints, so ticking a checkbox or confirming a shipment no longer silently reverts what you set. Only cards the script has never seen get the defaults applied
 - **Add Tracking** — supports both legacy and new eBay tracking systems (v1 + v2) 📬. On the v2 flow the tracking view is filled *and* Save is pressed automatically (auto-continuing past benign carrier/insurance warnings, but pausing on an invalid-number warning). An **"Auto-press Save on eBay"** checkbox in the tracking tooltip (checked by default) lets you turn the auto-submit off and fall back to fill-only
@@ -109,10 +114,30 @@ Every order's shipping address is automatically linted against structural rules:
 - **Verified auto-send** — the message tab retries the Send click and only closes once the send is confirmed. If it can't confirm, it leaves the tab open with the draft in place and a red banner explaining what went wrong, instead of closing silently ✅
 
 ### ✉️ Canned Messages & Templates
-- Fully templated messages with variable substitution: `{BUYER_FIRST}`, `{STICKER_NAME}`, `{ARRIVAL_DATE}`, `{SURPRISE_STICKER}`, `{SHIPPING_DATE}`, etc.
-- Multiple canned message drafts for backorder, pre-order, and delay scenarios
+Two different sets of templates, filled from two different variable sets:
+
+**Thank-you drafts** (`messageTemplates.thankYouDrafts` in the external config) — sent automatically with a shipment:
+
+| Variable | Filled with |
+|----------|-------------|
+| `{BUYER_NAME}` / `{BUYER_FIRST}` | Buyer's full name / first name |
+| `{SHIP_DATE}` | The card's Today/Tomorrow ship date, e.g. "Fri, Jun 27" |
+| `{STICKER_WORD}` | "sticker" or "stickers", matching the order's quantity |
+| `{PRONOUN_SUBJ}` / `{PRONOUN_OBJ}` / `{DEMONSTRATIVE}` | "it/they", "it/them", "this/these" — agreeing with the same quantity |
+| `{DELIVERY_NOTE}` | The Canada note for Canadian orders, otherwise the usual-arrival line plus a random patience variant |
+| `{TRACKING_NOTE}` | "To keep prices fair, orders at or under $25 ship without tracking." — **empty** for orders above `trackingOrderAmountThreshold`, since those ship with a label |
+
+**Manual canned drafts** — picked from the dropdown under each card's *Message* button. These three live in the userscript itself (`CONFIG.manualMessageDrafts`), not in the external config:
+
+| Option | Scenario | Variables |
+|--------|----------|-----------|
+| **Late + Gift** | Out of stock, offering a free sticker for the wait | `{BUYER_FIRST}`, `{STICKER_NAME}`, `{ARRIVAL_DATE}`, `{SURPRISE_STICKER}` |
+| **Late, no gift** | Out of stock, no gift offered | `{BUYER_FIRST}`, `{STICKER_NAME}`, `{ARRIVAL_DATE}` |
+| **Preorder Sticker** | Pre-order that hasn't shipped yet | `{BUYER_FIRST}`, `{STICKER_NAME}`, `{SHIPPING_DATE}` |
+
+- **ALL-CAPS buyer names are normalized** — eBay hands over names like `GEORGE MCDONALD`; the greeting reads "George McDonald" so the message doesn't look machine-generated. Names that already contain a lowercase letter are left exactly as typed, preserving intentional casing ✍️
 - **Editable live preview** — the customize-message modal shows the fully interpolated message as you type, and you can click into the preview to hand-edit any part of the final text before sending (a reset link restores template sync) ✍️
-- Templates and quotes loaded from an **external config file** (`altheastix-ebay-config.js`) so you can update them without touching the script 🧩
+- Thank-you drafts, delivery notes and quotes are loaded from an **external config file** (`altheastix-ebay-config.js`) so you can update them without touching the script 🧩. If it fails to load, each falls back to a built-in default
 
 ### 🧠 Smart Extras
 - **Order totals** calculated automatically from item prices and quantities, with totals over the dollar threshold (default: $25) highlighted to stand out 🧮
