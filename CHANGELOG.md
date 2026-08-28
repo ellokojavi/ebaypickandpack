@@ -1,5 +1,36 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.39
+- **Large-envelope print format.** Orders tagged **LG** (SKU containing `lg` —
+  the blue-highlighted cards) now print on a **7 × 5 in** landscape page
+  instead of the #10 geometry. Everything else is unchanged. Both formats live
+  in one `ENVELOPE_FORMATS` constant near the top of the script, with their own
+  type scale: the large envelope is only 78% as wide, so the delivery address
+  drops from 24px to 21px and the indent from 20% to 12% to keep long street
+  lines off a second row. Manila orders explicitly stay on #10.
+- **Mixed batches still print as one job.** "Print N Envelopes" over a
+  selection containing both sizes emits CSS *named pages*
+  (`@page envlarge { size: 7in 5in }` + `page: envlarge` on the envelope),
+  supported in Firefox since 110. A single-size run — which is every per-card
+  Print Envelope click and most batches — keeps the plain unnamed `@page` path
+  it always used. A mixed job also emits the unnamed `@page` at #10 size, so a
+  browser that ignores named pages falls back to the old behaviour rather than
+  to some unrelated default paper.
+- **Fixed: the `@page size` declaration was invalid and had been doing
+  nothing.** It read `size: 8.93in x 3.878in`; the CSS grammar is two lengths
+  separated by a space, and the stray `x` made the browser drop the whole
+  declaration. Envelopes were coming out on whatever paper the print dialog
+  had selected, not on a script-specified size. Now written as
+  `size: 8.93in 3.878in`, which means the page size in the print dialog is
+  genuinely driven by these numbers for the first time — **worth one test
+  print before a real batch.**
+- **Custom Envelope modal has a size picker.** A `#10 / Large` segmented
+  control above the buttons, defaulting to #10.
+- **New console diagnostic:** `altheastixEnvelopeReport()` tables every order
+  card on the page with the format it would print on, the LG/manila classes it
+  matched, and its SKUs — no print dialog opened. Each real print run also logs
+  its per-envelope breakdown and the exact page CSS it used.
+
 ## v4.38
 - Ship-date row in the defaults panel is now a single line: the Today/Tomorrow
   pill sits beside the "ship date (all orders)" label instead of wrapping onto
