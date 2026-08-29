@@ -114,6 +114,7 @@ Every order's shipping address is automatically linted against structural rules:
 - **Send Messages** to buyers using templated thank-you drafts loaded from the external config file 💌
 - Random quotes optionally appended to outgoing messages (configurable) 💬
 - **Auto-send toggle** with a safety confirmation step 🛡️ — remembers your last choice across page loads rather than resetting itself
+- **Composer-native typing** — the draft is inserted by the composer's own document (`execCommand('insertText')`), so eBay sees a genuine trusted input event rather than a synthetic one built in the userscript sandbox. The old synthetic path is kept as an automatic fallback ⌨️
 - **Verified auto-send** — the message tab retries the Send click and only closes once the send is confirmed. If it can't confirm, it leaves the tab open with the draft in place and a red banner explaining what went wrong, instead of closing silently ✅
 
 ### ✉️ Canned Messages & Templates
