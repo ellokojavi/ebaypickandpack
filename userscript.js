@@ -5861,22 +5861,70 @@
     // .value directly the way the old spaceSim() did — that desynced React's
     // tracker and could leave the composer believing the box was empty.
     function insertComposerText(textarea, text) {
+        const doc = textarea.ownerDocument;
+        const win = doc.defaultView || window;
         try { textarea.focus({ preventScroll: true }); } catch (e) {}
-        setAndTriggerInputValue(textarea, text);
-        const win = textarea.ownerDocument.defaultView || window;
+
+        // Preferred path: make the composer's OWN document generate the input.
+        // execCommand runs inside that document, so the resulting input event is
+        // browser-generated and native to that realm — indistinguishable from
+        // typing, which is the only thing some frameworks act on. This replaces
+        // nothing: the synthetic path below still runs as the fallback.
+        let native = false;
+        try {
+            textarea.setSelectionRange(0, textarea.value.length);
+            if (text === '') {
+                if (doc.execCommand('delete')) native = textarea.value === '';
+            } else if (doc.execCommand('insertText', false, text)) {
+                native = textarea.value === text;
+            }
+        } catch (e) {}
+        MSG_LOG('insertComposerText: ' + (native ? 'native execCommand insert' : 'synthetic fallback') +
+            ' (' + text.length + ' chars)');
+
+        if (!native) setAndTriggerInputValue(textarea, text);
+
         const KeyEvt = win.KeyboardEvent || KeyboardEvent;
         const InpEvt = win.InputEvent || InputEvent;
+        const Evt = win.Event || Event;
         ['keydown', 'keypress', 'keyup'].forEach(type => {
             try { textarea.dispatchEvent(new KeyEvt(type, { key: 'a', code: 'KeyA', bubbles: true, cancelable: true })); } catch (e) {}
         });
-        try {
-            textarea.dispatchEvent(new InpEvt('input', { data: text.slice(-1) || ' ', inputType: 'insertText', bubbles: true }));
-        } catch (e) {}
-        textarea.dispatchEvent(new Event('change', { bubbles: true }));
+        if (!native) {
+            try {
+                textarea.dispatchEvent(new InpEvt('input', { data: text.slice(-1) || ' ', inputType: 'insertText', bubbles: true }));
+            } catch (e) {}
+        }
+        // Built from the composer's own Event constructor, not this script's.
+        textarea.dispatchEvent(new Evt('change', { bubbles: true }));
         try {
             textarea.focus({ preventScroll: true });
             textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
         } catch (e) {}
+    }
+
+    // Activate a control that lives in another document. The pointer events are
+    // built with that document's own MouseEvent constructor, and the activation
+    // itself is element.click() — a NATIVE click dispatched by the engine inside
+    // the target realm, which no cross-realm wrapper can mangle. The old code
+    // dispatched a sandbox-built MouseEvent('click') and nothing else, which is
+    // the likeliest reason the composer's Send button was clicked all day
+    // without eBay ever reacting.
+    //
+    // mousedown/mouseup first, then click, is the order a real pointer produces.
+    // Only click() activates, so this cannot double-fire the button.
+    function activateForeignControl(el) {
+        const win = (el.ownerDocument && el.ownerDocument.defaultView) || window;
+        const ME = win.MouseEvent || MouseEvent;
+        ['mousedown', 'mouseup'].forEach(type => {
+            try { el.dispatchEvent(new ME(type, { bubbles: true, cancelable: true, view: win })); } catch (e) {}
+        });
+        let clicked = false;
+        try { el.click(); clicked = true; } catch (e) {}
+        if (!clicked) {
+            try { el.dispatchEvent(new ME('click', { bubbles: true, cancelable: true, view: win })); } catch (e) {}
+        }
+        return clicked;
     }
 
     // Click Send, then prove it went through. Retries up to 4 times and only
@@ -5906,12 +5954,9 @@
         const clickSend = (btn) => {
             clicks++;
             lastClick = Date.now();
-            MSG_LOG('Clicking Send (attempt ' + clicks + ')');
-            ['mousedown', 'mouseup', 'click'].forEach(type => {
-                try {
-                    btn.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: doc.defaultView || window }));
-                } catch (e) {}
-            });
+            const native = activateForeignControl(btn);
+            MSG_LOG('Clicking Send (attempt ' + clicks + ', ' +
+                (native ? 'native click()' : 'synthetic MouseEvent fallback') + ')');
         };
 
         while (Date.now() - start < timeout) {
@@ -6166,10 +6211,7 @@
                 if (realBeacon) win.navigator.sendBeacon = function (u) { attempts.push({ kind: 'sendBeacon (blocked)', url: String(u).slice(0, 120) }); return false; };
                 win.document.addEventListener('submit', blockSubmit, true);
 
-                const btn = findComposerSendButton(ready.doc);
-                ['mousedown', 'mouseup', 'click'].forEach(type => {
-                    try { btn.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: win })); } catch (e) {}
-                });
+                activateForeignControl(findComposerSendButton(ready.doc));
                 await msgSleep(2500);
             } finally {
                 try { win.fetch = realFetch; } catch (e) {}
@@ -6266,12 +6308,32 @@
         }
     }
 
+    // Realm-aware. Every element this script drives except the message composer
+    // lives in the script's OWN document, where `new Event(...)` is built from
+    // the same global the page uses. The composer does not: it sits inside
+    // .ordui-m2m-panel__iframe, a separate document with its own globals, and a
+    // userscript runs in Tampermonkey's sandbox on top of that. An Event
+    // constructed here and dispatched there is a cross-realm object; Chrome
+    // tends to shrug, Firefox's Xray wrappers do not, and the page framework on
+    // the far side can simply not react. So build the event with the TARGET
+    // window's constructor and take the value setter off the TARGET window's
+    // prototype. Same-document callers are unaffected — for them the target
+    // window IS this window.
     function setAndTriggerInputValue(element, value) {
         if (!element) return;
-        const valueSetter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(element), 'value').set;
-        valueSetter.call(element, value);
-        element.dispatchEvent(new Event('input', { bubbles: true }));
-        element.dispatchEvent(new Event('change', { bubbles: true }));
+        const win = (element.ownerDocument && element.ownerDocument.defaultView) || window;
+        let valueSetter = null;
+        try {
+            const proto = (element.tagName === 'TEXTAREA' ? win.HTMLTextAreaElement : win.HTMLInputElement);
+            if (proto) valueSetter = Object.getOwnPropertyDescriptor(proto.prototype, 'value').set;
+        } catch (e) {}
+        if (!valueSetter) {
+            try { valueSetter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(element), 'value').set; } catch (e) {}
+        }
+        if (valueSetter) valueSetter.call(element, value); else element.value = value;
+        const Evt = win.Event || Event;
+        element.dispatchEvent(new Evt('input', { bubbles: true }));
+        element.dispatchEvent(new Evt('change', { bubbles: true }));
     }
 
     // Two accepted shapes:
