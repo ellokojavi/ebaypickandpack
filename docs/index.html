@@ -1090,7 +1090,7 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
           <em id="ba-url">ebay.com/ship/bulk</em>
         </div>
         <div class="ba-stage">
-          <img id="ba-img-before" class="ba-img" alt="eBay's stock Get labels in bulk page: a list of orders, each with weight and dimension boxes, a shipping service dropdown and an insurance choice." src="data:image/webp;base64,">
+          <img id="ba-img-before" class="ba-img is-off" alt="eBay's stock Get labels in bulk page: a list of orders, each with weight and dimension boxes, a shipping service dropdown and an insurance choice." src="data:image/webp;base64,">
           <img id="ba-img-after" class="ba-img is-on" alt="The rebuilt page: a SKU picking panel on the left, batch selection filters, and order cards showing large SKU codes, quantity, print and ship controls." src="data:image/webp;base64,">
         </div>
         <figcaption class="ba-cap" id="ba-cap"></figcaption>
@@ -1233,12 +1233,17 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
   font-family: var(--mono); font-size: .64rem; font-style: normal;
   color: var(--muted); margin-left: .6rem; letter-spacing: .03em;
 }
+/* Whichever image is showing sits in the flow and sets the frame height, so
+   each page is seen whole at its own aspect ratio instead of being cropped
+   into the other's box. The hidden one overlays it for the cross-fade. */
 .ba-stage { position: relative; background: var(--ground-deep); }
-.ba-img { display: block; width: 100%; height: auto; transition: opacity .32s ease; }
-#ba-img-after { position: relative; }
-#ba-img-before { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; }
-.ba-img { opacity: 0; }
-.ba-img.is-on { opacity: 1; }
+.ba-img { display: block; width: 100%; transition: opacity .3s ease; }
+.ba-img.is-on { position: relative; height: auto; opacity: 1; }
+.ba-img.is-off {
+  position: absolute; inset: 0;
+  height: 100%; object-fit: contain; object-position: top center;
+  opacity: 0; pointer-events: none;
+}
 .ba-cap {
   padding: .7rem .9rem;
   border-top: 1px solid var(--rule);
@@ -3695,7 +3700,9 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
         b.setAttribute("aria-pressed", String(b.getAttribute("data-ba") === k));
       });
       before.classList.toggle("is-on", k === "before");
+      before.classList.toggle("is-off", k !== "before");
       after.classList.toggle("is-on", k === "after");
+      after.classList.toggle("is-off", k !== "after");
       cap.innerHTML = CAP[k];
       url.textContent = k === "before" ? "ebay.com/ship/bulk — unmodified" : "ebay.com/ship/bulk — with the userscript";
     }
