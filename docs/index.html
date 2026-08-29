@@ -138,7 +138,9 @@ body {
   font-size: 1.0625rem;
   line-height: 1.62;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+  /* clip, not hidden: hidden would make body a scroll container and break the
+     sticky picking panel inside the demo. */
+  overflow-x: clip;
 }
 
 h1, h2, h3, h4 {
@@ -332,7 +334,7 @@ h1.title .lied { white-space: normal; }
   border: 1px solid var(--rule);
   border-radius: 10px;
   box-shadow: var(--shadow-lift);
-  overflow: hidden;
+  overflow: clip;
 }
 .instrument-head {
   display: flex;
@@ -634,7 +636,9 @@ h1.title .lied { white-space: normal; }
 /* --- SKU panel actions + defaults panel, matching the live layout --- */
 .leftcol { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .panelacts { padding: 4px 13px 13px; display: flex; flex-direction: column; gap: 7px; align-items: center; }
-.btn2.wide { width: 100%; text-align: center; }
+.btn2.wide, .btnblue.wide { width: 100%; text-align: center; padding: 9px 14px; font-size: 12.5px; }
+.btnblue.wide { margin: 0; }
+.panelacts [hidden] { display: none !important; }
 .customenv { font-size: 11.5px; font-weight: 600; color: var(--ebay-link2); cursor: pointer; }
 .customenv:hover { text-decoration: underline; }
 
@@ -677,7 +681,17 @@ h1.title .lied { white-space: normal; }
    ============================================================ */
 .pplayout { display: grid; gap: 14px; grid-template-columns: minmax(0,1fr); align-items: start; }
 @media (min-width: 60rem) { .pplayout { grid-template-columns: 340px minmax(0,1fr); } }
-@media (min-width: 60rem) { .pplayout .skupanel { position: sticky; top: 1rem; max-height: calc(100vh - 3rem); overflow-y: auto; } }
+/* Both panels ride along with the scroll and stay pinned near the top, so the
+   picking list and the defaults are reachable anywhere in a long order list.
+   The real script uses position:fixed; sticky is its equivalent inside a
+   page that isn't the whole viewport. */
+@media (min-width: 60rem) {
+  .leftcol {
+    position: sticky; top: 1rem; align-self: start;
+    max-height: calc(100vh - 2rem); overflow-y: auto;
+    scrollbar-width: thin;
+  }
+}
 .skupanel {
   background: #2a2a2a;
   color: #e0e0e0;
@@ -738,9 +752,14 @@ h1.title .lied { white-space: normal; }
   border-color: var(--lg);
   box-shadow: 0 0 8px var(--lg-soft), 0 0 0 1px var(--lg);
 }
-.sku.manila { background: #FFD54F; color: #3a2c05; border-color: #E0B93C; }
-.sku.lg     { background: #B3E5FC; color: #0b2f42; border-color: #8CCBE8; }
+/* These were the script's LIGHT-mode fills applied to a dark UI. Manila and LG
+   keep whatever background the pill already has — default, or the amber of a
+   multi-quantity pill — and carry their marking in the border, so the two
+   signals stack instead of overwriting each other. Border rules come last so
+   they win over .multiqty. */
 .sku.multiqty { background: #2d2a1f; border-color: #755d31; color: #bf9240; }
+.sku.lg     { border: 3px solid #ffffb1; }
+.sku.manila { border: 3px solid #ffd54f; }
 .sku.done { opacity: .42; text-decoration: line-through; }
 .sku.hide { display: none; }
 .skusep { flex-basis: 100%; height: 0; margin-top: 7px; margin-bottom: 2px; border-top: 1px solid #3d3d3d; }
@@ -1085,6 +1104,30 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 .nowrap { white-space: nowrap; }
 .tnum { font-variant-numeric: tabular-nums; }
 .hidden { display: none !important; }
+
+/* ============================================================
+   BREAKOUT — the UI recreations need more width than the prose
+   measure to read like the real page, so they escape .wrap and
+   centre on the viewport instead.
+   ============================================================ */
+.breakout {
+  position: relative;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(94vw, 84rem);
+}
+/* at that width the panel and address columns can breathe */
+@media (min-width: 78rem) {
+  .pplayout { grid-template-columns: 360px minmax(0, 1fr); gap: 16px; }
+  .cardbody { grid-template-columns: minmax(0, 1fr) 258px; gap: 16px; }
+  .item { grid-template-columns: 104px minmax(0, 1fr); gap: 14px; }
+  .prodimg { width: 104px; height: 104px; }
+  .skubig { font-size: 16.5px; }
+  .ititle { font-size: 12.5px; }
+  .qtyline { font-size: 12.5px; }
+  .addrpanel { font-size: 12px; padding: 12px 13px; }
+  .tour { grid-template-columns: minmax(0, 2.3fr) minmax(15rem, .75fr); }
+}
 </style>
 
 <div class="themebar">
@@ -1755,7 +1798,7 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
       </p>
     </div>
 
-    <div class="tour" id="tour">
+    <div class="tour breakout" id="tour">
       <figure class="tour-shot">
         <img id="tour-img" alt="The rebuilt pick-and-pack page, annotated with numbered markers." src="data:image/webp;base64,">
         <div class="tour-pins" id="tour-pins"></div>
@@ -1819,11 +1862,12 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
         list doesn't shift while you work down it.
       </p>
       <p class="note" style="margin-top:1.3rem;">
-        Live below — filter it, click a SKU, run a batch filter.
+        Live below — filter it, click a SKU, run a batch filter and watch the panel's bulk actions
+        follow the selection.
       </p>
     </div>
 
-    <div style="display:grid;gap:1.2rem;grid-template-columns:minmax(0,1fr);" id="ppwrap">
+    <div class="breakout" style="display:grid;gap:1.2rem;grid-template-columns:minmax(0,1fr);" id="ppwrap">
       <div class="instrument">
         <div class="instrument-head">
           <span class="dot"></span><span>ebay.com/ship/bulk</span>
@@ -1841,8 +1885,8 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
                 <span style="font-size:15px;" aria-hidden="true">🌙</span>
               </div>
               <div class="watchpill" id="watchpill" role="button" tabindex="0">
-                <span>🔔 2 new orders since load</span>
-                <span class="act">Reload</span>
+                <span>🔔 3 new orders since load</span>
+                <span class="act">Refresh</span>
               </div>
               <div class="watchstatus" id="watchstatus">
                 <span>· checked 2m ago ·</span><span class="act" id="checknow">check now</span>
@@ -1853,7 +1897,8 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
               </div>
               <div class="skulist" id="skulist"></div>
               <div class="panelacts">
-                <button class="btn2 wide" type="button" id="printall">Print All 10 Envelopes</button>
+                <button class="btn2 wide" type="button" id="printbtn">Print All 10 Envelopes</button>
+                <button class="btnblue wide" type="button" id="shipbtn" hidden>Ship 0 Selected Orders</button>
                 <span class="customenv">✉ Custom Envelope</span>
               </div>
             </div>
@@ -1898,8 +1943,6 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
                 </button>
                 <span class="grow"></span>
                 <span class="sortby">Sort by <span class="fakesel">Order date <span style="opacity:.6">▾</span></span></span>
-                <button class="btnblue" type="button" id="printbtn" disabled>Print 0 Selected</button>
-                <button class="btn" type="button" id="shipbtn" style="display:none;">Ship 0</button>
               </div>
               <div id="orders"></div>
             </div>
@@ -3202,12 +3245,17 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
         b.setAttribute("data-state", state);
       });
 
+      /* Bulk actions live in the SKU panel, not the selection bar. With nothing
+         ticked the print button offers the whole batch; ticking orders narrows
+         it, and only then does the blue Ship button appear. */
       var n = selectedIdx().length;
+      var total = ORDERS.filter(function (o) { return !o.shipped; }).length;
       var pb = $("#printbtn"), sb = $("#shipbtn");
-      pb.textContent = "Print " + n + " Selected";
-      pb.disabled = n === 0;
-      sb.style.display = n > 0 ? "" : "none";
-      sb.textContent = "Ship " + n;
+      pb.textContent = n === 0
+        ? "Print All " + total + " Envelopes"
+        : "Print " + n + " Selected Envelope(s)";
+      sb.hidden = n === 0;
+      sb.textContent = "Ship " + n + " Selected Order" + (n === 1 ? "" : "s");
 
       $$("#orders [data-sel]").forEach(function (cb) {
         cb.checked = !!selected[cb.getAttribute("data-sel")];
@@ -3880,19 +3928,19 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
     /* x / y are percentages of the screenshot */
     var PINS = [
       { x: 24.0, y: 11.8, t: "Picking panel",
-        b: "Every SKU in the batch, alphabetical, grouped by letter. The count is work remaining and also drives the tab title and favicon." },
+        b: "Every SKU in the batch, alphabetical, grouped by letter. It floats \u2014 pinned to the top of the viewport as the order list scrolls past \u2014 so the picking list is reachable from anywhere in a forty-order batch. The count is work remaining and also drives the tab title and favicon." },
       { x: 24.0, y: 18.8, t: "Background order watch",
         b: "The page is a snapshot from load. Every 5 minutes the script asks eBay's awaiting-shipment endpoint for the current order list and compares ids. New sale mid-session, no reload needed to know. The status line reads \u201cchecked 2m ago\u201d so silence is never ambiguous." },
       { x: 24.0, y: 26.5, t: "SKU carries the packing rule",
         b: "B01D = box B, sticker 1. \u201cLg\u201d and the yellow outline mean oversized; amber pills like A09 \u00d72 mean more than one. Sort the batch into piles before opening an order." },
       { x: 24.0, y: 42.9, t: "Destination on the pill",
         b: "F01 shows \ud83c\udde8\ud83c\udde6 \u2014 Canada needs an international stamp. Known at picking time, not at the printer." },
-      { x: 24.0, y: 50.7, t: "Print all envelopes",
-        b: "One print job for the whole selection, one #10 envelope per page, sized for a home printer. eBay gives one dialog per order. Custom Envelope prints a one-off for an address not in the batch." },
+      { x: 24.0, y: 50.7, t: "Bulk actions live here",
+        b: "Both act on the selection, so they sit with the picking list rather than the order rows. With nothing ticked the button prints the whole batch \u2014 one job, one #10 envelope per page, sized for a home printer, against eBay's one dialog per order. Tick orders and it narrows to them, and a blue Ship button appears to run them as a queue. Custom Envelope prints a one-off for an address not in the batch." },
       { x: 24.0, y: 58.5, t: "Defaults for all orders",
         b: "Thank-you message, auto-send, and ship date \u2014 set once, stored between sessions, overridable per card." },
       { x: 63.5, y: 17.1, t: "Batch filters",
-        b: "Selects exactly the plain-envelope orders, or exactly the Canadian ones. Each checkbox is derived from the live selection, not remembered. Canada shows (0) and is disabled rather than hidden." },
+        b: "Selects exactly the plain-envelope orders, or exactly the Canadian ones, and the panel's print and ship buttons follow. Each checkbox is derived from the live selection, not remembered. A filter matching nothing shows (0) and is disabled rather than hidden." },
       { x: 60.5, y: 32.0, t: "SKU and quantity, full size",
         b: "Both were 12px grey on eBay's page. Quantity turns amber above 1 \u2014 shipping one when three were bought costs a replacement plus postage twice." },
       { x: 45.0, y: 40.0, t: "Print this envelope",
