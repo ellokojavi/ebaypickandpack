@@ -403,246 +403,271 @@ h1.title .lied { white-space: normal; }
 .liedemo .switch button:hover:not([aria-pressed="true"]) { color: var(--ink); }
 
 /* ============================================================
-   ORDER CARD — recreated from the real stylesheet
+   ORDER CARD — colours and structure taken from the live page
+   page #1a1a1a · card #2a2a2a · panel head #333 · primary #4164ea
+   link #88bdfa · sku #fff · qty #f2a93b · sold #707070
    ============================================================ */
+.ui { --ebay-page: #1a1a1a; --ebay-card: #2a2a2a; --ebay-head: #333;
+      --ebay-blue: #4164ea; --ebay-link: #88bdfa; --ebay-link2: #6381ed;
+      --ebay-btn: #3a3a3a; --ebay-btn-bd: #555; --ebay-txt: #e0e0e0;
+      --ebay-dim: #8c8c8c; --ebay-sold: #707070; --ebay-qty: #f2a93b;
+      --ebay-off: #5f5f5f; --ebay-pill: #2f3b5b; --ebay-pilltx: #a4cbfa;
+      --ebay-line: #3d3d3d; }
+
 .card {
   position: relative;
-  background: var(--surface);
-  border: 1px solid var(--rule-strong);
-  border-radius: 8px;
-  padding: 11px 12px;
-  display: grid;
-  grid-template-columns: 54px minmax(0, 1fr);
-  gap: 10px;
-  transition: opacity .25s, border-color .25s, background .25s;
+  background: var(--ebay-card);
+  border: 1px solid var(--ebay-line);
+  border-radius: 10px;
+  padding: 11px 13px 13px;
+  color: var(--ebay-txt);
+  transition: opacity .25s, border-color .25s;
 }
-.card + .card { margin-top: 9px; }
-.card.manila { background: var(--warn-soft); border: 3px solid #E09A3C; }
-.card.lg     { background: var(--lg-soft);   border: 2px solid #D9D98F; }
-.card.multi  { background: var(--multi-tint, rgba(46,125,50,.10)); }
-.card.multi.t1 { --multi-tint: rgba(46,125,50,.16); }
-.card.multi.t2 { --multi-tint: rgba(20,110,140,.16); }
-.card.multi.t3 { --multi-tint: rgba(120,90,160,.16); }
-.card.shipped { opacity: .62; border-left: 5px solid var(--ok); }
-.card.failed  { border-left: 5px solid var(--bad); }
+.card + .card { margin-top: 11px; }
+.card.manila { border: 2px solid #E09A3C; }
+.card.lg     { border: 2px solid #D9D98F; }
+.card.multi  { background: var(--multi-tint, #2a4a3f); }
+.card.multi.t1 { --multi-tint: #2a4a3f; }
+.card.multi.t2 { --multi-tint: #2a3f4a; }
+.card.multi.t3 { --multi-tint: #3a3350; }
+.card.shipped { opacity: .6; border-left: 5px solid #4caf50; }
+.card.failed  { border-left: 5px solid #f87171; }
 .card.dim { opacity: .18; }
 
-.card .thumbs { display: flex; flex-direction: column; gap: 5px; }
-.card .thumb {
-  display: block;
-  width: 54px; height: 54px;
-  border-radius: 5px;
-  overflow: hidden;
-  background: var(--surface-2);
-  border: 1px solid var(--rule);
-  user-select: none;
-  cursor: zoom-in;
-  flex: none;
-}
-.card .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.card .body { min-width: 0; }
-.card .who {
-  font-weight: 700;
-  font-size: 13px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  flex-wrap: wrap;
-}
-.card .addr {
-  color: var(--muted);
-  font-size: 11.5px;
-  line-height: 1.45;
-  margin-top: 1px;
-  font-variant-numeric: tabular-nums;
-}
-.card .titleline {
+/* --- header row --- */
+.cardhead {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding-bottom: 9px; margin-bottom: 10px;
+  border-bottom: 1px solid var(--ebay-line);
   font-size: 12px;
-  color: var(--ink-2);
-  margin-top: 5px;
 }
-.card .meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 8px;
-  margin-top: 6px;
-  font-size: 11px;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
+.cardhead input[type="checkbox"] { accent-color: var(--ebay-blue); margin: 0; }
+.cardhead .oid {
+  color: var(--ebay-dim); text-decoration: underline;
+  font-weight: 600; letter-spacing: .01em; cursor: pointer;
 }
-.card .meta .oid { font-family: var(--mono); font-size: 10.5px; }
-.card .meta .total { font-weight: 700; color: var(--ink-2); }
-.card .meta .total.hot { color: var(--accent); }
-.card .meta a { color: var(--lg); text-decoration: none; font-weight: 600; }
-.card .meta a:hover { text-decoration: underline; }
+.notepill {
+  background: var(--ebay-pill); color: var(--ebay-pilltx);
+  font-size: 10.5px; font-weight: 700;
+  padding: 2px 8px; border-radius: 999px;
+}
+.cardhead .hmeta { color: var(--ebay-sold); }
+.cardhead .hmeta b { color: var(--ebay-txt); font-weight: 700; }
+.cardhead .flag { font-size: 12px; }
 
-.qty {
-  font-size: 1.35em;
-  font-weight: 700;
-  color: var(--warn);
-}
+/* --- body: items | address panel --- */
+.cardbody { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 44rem) { .cardbody { grid-template-columns: minmax(0, 1fr) 224px; } }
 
+.items { display: flex; flex-direction: column; gap: 11px; min-width: 0; }
+.item { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 11px; align-items: start; }
+.prodimg {
+  width: 84px; height: 84px; border-radius: 6px; overflow: hidden;
+  background: #222; border: 1px solid var(--ebay-line); cursor: zoom-in;
+}
+.prodimg img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.ititle {
+  color: var(--ebay-link); font-size: 11.5px; line-height: 1.35;
+  text-decoration: underline; cursor: pointer;
+}
+.revise {
+  display: inline-block; margin-left: 5px; vertical-align: 1px;
+  background: var(--ebay-pill); color: var(--ebay-pilltx);
+  font-size: 9.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px;
+  text-decoration: none;
+}
+.skubig {
+  font-size: 15px; font-weight: 700; color: #fff;
+  margin-top: 5px; letter-spacing: -0.01em; line-height: 1.2;
+}
+.qtyline { font-size: 12px; margin-top: 2px; color: var(--ebay-sold); }
+.qtyline.multi { color: var(--ebay-qty); font-weight: 600; }
+.soldline { font-size: 11.5px; color: var(--ebay-sold); margin-top: 1px; }
+
+.cardacts { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; align-items: flex-start; }
+.btn2 {
+  font-family: var(--display); font-size: 12px; font-weight: 700;
+  padding: 7px 16px; border-radius: 6px;
+  background: var(--ebay-btn); color: var(--ebay-txt);
+  border: 1px solid var(--ebay-btn-bd); cursor: pointer; white-space: nowrap;
+}
+.btn2:hover:not(:disabled) { background: #454545; }
+.btn2:disabled { opacity: .45; cursor: not-allowed; }
+.buylabel {
+  font-size: 11.5px; font-weight: 700; color: var(--ebay-link2);
+  text-decoration: none; cursor: pointer;
+}
+.buylabel:hover { text-decoration: underline; }
+
+/* --- address panel --- */
+.addrpanel {
+  background: var(--ebay-card);
+  border: 1px solid var(--ebay-line);
+  border-radius: 8px;
+  padding: 10px 11px;
+  font-size: 11.5px; line-height: 1.45;
+  align-self: start;
+}
+.card.multi .addrpanel { background: rgba(0,0,0,.18); }
+.aname { font-weight: 700; font-size: 12.5px; color: #fff; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.alines { color: var(--ebay-txt); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.alinks { margin-top: 6px; display: flex; gap: 10px; }
+.alinks span { color: var(--ebay-link2); font-weight: 600; cursor: pointer; }
+.alinks span:hover { text-decoration: underline; }
+.msgrow { display: flex; gap: 6px; margin-top: 9px; }
+.msgrow .fakesel {
+  flex: 1 1 auto; min-width: 0;
+  background: var(--ebay-btn); border: 1px solid var(--ebay-btn-bd);
+  border-radius: 5px; padding: 5px 7px; font-size: 11px; color: var(--ebay-txt);
+  display: flex; align-items: center; justify-content: space-between; gap: 4px;
+  cursor: pointer; white-space: nowrap; overflow: hidden;
+}
+.btnblue {
+  font-family: var(--display); font-weight: 700; font-size: 11.5px;
+  background: var(--ebay-blue); color: #fff; border: 0;
+  border-radius: 5px; padding: 6px 11px; cursor: pointer; white-space: nowrap;
+}
+.btnblue:hover:not(:disabled) { background: #3355d8; }
+.btnblue.full { display: block; width: 100%; margin-top: 8px; padding: 8px; font-size: 12.5px; }
+.btnblue:disabled { opacity: .5; cursor: not-allowed; }
+.thankrow { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 11.5px; cursor: pointer; }
+.thankrow input { accent-color: var(--ebay-blue); margin: 0; }
+.shiprow { display: flex; align-items: center; gap: 5px; margin-top: 7px; font-size: 10px; color: var(--ebay-sold); white-space: nowrap; }
+.seg { display: inline-flex; border-radius: 5px; overflow: hidden; border: 1px solid var(--ebay-btn-bd); }
+.seg span {
+  padding: 2px 7px; font-size: 10px; font-weight: 600;
+  background: var(--ebay-btn); color: var(--ebay-txt); cursor: pointer;
+}
+.seg span.on { background: var(--ebay-blue); color: #fff; }
+
+/* address validation badge */
 .badge {
-  display: inline-grid;
-  place-items: center;
-  width: 15px; height: 15px;
-  border-radius: 50%;
-  font-size: 10px;
-  cursor: help;
-  position: relative;
-  flex: none;
+  display: inline-grid; place-items: center;
+  width: 15px; height: 15px; border-radius: 50%;
+  font-size: 10px; cursor: help; position: relative; flex: none;
 }
-.badge.warn { background: var(--warn-soft); color: var(--warn); border: 1px solid var(--warn-line); }
-.badge.ok   { background: var(--ok-soft);   color: var(--ok);   border: 1px solid var(--ok-line); }
+.badge.warn { background: rgba(242,169,59,.16); color: var(--ebay-qty); border: 1px solid #6b5124; }
+.badge.ok   { background: rgba(76,175,80,.14);  color: #6ddb84;        border: 1px solid #2c5e3e; }
 .badge .tip {
-  position: absolute;
-  bottom: calc(100% + 7px);
-  left: 50%;
-  transform: translateX(-50%);
-  width: max-content;
-  max-width: 230px;
-  background: var(--ink);
-  color: var(--ground);
-  font-size: 11px;
-  font-weight: 400;
-  line-height: 1.45;
-  text-align: left;
-  padding: 7px 9px;
-  border-radius: 5px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity .15s;
-  z-index: 20;
-  box-shadow: var(--shadow-lift);
+  position: absolute; bottom: calc(100% + 7px); left: 50%; transform: translateX(-50%);
+  width: max-content; max-width: 210px;
+  background: #111; color: #eee; font-size: 11px; font-weight: 400;
+  line-height: 1.45; text-align: left; padding: 7px 9px; border-radius: 5px;
+  opacity: 0; pointer-events: none; transition: opacity .15s; z-index: 20;
+  box-shadow: 0 6px 20px rgba(0,0,0,.55);
 }
 .badge:hover .tip, .badge:focus-visible .tip { opacity: 1; }
 
 .notecallout {
-  margin-top: 6px;
-  padding: 6px 9px;
-  border-radius: 5px;
-  background: var(--surface-2);
-  border-left: 2px solid var(--rule-strong);
-  font-size: 11.5px;
-  color: var(--ink-2);
-  font-style: italic;
+  margin-top: 8px; padding: 6px 9px; border-radius: 5px;
+  background: rgba(255,255,255,.05); border-left: 2px solid var(--ebay-btn-bd);
+  font-size: 11px; color: var(--ebay-txt); font-style: italic;
 }
 
-/* Card action row */
-.cardactions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 9px;
-}
-.btn {
-  font-family: var(--display);
-  font-size: 11.5px;
-  font-weight: 600;
-  padding: 5px 11px;
-  border-radius: 5px;
-  border: 1px solid var(--rule-strong);
-  background: var(--surface);
-  color: var(--ink);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background .15s, border-color .15s, opacity .15s;
-}
-.btn:hover:not(:disabled) { background: var(--surface-2); border-color: var(--muted); }
-.btn:disabled { opacity: .45; cursor: not-allowed; }
-.btn.primary { background: #3665f3; border-color: #3665f3; color: #fff; }
-.btn.primary:hover:not(:disabled) { background: #2b53ce; border-color: #2b53ce; }
-.btn.ghost { border-color: transparent; color: var(--muted); }
-.btn.ghost:hover:not(:disabled) { color: var(--ink); background: var(--surface-2); }
-
-/* Ship states — the real styles */
+/* --- ship states (unchanged semantics, real colours) --- */
 .shipped-label {
-  display: block; width: 100%;
-  margin-top: 10px; padding: 8px 12px;
-  font-size: 13px; font-weight: 700; text-align: center;
-  color: #fff; background: #28a745; border-radius: 6px;
+  display: block; width: 100%; margin-top: 9px; padding: 8px 12px;
+  font-size: 12.5px; font-weight: 700; text-align: center;
+  color: #e0e0e0; background: #2e7d32; border-radius: 6px;
 }
-:root[data-theme="dark"] .shipped-label { background: #2e7d32; color: #e0e0e0; }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .shipped-label { background: #2e7d32; color: #e0e0e0; }
-}
-
 .pending {
   display: flex; align-items: center; gap: 9px;
-  width: 100%; margin-top: 10px; padding: 9px 12px;
-  border-radius: 6px;
-  background: var(--warn-soft);
-  border: 1px solid var(--warn-line);
-  color: var(--warn);
-  font-size: 12.5px; font-weight: 600;
+  width: 100%; margin-top: 9px; padding: 9px 12px; border-radius: 6px;
+  background: rgba(232,174,78,.11); border: 1px solid #6b5124;
+  color: #e8ae4e; font-size: 12px; font-weight: 600;
 }
 .spinner {
   width: 15px; height: 15px; border-radius: 50%; flex: none;
-  background: var(--warn);
-  border: 3px solid rgba(255,255,255,.35);
-  border-top-color: #fff;
+  background: #b45309; border: 3px solid rgba(255,255,255,.35); border-top-color: #fff;
   animation: spin 900ms linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-.pending .sub { font-size: 11px; font-weight: 400; opacity: .8; }
+.pending .sub { font-size: 10.5px; font-weight: 400; opacity: .8; }
 .pending .undo {
-  margin-left: auto;
-  font-size: 11px; font-weight: 500;
-  padding: 3px 9px; border-radius: 4px;
-  border: 1px solid var(--warn-line);
+  margin-left: auto; font-size: 10.5px; font-weight: 500;
+  padding: 3px 9px; border-radius: 4px; border: 1px solid #6b5124;
   background: transparent; color: inherit; cursor: pointer;
 }
-.pending .undo:hover { background: var(--surface); }
-
 .failbanner {
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
-  width: 100%; margin-top: 10px; padding: 9px 12px; border-radius: 6px;
-  font-size: 12.5px; line-height: 1.4;
-  background: var(--bad-soft);
-  border: 1px solid var(--bad-line);
-  color: var(--bad);
+  width: 100%; margin-top: 9px; padding: 9px 12px; border-radius: 6px;
+  font-size: 12px; line-height: 1.4;
+  background: rgba(248,113,113,.11); border: 1px solid #6e3733; color: #f58f86;
 }
 .failbanner .txt { flex: 1 1 160px; min-width: 0; font-weight: 600; }
-.failbanner .why { display: block; font-size: 11px; opacity: .85; font-weight: 400; margin-top: 2px; }
+.failbanner .why { display: block; font-size: 10.5px; opacity: .85; font-weight: 400; margin-top: 2px; }
 .failbanner button, .failbanner a {
-  font-size: 11.5px; font-weight: 700; padding: 4px 10px; border-radius: 5px;
-  cursor: pointer; text-decoration: none; white-space: nowrap;
-  border: 1px solid transparent;
+  font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 5px;
+  cursor: pointer; text-decoration: none; white-space: nowrap; border: 1px solid transparent;
 }
-.failbanner .retry { background: var(--bad); color: #fff; }
-.failbanner .open { background: transparent; color: inherit; border-color: var(--bad-line); }
+.failbanner .retry { background: #b91c1c; color: #fff; }
+.failbanner .open { background: transparent; color: inherit; border-color: #6e3733; }
 .failbanner .dismiss { background: transparent; color: inherit; border: none; opacity: .7; font-weight: 400; }
-
 .msgpill {
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
   width: 100%; margin-top: 8px; padding: 7px 10px; border-radius: 6px;
-  font-size: 11.5px; line-height: 1.4;
-  background: var(--warn-soft);
-  border: 1px solid var(--warn-line);
-  color: var(--warn);
+  font-size: 11px; line-height: 1.4;
+  background: rgba(232,174,78,.11); border: 1px solid #6b5124; color: #e8ae4e;
 }
 .msgpill .txt { flex: 1 1 130px; font-weight: 600; }
-.msgpill .why { display: block; font-size: 10.5px; font-weight: 400; opacity: .85; margin-top: 1px; }
+.msgpill .why { display: block; font-size: 10px; font-weight: 400; opacity: .85; margin-top: 1px; }
 .msgpill button {
-  font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 5px;
-  border: 1px solid transparent; background: var(--warn); color: #fff; cursor: pointer;
+  font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 5px;
+  border: 1px solid transparent; background: #b45309; color: #fff; cursor: pointer;
 }
 .msgpill .open {
-  font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 5px;
-  border: 1px solid var(--warn-line); background: transparent; color: inherit; cursor: pointer;
+  font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 5px;
+  border: 1px solid #6b5124; background: transparent; color: inherit; cursor: pointer;
 }
-
 .queuedbadge {
-  display: block; width: 100%; margin-top: 10px; padding: 8px 12px;
-  font-size: 12.5px; font-weight: 700; text-align: center; border-radius: 6px;
-  background: var(--surface-2); color: var(--muted);
-  border: 1px dashed var(--rule-strong);
+  display: block; width: 100%; margin-top: 9px; padding: 8px 12px;
+  font-size: 12px; font-weight: 700; text-align: center; border-radius: 6px;
+  background: #3a3a3a; color: #aaa; border: 1px dashed #555;
 }
-
 @media (prefers-reduced-motion: reduce) {
   .spinner { animation: none; }
   * { scroll-behavior: auto !important; }
+}
+
+
+/* --- SKU panel actions + defaults panel, matching the live layout --- */
+.leftcol { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.panelacts { padding: 4px 13px 13px; display: flex; flex-direction: column; gap: 7px; align-items: center; }
+.btn2.wide { width: 100%; text-align: center; }
+.customenv { font-size: 11.5px; font-weight: 600; color: var(--ebay-link2); cursor: pointer; }
+.customenv:hover { text-decoration: underline; }
+
+.cfgpanel {
+  background: var(--ebay-card); border: 1px solid var(--ebay-line);
+  border-radius: 12px; padding: 11px 13px 13px; color: var(--ebay-txt);
+}
+.cfghead {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12.5px; font-weight: 700;
+  padding-bottom: 10px; margin-bottom: 4px;
+}
+.cfghead span:first-child { flex: 1 1 auto; }
+.cfghead .chev { opacity: .55; font-size: 11px; }
+.cfgrow { display: flex; align-items: center; gap: 9px; margin-top: 11px; font-size: 11.5px; }
+.cfgrow .lbl { flex: 1 1 auto; }
+.cfgrow .info { opacity: .45; font-size: 11px; cursor: help; }
+.toggle {
+  width: 34px; height: 18px; border-radius: 999px; background: #555;
+  position: relative; flex: none; cursor: pointer; transition: background .18s;
+}
+.toggle i {
+  position: absolute; top: 2px; left: 2px; width: 14px; height: 14px;
+  border-radius: 50%; background: #fff; transition: transform .18s;
+}
+.toggle.on { background: var(--ebay-blue); }
+.toggle.on i { transform: translateX(16px); }
+
+.sortby { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--ebay-txt); }
+.sortby .fakesel {
+  background: var(--ebay-btn); border: 1px solid var(--ebay-btn-bd);
+  border-radius: 5px; padding: 5px 9px; font-size: 11px;
+  display: inline-flex; gap: 6px; align-items: center; cursor: pointer;
 }
 </style>
 
@@ -654,17 +679,18 @@ h1.title .lied { white-space: normal; }
 @media (min-width: 60rem) { .pplayout { grid-template-columns: 340px minmax(0,1fr); } }
 @media (min-width: 60rem) { .pplayout .skupanel { position: sticky; top: 1rem; max-height: calc(100vh - 3rem); overflow-y: auto; } }
 .skupanel {
-  background: var(--surface);
-  border: 1px solid var(--rule-strong);
+  background: #2a2a2a;
+  color: #e0e0e0;
+  border: 1px solid #3d3d3d;
   border-radius: 12px;
   overflow: hidden;
   box-shadow: var(--shadow);
 }
 .skupanel .head {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  padding: 10px 13px;
-  background: var(--surface-2);
-  border-bottom: 1px solid var(--rule);
+  padding: 11px 13px;
+  background: #333;
+  border-bottom: 1px solid #3d3d3d;
   font-size: 13.5px; font-weight: 700;
 }
 .skupanel .watchpill {
@@ -690,9 +716,9 @@ h1.title .lied { white-space: normal; }
   font-size: 12.5px;
   padding: 7px 10px;
   border-radius: 6px;
-  border: 1px solid var(--rule-strong);
-  background: var(--ground);
-  color: var(--ink);
+  border: 1px solid #555;
+  background: #1f1f1f;
+  color: #e0e0e0;
 }
 .skupanel input[type="search"]::placeholder { color: var(--muted); }
 .skulist {
@@ -700,11 +726,11 @@ h1.title .lied { white-space: normal; }
   padding: 11px 13px 13px;
 }
 .sku {
-  padding: 4px 8px; border-radius: 4px; font-size: 12.5px;
-  background: var(--surface-2);
-  border: 1px solid var(--rule-strong);
+  padding: 5px 10px; border-radius: 6px; font-size: 12.5px;
+  background: #3a3a3a;
+  border: 1px solid #555;
   line-height: 1.4; white-space: nowrap; cursor: pointer;
-  color: var(--ink);
+  color: #e0e0e0;
   transition: transform .18s, box-shadow .18s, border-color .18s, opacity .18s;
 }
 .sku:hover, .sku.hot {
@@ -714,39 +740,39 @@ h1.title .lied { white-space: normal; }
 }
 .sku.manila { background: #FFD54F; color: #3a2c05; border-color: #E0B93C; }
 .sku.lg     { background: #B3E5FC; color: #0b2f42; border-color: #8CCBE8; }
-.sku.multiqty { background: var(--warn-soft); border-color: var(--warn-line); }
+.sku.multiqty { background: #2d2a1f; border-color: #755d31; color: #bf9240; }
 .sku.done { opacity: .42; text-decoration: line-through; }
 .sku.hide { display: none; }
-.skusep { flex-basis: 100%; height: 0; margin-top: 6px; margin-bottom: 1px; border-top: 1px solid var(--rule); }
+.skusep { flex-basis: 100%; height: 0; margin-top: 7px; margin-bottom: 2px; border-top: 1px solid #3d3d3d; }
 
 /* ============================================================
    BATCH BAR
    ============================================================ */
 .batchbar {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
-  padding: 10px 13px;
-  border: 1px solid var(--rule-strong);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 13px;
+  padding: 11px 13px;
+  border: 1px solid #3d3d3d;
   border-radius: 10px;
-  background: var(--surface);
+  background: #2a2a2a; color: #e0e0e0;
   margin-bottom: 11px;
 }
 .bfilter {
   display: flex; align-items: center; gap: 7px;
-  font-size: 12.5px; font-weight: 500;
+  font-size: 12.5px; font-weight: 600;
   cursor: pointer; user-select: none;
-  color: var(--ink);
+  color: #88bdfa;
   background: none; border: 0; padding: 0;
   font-family: var(--display);
 }
 .bfilter:disabled { opacity: .42; cursor: not-allowed; }
 .bfilter .box {
   width: 15px; height: 15px; border-radius: 3px;
-  border: 1.5px solid var(--muted);
+  border: 1.5px solid #6a6a6a;
   display: grid; place-items: center;
   flex: none;
   transition: background .15s, border-color .15s;
 }
-.bfilter[data-state="on"] .box { background: #3665f3; border-color: #3665f3; }
+.bfilter[data-state="on"] .box { background: #4164ea; border-color: #4164ea; }
 .bfilter[data-state="on"] .box::after { content: "✓"; color: #fff; font-size: 10px; font-weight: 700; line-height: 1; }
 .bfilter[data-state="mixed"] .box { background: var(--rule-strong); border-color: var(--muted); }
 .bfilter[data-state="mixed"] .box::after { content: ""; width: 8px; height: 1.5px; background: var(--ink-2); }
@@ -1804,8 +1830,9 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
           <span class="spacer"></span>
           <span class="live">interactive</span>
         </div>
-        <div class="instrument-body ui" style="background:var(--ground);">
+        <div class="instrument-body ui" style="background:#1a1a1a;padding:14px;">
           <div class="pplayout" id="pplayout">
+            <div class="leftcol">
 
             <!-- SKU PANEL -->
             <div class="skupanel" id="skupanel">
@@ -1825,6 +1852,35 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
                        aria-label="Filter SKUs, buyers and item titles">
               </div>
               <div class="skulist" id="skulist"></div>
+              <div class="panelacts">
+                <button class="btn2 wide" type="button" id="printall">Print All 10 Envelopes</button>
+                <span class="customenv">✉ Custom Envelope</span>
+              </div>
+            </div>
+
+            <!-- DEFAULTS PANEL -->
+            <div class="cfgpanel">
+              <div class="cfghead">
+                <span>Defaults for all orders</span>
+                <span class="toggle on" role="switch" aria-checked="true" tabindex="0"><i></i></span>
+                <span aria-hidden="true">🌙</span>
+                <span class="chev">▾</span>
+              </div>
+              <div class="cfgrow">
+                <span class="toggle on" role="switch" aria-checked="true" tabindex="0"><i></i></span>
+                <span class="lbl">Send thank you msg (all orders)</span><span class="info">ⓘ</span>
+              </div>
+              <div class="cfgrow">
+                <span class="toggle on" role="switch" aria-checked="true" tabindex="0"><i></i></span>
+                <span class="lbl">auto-send messages</span><span class="info">ⓘ</span>
+              </div>
+              <div class="cfgrow">
+                <span class="lbl">ship date (all orders)</span>
+                <span class="seg"><span>Today</span><span class="on">Tomorrow</span></span>
+                <span class="info">ⓘ</span>
+              </div>
+            </div>
+
             </div>
 
             <!-- ORDERS -->
@@ -1841,7 +1897,8 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
                   <span class="box"></span><span>Select 🇨🇦 Canada <span class="tnum" data-count="canada">(0)</span></span>
                 </button>
                 <span class="grow"></span>
-                <button class="btn primary" type="button" id="printbtn" disabled>Print 0 Selected</button>
+                <span class="sortby">Sort by <span class="fakesel">Order date <span style="opacity:.6">▾</span></span></span>
+                <button class="btnblue" type="button" id="printbtn" disabled>Print 0 Selected</button>
                 <button class="btn" type="button" id="shipbtn" style="display:none;">Ship 0</button>
               </div>
               <div id="orders"></div>
@@ -2289,25 +2346,47 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
             <span class="spacer"></span>
             <span class="live">interactive</span>
           </div>
-          <div class="instrument-body ui">
+          <div class="instrument-body ui" style="background:#1a1a1a;">
             <div class="card" id="lie-card">
-              <div class="thumb" aria-hidden="true">🦕</div>
-              <div class="body">
-                <div class="who">Marisol Vega</div>
-                <div class="addr">1188 Cascade Ave<br>Bellingham WA 98225</div>
-                <div class="titleline">Stegosaurus Vinyl Sticker — <span class="mono">B04</span></div>
-                <div class="meta">
-                  <span class="oid">14‑13299‑40871</span>
-                  <span class="total">$6.50</span>
-                  <span>USPS Ground</span>
+            <div class="cardhead">
+              <input type="checkbox" aria-label="Select order">
+              <span class="oid">21-13402-55190</span>
+              <span class="notepill">+note</span>
+              <span class="hmeta">| <b>Total: $10.58</b> | Free Shipping</span>
+            </div>
+            <div class="cardbody">
+              <div class="items">
+                <div class="item">
+                  <span class="prodimg"><img src="data:image/webp;base64,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" alt=""></span>
+                  <div>
+                    <span class="ititle">Orange Bitcoin Vinyl Sticker — Weatherproof Crypto Decal</span><span class="revise">revise</span>
+                    <div class="skubig">SKU: E59B Bitcoin</div>
+                    <div class="qtyline multi">Qty: 2</div>
+                    <div class="soldline">Sold for: $10.58</div>
+                  </div>
                 </div>
-                <div class="cardactions">
-                  <button class="btn primary" id="lie-ship" type="button">Mark as Shipped &amp; Msg</button>
-                  <button class="btn" type="button" disabled>Print Envelope</button>
+                <div class="cardacts">
+                  <button class="btn2" type="button" disabled>Print Envelope</button>
+                  <span class="buylabel">Buy shipping label →</span>
+                </div>
+              </div>
+              <div class="addrpanel">
+                <div class="aname">Roger Boyer<span class="badge ok" tabindex="0">✔<span class="tip">Address looks correct</span></span></div>
+                <div class="alines">1445 Brennen Rd<br>Columbia SC 29206-4468<br>United States</div>
+                <div class="alinks"><span>Edit</span><span>Copy</span></div>
+                <div id="lie-actions">
+                  <div class="msgrow">
+                    <span class="fakesel">Empty Message <span style="opacity:.6">▾</span></span>
+                    <button class="btnblue" type="button">Message</button>
+                  </div>
+                  <button class="btnblue full" type="button" id="lie-ship">Mark as Shipped &amp; Msg</button>
+                  <label class="thankrow"><input type="checkbox" checked> Send thank you msg</label>
+                  <div class="shiprow">Ships <span class="seg"><span>Today</span><span class="on">Tomorrow</span></span> Sat, Aug 29</div>
                 </div>
                 <div id="lie-slot"></div>
               </div>
             </div>
+          </div>
           </div>
         </div>
         <p class="caption" id="lie-caption">
@@ -2348,26 +2427,45 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
           <span class="spacer"></span>
           <span class="live" id="state-name">idle</span>
         </div>
-        <div class="instrument-body ui">
+        <div class="instrument-body ui" style="background:#1a1a1a;">
           <div class="card" id="state-card">
-            <div class="thumb" aria-hidden="true">🍄</div>
-            <div class="body">
-              <div class="who">
-                Dan Okonkwo
-                <span class="badge ok" tabindex="0">✔<span class="tip">Address looks correct</span></span>
+            <div class="cardhead">
+              <input type="checkbox" aria-label="Select order">
+              <span class="oid">21-13402-55190</span>
+              <span class="notepill">+note</span>
+              <span class="hmeta">| <b>Total: $9.98</b> | Free Shipping</span>
+            </div>
+            <div class="cardbody">
+              <div class="items">
+                <div class="item">
+                  <span class="prodimg"><img src="data:image/webp;base64,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" alt=""></span>
+                  <div>
+                    <span class="ititle">Seattle Space Needle & Mount Rainier Vinyl Sticker — 3in</span><span class="revise">revise</span>
+                    <div class="skubig">SKU: S04</div>
+                    <div class="qtyline multi">Qty: 2</div>
+                    <div class="soldline">Sold for: $9.98</div>
+                  </div>
+                </div>
+                <div class="cardacts">
+                  <button class="btn2" type="button" disabled>Print Envelope</button>
+                  <span class="buylabel">Buy shipping label →</span>
+                </div>
               </div>
-              <div class="addr">88 Rutherford St Apt 4C<br>Providence RI 02906<br>United States</div>
-              <div class="titleline">Morel Mushroom Sticker — <span class="mono">A07</span></div>
-              <div class="meta">
-                <span class="oid">21‑13402‑55190</span>
-                <span class="total">$4.25</span>
-                <span>Standard envelope</span>
+              <div class="addrpanel">
+                <div class="aname">Dan Okonkwo<span class="badge ok" tabindex="0">✔<span class="tip">Address looks correct</span></span></div>
+                <div class="alines">88 Rutherford St Apt 4C<br>Providence RI 02906<br>United States</div>
+                <div class="alinks"><span>Edit</span><span>Copy</span></div>
+                <div id="state-actions">
+                  <div class="msgrow">
+                    <span class="fakesel">Empty Message <span style="opacity:.6">▾</span></span>
+                    <button class="btnblue" type="button">Message</button>
+                  </div>
+                  <button class="btnblue full" type="button" data-state="pending">Mark as Shipped &amp; Msg</button>
+                  <label class="thankrow"><input type="checkbox" checked> Send thank you msg</label>
+                  <div class="shiprow">Ships <span class="seg"><span>Today</span><span class="on">Tomorrow</span></span> Sat, Aug 29</div>
+                </div>
+                <div id="state-slot"></div>
               </div>
-              <div class="cardactions" id="state-actions">
-                <button class="btn primary" type="button" data-state="pending">Mark as Shipped &amp; Msg</button>
-                <button class="btn" type="button" disabled>Print Envelope</button>
-              </div>
-              <div id="state-slot"></div>
             </div>
           </div>
         </div>
@@ -2898,45 +2996,45 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 
   var ORDERS = [
     { id: "16-15082-09353", who: "Marisol Vega", city: "Bellingham WA 98225", street: "1188 Cascade Ave",
-      items: [{ sku: "E59B Bitcoin", title: "Orange Bitcoin Vinyl Sticker \u2014 Weatherproof Crypto Decal", qty: 1, art: "btc-orange" }],
+      items: [{ sku: "E59B Bitcoin", title: "Orange Bitcoin Vinyl Sticker \u2014 Weatherproof Crypto Decal", qty: 1, art: "btc-orange" , unit: 4.99 }],
       total: 4.99, kind: "plain", ok: true },
     { id: "21-13402-55190", who: "Dan Okonkwo", city: "Providence RI 02906", street: "88 Rutherford St Apt 4C",
-      items: [{ sku: "S04", title: "Seattle Space Needle & Mount Rainier Sticker \u2014 3in", qty: 2, art: "seattle-rainier" }],
+      items: [{ sku: "S04", title: "Seattle Space Needle & Mount Rainier Sticker \u2014 3in", qty: 2, art: "seattle-rainier" , unit: 4.99 }],
       total: 9.98, kind: "plain", ok: true },
     { id: "09-13455-11204", who: "Priya Raman", city: "Toronto ON M5V 2T6", street: "410 Queens Quay W",
-      items: [{ sku: "G03", title: "Argentina Flag Vinyl Sticker \u2014 3.5in", qty: 1, art: "argentina-flag" }],
+      items: [{ sku: "G03", title: "Argentina Flag Vinyl Sticker \u2014 3.5in", qty: 1, art: "argentina-flag" , unit: 4.99 }],
       total: 4.99, kind: "canada", ok: true },
     { id: "33-13471-88320", who: "Kev Brannigan", city: "Tulsa OK 74104", street: "2201 S Utica Ave",
       items: [{ sku: "P07", title: "American Flag Pin Up Girl Sticker 2-Pack", qty: 1, art: "pinup-2pack" }],
       total: 8.29, kind: "manila", ok: true },
     { id: "55-13488-22019", who: "Aurelia Fontaine", city: "Ann Arbor MI 48104", street: "715 Packard St",
-      items: [{ sku: "H02", title: "Handball Sticker Pack \u2014 Player, Ball, I Love HB", qty: 1, art: "handball" }],
+      items: [{ sku: "H02", title: "Handball Sticker Pack \u2014 Player, Ball, I Love HB", qty: 1, art: "handball" , unit: 4.89 }],
       total: 4.89, kind: "lg", ok: true },
     { id: "72-13501-99614", who: "Tom\u00e1s Beltr\u00e1n", city: "Santa Fe NM 87501", street: "24 Camino del Monte",
-      items: [{ sku: "A12", title: "American Flag Eagle Vinyl Sticker", qty: 3, art: "eagle-flag" },
-              { sku: "A21", title: "Hecho en Mexico Eagle Sticker", qty: 2, art: "mexico-eagle" },
-              { sku: "P02", title: "Pin Up Mudflap Girl Sticker", qty: 2, art: "mudflap" }],
+      items: [{ sku: "A12", title: "American Flag Eagle Vinyl Sticker", qty: 3, art: "eagle-flag" , unit: 4.89 },
+              { sku: "A21", title: "Hecho en Mexico Eagle Sticker", qty: 2, art: "mexico-eagle" , unit: 4.89 },
+              { sku: "P02", title: "Pin Up Mudflap Girl Sticker", qty: 2, art: "mudflap" , unit: 4.89 }],
       total: 34.23, kind: "label", ok: true, tint: 1 },
     { id: "18-13512-30447", who: "Georgia Whitlock", city: "Savannah GA 31401", street: "608 Habersham",
-      items: [{ sku: "S11", title: "Seattle Space Needle Vinyl Decal \u2014 City & Mount Rainier", qty: 1, art: "seattle-city" }],
+      items: [{ sku: "S11", title: "Seattle Space Needle Vinyl Decal \u2014 City & Mount Rainier", qty: 1, art: "seattle-city" , unit: 4.89 }],
       total: 4.89, kind: "plain", ok: false,
       warn: ["\u201c608\u201d is a number on its own line \u2014 street number may be duplicated"],
       note: "Please no bend! Last one arrived creased \ud83d\ude4f" },
     { id: "62-13518-40255", who: "Wes Ferraro", city: "Missoula MT 59801", street: "1902 S 6th St W",
-      items: [{ sku: "E59B Bitcoin", title: "Orange Bitcoin Vinyl Sticker", qty: 1, art: "btc-orange" },
-              { sku: "E60", title: "Bitcoin BTC Vinyl Sticker \u2014 3in", qty: 1, art: "btc-btc" }],
+      items: [{ sku: "E59B Bitcoin", title: "Orange Bitcoin Vinyl Sticker", qty: 1, art: "btc-orange" , unit: 4.99 },
+              { sku: "E60", title: "Bitcoin BTC Vinyl Sticker \u2014 3in", qty: 1, art: "btc-btc" , unit: 4.69 }],
       total: 9.68, kind: "plain", ok: true, tint: 3 },
     { id: "27-13519-61130", who: "Noor Haddad", city: "Vancouver BC V6B 1H4", street: "55 Water St",
-      items: [{ sku: "P02", title: "Pin Up Mudflap Girl Sticker", qty: 2, art: "mudflap" }],
+      items: [{ sku: "P02", title: "Pin Up Mudflap Girl Sticker", qty: 2, art: "mudflap" , unit: 4.89 }],
       total: 9.78, kind: "canada", ok: true },
     { id: "81-13521-04478", who: "Ruth Okafor", city: "Asheville NC 28801", street: "PO Box 2244",
-      items: [{ sku: "A12", title: "American Flag Eagle Vinyl Sticker", qty: 1, art: "eagle-flag" }],
+      items: [{ sku: "A12", title: "American Flag Eagle Vinyl Sticker", qty: 1, art: "eagle-flag" , unit: 4.89 }],
       total: 4.89, kind: "plain", ok: true },
     { id: "40-13523-19007", who: "Silas Pham", city: "Ypsilanti MI 48197", street: "331 N Huron St",
-      items: [{ sku: "A21", title: "Hecho en Mexico Eagle Sticker", qty: 1, art: "mexico-eagle" }],
+      items: [{ sku: "A21", title: "Hecho en Mexico Eagle Sticker", qty: 1, art: "mexico-eagle" , unit: 4.89 }],
       total: 4.89, kind: "manila", ok: true },
     { id: "44-13520-70882", who: "Hal Nordstrom", city: "Duluth MN 55805", street: "1417 E 4th St",
-      items: [{ sku: "S04", title: "Seattle Space Needle & Mount Rainier Sticker", qty: 3, art: "seattle-rainier" }],
+      items: [{ sku: "S04", title: "Seattle Space Needle & Mount Rainier Sticker", qty: 3, art: "seattle-rainier" , unit: 4.99 }],
       total: 14.97, kind: "plain", ok: true, shipped: true }
   ];
 
@@ -2961,37 +3059,57 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
       wrap.innerHTML = ORDERS.map(function (o, i) {
         var hot = o.total > 25;
         var badge = o.ok
-          ? '<span class="badge ok" tabindex="0">✔<span class="tip">Address looks correct</span></span>'
-          : '<span class="badge warn" tabindex="0">⚠<span class="tip">' +
-            o.warn.map(function (w) { return "• " + esc(w); }).join("<br>") + "</span></span>";
-        var titles = o.items.map(function (it) {
-          return esc(it.title) + ' — <span class="mono">' + it.sku + "</span>" +
-            (it.qty > 1 ? ' <span class="qty">×' + it.qty + "</span>" : "");
-        }).join("<br>");
+          ? '<span class="badge ok" tabindex="0">\u2714<span class="tip">Address looks correct</span></span>'
+          : '<span class="badge warn" tabindex="0">\u26a0<span class="tip">' +
+            o.warn.map(function (w) { return "\u2022 " + esc(w); }).join("<br>") + "</span></span>";
+
+        var items = o.items.map(function (it) {
+          return '<div class="item">' +
+              '<span class="prodimg"><img src="' + (ART[it.art] || "") + '" alt=""></span>' +
+              "<div>" +
+                '<span class="ititle">' + esc(it.title) + "</span>" +
+                '<span class="revise">revise</span>' +
+                '<div class="skubig">SKU: ' + esc(it.sku) + "</div>" +
+                '<div class="qtyline' + (it.qty > 1 ? " multi" : "") + '">Qty: ' + it.qty + "</div>" +
+                '<div class="soldline">Sold for: ' + money(it.unit * it.qty) + "</div>" +
+              "</div>" +
+            "</div>";
+        }).join("");
+
         return (
           '<div class="' + cardClass(o) + '" data-i="' + i + '" id="ord-' + i + '">' +
-            '<div class="thumbs">' + o.items.map(function (it) {
-              return '<span class="thumb"><img src="' + (ART[it.art] || "") + '" alt=""></span>';
-            }).join("") + "</div>" +
-            '<div class="body">' +
-              '<div class="who">' +
-                '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:700;">' +
-                  '<input type="checkbox" data-sel="' + i + '"' + (o.shipped ? " disabled" : "") + '>' +
-                  esc(o.who) +
-                "</label>" + badge +
-                (o.kind === "canada" ? ' <span style="font-size:12px;">🇨🇦</span>' : "") +
+            '<div class="cardhead">' +
+              '<input type="checkbox" data-sel="' + i + '"' + (o.shipped ? " disabled" : "") +
+                ' aria-label="Select order ' + o.id + '">' +
+              '<span class="oid">' + o.id + "</span>" +
+              '<span class="notepill">+note</span>' +
+              '<span class="hmeta">| <b>Total: ' + money(o.total) + "</b> | Free Shipping</span>" +
+              (o.kind === "canada" ? '<span class="flag">\uD83C\uDDE8\uD83C\uDDE6</span>' : "") +
+            "</div>" +
+            '<div class="cardbody">' +
+              '<div class="items">' + items +
+                '<div class="cardacts">' +
+                  '<button class="btn2" type="button">Print Envelope</button>' +
+                  '<span class="buylabel">' + (hot ? "Buy shipping label \u2192" : "Buy shipping label \u2192") + "</span>" +
+                "</div>" +
+                (o.note ? '<div class="notecallout">\uD83D\uDCAC ' + esc(o.note) + "</div>" : "") +
               "</div>" +
-              '<div class="addr">' + esc(o.street) + "<br>" + esc(o.city) +
-                (o.kind === "canada" ? "<br>Canada" : "<br>United States") + "</div>" +
-              '<div class="titleline">' + titles + "</div>" +
-              '<div class="meta">' +
-                '<span class="oid">' + o.id + "</span>" +
-                '<span class="total' + (hot ? " hot" : "") + '">' + money(o.total) + "</span>" +
-                (hot ? '<a href="#" onclick="return false">+tracking</a>' : "") +
-                '<a href="#" onclick="return false">+note</a>' +
+              '<div class="addrpanel">' +
+                '<div class="aname">' + esc(o.who) + badge + "</div>" +
+                '<div class="alines">' + esc(o.street) + "<br>" + esc(o.city) +
+                  (o.kind === "canada" ? "<br>Canada" : "<br>United States") + "</div>" +
+                '<div class="alinks"><span>Edit</span><span>Copy</span></div>' +
+                (o.shipped
+                  ? '<div class="shipped-label">\u2713 Shipped</div>'
+                  : '<div class="msgrow">' +
+                      '<span class="fakesel">Empty Message <span style="opacity:.6">\u25be</span></span>' +
+                      '<button class="btnblue" type="button">Message</button>' +
+                    "</div>" +
+                    '<button class="btnblue full" type="button">Mark as Shipped &amp; Msg</button>' +
+                    '<label class="thankrow"><input type="checkbox" checked> Send thank you msg</label>' +
+                    '<div class="shiprow">Ships <span class="seg"><span>Today</span><span class="on">Tomorrow</span></span> Sat, Aug 29</div>'
+                ) +
               "</div>" +
-              (o.note ? '<div class="notecallout">💬 ' + esc(o.note) + "</div>" : "") +
-              (o.shipped ? '<div class="shipped-label">✓ Shipped</div>' : "") +
             "</div>" +
           "</div>"
         );
