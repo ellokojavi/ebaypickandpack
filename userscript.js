@@ -3279,6 +3279,7 @@
         function confirmShipBatch(cards) {
             const withMsg = cards.filter(c => c.querySelector('.thank-you-checkbox')?.checked).length;
             const withNote = cards.filter(c => c.querySelector('.ship-tomorrow-checkbox')?.checked).length;
+            const withShippedNote = cards.length - withNote;
             // 30s/order, not 20: measured across two real batches (12 orders,
             // 2026-08-23) the wall-clock cost was ~29s each — eBay confirms in
             // 23–31s and the inter-order pause and tab teardown add the rest.
@@ -3299,7 +3300,8 @@
             [
                 ['Orders to mark shipped', cards.length],
                 ['Thank-you messages', withMsg],
-                ['"Will ship" notes', withNote],
+                ['"Will be shipped on" notes', withNote],
+                ['"Shipped on" notes', withShippedNote],
                 ['Rough time, one at a time', `~${mins} min`]
             ].forEach(([label, value]) => {
                 const li = document.createElement('li');
@@ -3382,14 +3384,21 @@
                 // Only the SHIP step can fail and be retried; the note and the
                 // message are one-shot side effects, and re-running them would
                 // send the buyer a second thank-you every time you hit Retry.
-                if (shipTomorrowCheckbox && shipTomorrowCheckbox.checked && orderItemElement.dataset.shipNoteSent !== '1') {
+                // Every shipped order gets a dated note, not just the ones
+                // deferred to tomorrow. A same-day order used to get none at
+                // all, which left no record on eBay of when it actually went
+                // out — the one case where the note matters most.
+                if (orderItemElement.dataset.shipNoteSent !== '1') {
                     orderItemElement.dataset.shipNoteSent = '1';
-                    const tomorrow = computeNextShipDateSkippingSunday(1);
+                    const shipsTomorrow = !!(shipTomorrowCheckbox && shipTomorrowCheckbox.checked);
+                    const noteDate = shipsTomorrow ? computeNextShipDateSkippingSunday(1) : new Date();
                     const options = { weekday: 'long', month: 'short', day: 'numeric' };
-                    const formattedDate = tomorrow.toLocaleDateString('en-US', options);
-                    const noteText = `Will be shipped on ${formattedDate}`;
+                    const formattedDate = noteDate.toLocaleDateString('en-US', options);
+                    const noteText = shipsTomorrow
+                        ? `Will be shipped on ${formattedDate}`
+                        : `Shipped on ${formattedDate}`;
 
-                    await GM_setValue(NOTE_ADD_KEY, { orderId: firstOrderId, note: noteText });
+                    await queueOrderNote(firstOrderId, noteText);
                     openAutomationTab(`https://www.ebay.com/mesh/ord/details?orderid=${firstOrderId}&tm_action=add_note`, { active: false });
 
                     const noteLink = orderItemElement.querySelector(`.${CONFIG.classNames.addNoteLink}[data-order-id="${firstOrderId}"]`);
@@ -3654,7 +3663,7 @@
                         e.stopPropagation();
                         const noteText = noteInput.value.trim();
                         if (noteText) {
-                            await GM_setValue(NOTE_ADD_KEY, { orderId: orderId, note: noteText });
+                            await queueOrderNote(orderId, noteText);
                             openAutomationTab(`https://www.ebay.com/mesh/ord/details?orderid=${orderId}&tm_action=add_note`, { active: false });
                             target.textContent = 'note ✅';
                         }
@@ -5483,9 +5492,9 @@
             else if (urlAction === 'add_note') {
                 (async () => {
                     try {
-                        const noteData = await GM_getValue(NOTE_ADD_KEY);
-                        if (!noteData || noteData.orderId !== urlOrderId) {
-                            throw new Error('Note data mismatch or missing.');
+                        const noteText = await peekOrderNote(urlOrderId);
+                        if (noteText === null) {
+                            throw new Error('No note was queued for order ' + urlOrderId + '.');
                         }
 
                         await waitForElement('#itemInfo, .status-summary');
@@ -5524,16 +5533,20 @@
                             const noteTextarea = await waitForElement('.lightbox-dialog__main textarea');
                             const saveButton = await waitForElement('.lightbox-dialog__footer button.btn--primary');
 
-                            noteTextarea.focus();
-                            noteTextarea.value = noteData.note;
-                            noteTextarea.dispatchEvent(new Event('input', { bubbles: true }));
-                            noteTextarea.dispatchEvent(new Event('change', { bubbles: true }));
+                            // Realm-correct insertion, same as the message
+                            // composer — the note dialog is in this document, so
+                            // this is belt-and-braces, but it keeps one way of
+                            // typing into a field across the whole script.
+                            setAndTriggerInputValue(noteTextarea, noteText);
                             noteTextarea.blur();
 
                             setTimeout(async () => {
                                 saveButton.click();
-                                await GM_setValue(CONFIRMED_NOTE_KEY, { orderId: noteData.orderId, status: 'success' });
-                                await GM_setValue(NOTE_ADD_KEY, null);
+                                await GM_setValue(CONFIRMED_NOTE_KEY, { orderId: urlOrderId, status: 'success' });
+                                // Remove ONLY this order's entry. The old code
+                                // nulled the whole key and took any sibling
+                                // tab's queued note down with it.
+                                await consumeOrderNote(urlOrderId);
                                 finishAutomationTab('Note added', 500);
                             }, 500);
                         } else {
@@ -5541,10 +5554,11 @@
                         }
                     } catch (error) {
                         console.error('Error during note automation:', error);
-                        const noteData = await GM_getValue(NOTE_ADD_KEY);
-                        if (noteData) {
-                            await GM_setValue(CONFIRMED_NOTE_KEY, { orderId: noteData.orderId, status: 'error', message: error.message });
-                        }
+                        // Report against the order in the URL, not whatever
+                        // happens to be sitting in storage — during a batch that
+                        // used to be a different order entirely, so one failure
+                        // marked an innocent card's note as failed.
+                        await GM_setValue(CONFIRMED_NOTE_KEY, { orderId: urlOrderId, status: 'error', message: error.message });
                         // Do not close the tab on error to allow for debugging
                     }
                 })();
@@ -5680,6 +5694,54 @@
     // tab found nothing queued and gave up silently. Split in two, the message
     // survives every failure that happens before the text is actually in the
     // box, which is what makes a retry — by reload or by hand — possible at all.
+    // --- Order-note payloads (same map discipline as buyer messages) ---
+    // NOTE_ADD_KEY used to hold ONE { orderId, note } object. That is fine when
+    // a single card is shipped by hand, and quietly lossy the moment a batch
+    // runs: each order writes the slot and opens its note tab, and the note tab
+    // is a BACKGROUND tab, so it is throttled and slow. Order N's write lands
+    // while order N-1's tab is still reading, N-1 sees the wrong orderId and
+    // throws "Note data mismatch or missing" — and that error path deliberately
+    // leaves the tab OPEN. Worse, a tab that did succeed cleared the whole key
+    // to null, so an in-flight sibling then found nothing at all. One missing
+    // note could cascade into several.
+    //
+    // Keyed by order id, the tabs stop competing. Kept as function declarations
+    // (not const arrows) because the tm_action dispatcher can reach these
+    // before this point in the file has executed — see the note above MSG_LOG.
+    async function queueOrderNote(orderId, note) {
+        let store = await GM_getValue(NOTE_ADD_KEY);
+        // Legacy single-payload shape, still possible right after an update.
+        if (!store || typeof store !== 'object' || Array.isArray(store) || typeof store.orderId === 'string') store = {};
+        store[orderId] = { note: note, queuedAt: Date.now() };
+        await GM_setValue(NOTE_ADD_KEY, store);
+    }
+    async function peekOrderNote(orderId) {
+        const store = await GM_getValue(NOTE_ADD_KEY);
+        if (!store || typeof store !== 'object') return null;
+        if (typeof store.orderId === 'string') {
+            if (store.orderId !== orderId) return null;
+            return typeof store.note === 'string' ? store.note : null;
+        }
+        const entry = store[orderId];
+        if (!entry) return null;
+        return typeof entry.note === 'string' ? entry.note : null;
+    }
+    async function consumeOrderNote(orderId) {
+        const store = await GM_getValue(NOTE_ADD_KEY);
+        if (!store || typeof store !== 'object') return;
+        if (typeof store.orderId === 'string') {
+            if (store.orderId === orderId) await GM_setValue(NOTE_ADD_KEY, {});
+            return;
+        }
+        delete store[orderId];
+        // Drop stale entries so the map can't grow without bound.
+        const cutoff = Date.now() - 6 * 60 * 60 * 1000;
+        Object.keys(store).forEach(k => {
+            if (!store[k] || (store[k].queuedAt || 0) < cutoff) delete store[k];
+        });
+        await GM_setValue(NOTE_ADD_KEY, store);
+    }
+
     async function peekBuyerMessage(storageKey, orderId) {
         const store = await GM_getValue(storageKey);
         if (!store || typeof store !== 'object') return null;
