@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The Checkmark That Lied — Altheastix eBay Order Manager</title>
-<meta name="description" content="eBay tells you what sold, not what to go and pick. How a Tampermonkey userscript rebuilt the bulk shipping page into a pick-and-pack tool for a 350-item-a-month sticker shop.">
+<meta name="description" content="eBay's bulk shipping page buys postage. This userscript rebuilds it into a pick-and-pack tool for a 350-item-a-month sticker shop: SKU picking panel, batch envelope printing, background order watch.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,400&family=JetBrains+Mono:wght@400;500;700&display=swap">
@@ -1071,9 +1071,8 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
     <div class="kicker">Altheastix eBay Order Manager <span>— a Tampermonkey userscript</span></div>
     <h1 class="title">Ten orders a day,<br>and <span class="lied">no way to pack them</span></h1>
     <p class="lede">
-      eBay tells you what sold. It does not tell you what to go and get, which box it lives in,
-      what envelope it needs, or what you've already done. So I rebuilt the page that was closest
-      to the job.
+      eBay tells you what sold. It doesn't tell you which box the sticker is in, what envelope it
+      needs, or what you've already packed. This rebuilds the page that came closest.
     </p>
 
     <div class="ba" id="ba">
@@ -1108,35 +1107,32 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 </header>
 
 <!-- ============================================================
-     THE FOOTHOLD — what eBay's page is actually for
+     THE PROBLEM
      ============================================================ -->
 <section class="pad-y">
   <div class="wrap">
     <div class="col">
       <div class="eyebrow">the problem</div>
       <h2 style="font-size:clamp(1.7rem,4vw,2.4rem);margin-bottom:1.2rem;">
-        eBay's page answers “how much postage do I buy?” I needed it to answer “what do I go and get?”
+        eBay's page buys postage. I needed one that runs a pick-and-pack.
       </h2>
       <p>
-        Altheastix is a one-person sticker shop. Orders arrive all day; ten to fifteen of them need
-        to physically leave the house. Nothing in eBay's seller tools is shaped like that work.
-        <em>Get labels in bulk</em> — the page above — is the closest thing they have, and it is
-        really a checkout: a list of orders, each with a weight box, three dimension boxes, a
-        service dropdown and an insurance radio, adding up to a total you pay at the top right.
+        <em>Get labels in bulk</em> is a checkout. Each order gets a weight box, three dimension
+        boxes, a service dropdown and an insurance radio, adding to a total you pay at the top.
+        For $5 stickers none of that varies: always one ounce, always the same envelope.
       </p>
       <p>
-        For a shop selling $5 stickers, almost none of that is the job. The weight is always one
-        ounce. The dimensions are always the same envelope. The parts I actually needed were
-        squeezed into small grey text — the SKU, the quantity — or missing entirely.
+        The two fields that decide what I physically go and fetch — SKU and quantity — are 12px
+        grey under the title. Everything else about packing is absent.
       </p>
 
       <div class="gap-table">
         <div class="gap-row gap-head">
-          <span>What packing an order needs</span><span>Where eBay's page puts it</span>
+          <span>What packing needs</span><span>What eBay's page gives</span>
         </div>
         <div class="gap-row">
           <span><b>Which box the sticker is in</b></span>
-          <span class="miss">The SKU, in 12px grey, below the title</span>
+          <span class="miss">SKU, 12px grey, under the title</span>
         </div>
         <div class="gap-row">
           <span><b>How many to count out</b></span>
@@ -1144,35 +1140,37 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
         </div>
         <div class="gap-row">
           <span><b>One list of everything to pick</b></span>
-          <span class="miss">A pick list — buried, and per-order</span>
+          <span class="miss">A pick list, per order</span>
         </div>
         <div class="gap-row">
-          <span><b>Printable addresses for my own printer</b></span>
-          <span class="none">Not offered — labels are bought, not printed</span>
+          <span><b>Printable addresses for a home printer</b></span>
+          <span class="none">None — labels are bought, not printed</span>
         </div>
         <div class="gap-row">
           <span><b>Which orders need a manila envelope</b></span>
-          <span class="none">Nothing. You open each one and read it</span>
+          <span class="none">None — open each one and read it</span>
         </div>
         <div class="gap-row">
-          <span><b>What I've already packed</b></span>
-          <span class="none">Nothing. The page is a snapshot</span>
+          <span><b>Orders that arrived since the page loaded</b></span>
+          <span class="none">None — the page is a snapshot</span>
         </div>
         <div class="gap-row">
-          <span><b>Postage weight and dimensions</b></span>
-          <span class="has">Six input boxes per order, front and centre</span>
+          <span><b>What's already packed</b></span>
+          <span class="none">None</span>
         </div>
         <div class="gap-row">
-          <span><b>Insurance upsell</b></span>
-          <span class="has">Two radio buttons per order</span>
+          <span><b>Weight and dimensions</b></span>
+          <span class="has">Six inputs per order</span>
+        </div>
+        <div class="gap-row">
+          <span><b>Insurance</b></span>
+          <span class="has">Two radios per order</span>
         </div>
       </div>
 
       <p style="margin-top:1.8rem;">
-        One thing on that page was the right shape, though: it had a <strong>pick list</strong>.
-        Not a useful one — but the existence of a picking concept meant the page was reachable from
-        where I needed to be. Everything since has been refactoring that page, in the browser, into
-        the tool the work actually wanted.
+        The pick list was the one thing on the page shaped like the job. The rest is a rebuild of
+        that page, in the browser, around the eight steps below.
       </p>
     </div>
   </div>
@@ -1182,7 +1180,7 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 /* ============================================================
    BEFORE / AFTER
    ============================================================ */
-.ba { margin-top: clamp(2.2rem, 5vw, 3.4rem); }
+.ba { margin-top: clamp(1.8rem, 4vw, 2.8rem); }
 .ba-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1236,10 +1234,7 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
   color: var(--muted); margin-left: .6rem; letter-spacing: .03em;
 }
 .ba-stage { position: relative; background: var(--ground-deep); }
-.ba-img {
-  display: block; width: 100%; height: auto;
-  transition: opacity .32s ease;
-}
+.ba-img { display: block; width: 100%; height: auto; transition: opacity .32s ease; }
 #ba-img-after { position: relative; }
 #ba-img-before { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; }
 .ba-img { opacity: 0; }
@@ -1252,7 +1247,6 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
   color: var(--muted);
 }
 .ba-cap b { color: var(--ink-2); font-weight: 600; }
-
 @media (prefers-reduced-motion: reduce) { .ba-img { transition: none; } }
 
 /* ============================================================
@@ -1268,7 +1262,7 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: .15rem .9rem;
-  padding: .6rem .85rem;
+  padding: .55rem .85rem;
   font-family: var(--display);
   font-size: .84rem;
   line-height: 1.45;
@@ -1712,19 +1706,18 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 <hr class="rule">
 
 <!-- ============================================================
-     ANNOTATED TOUR — what got built, on the real page
+     ANNOTATED TOUR
      ============================================================ -->
 <section class="pad-y">
   <div class="wrap">
     <div class="col" style="margin-bottom:2rem;">
-      <div class="eyebrow">the solution, in place</div>
+      <div class="eyebrow">what was built</div>
       <h2 style="font-size:clamp(1.7rem,4vw,2.4rem);margin-bottom:1rem;">
-        Every part of the packing job, put back on the page.
+        The rebuilt page, part by part.
       </h2>
       <p>
-        Same URL, same orders, same eBay session. The script hides what the page was doing and
-        rebuilds it around the eight steps of actually getting a sticker into a mailbox.
-        Click a marker to see what each piece is for.
+        Same URL, same orders, same eBay session — the script replaces the layout in the browser.
+        Click a marker.
       </p>
     </div>
 
@@ -1755,48 +1748,42 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 <section class="pad-y">
   <div class="wrap">
     <div class="col" style="margin-bottom:2rem;">
-      <div class="eyebrow">solution 1 — picking</div>
+      <div class="eyebrow">1 — picking</div>
       <h2 style="font-size:clamp(1.7rem,4vw,2.4rem);margin-bottom:1rem;">
-        The SKU isn't an identifier. It's a map reference.
+        The SKU is a shelf address.
       </h2>
       <p>
-        Stickers live in lettered containers. The SKU encodes the address:
-        <strong>F24 is the twenty-fourth sticker in box F.</strong> Once the codes mean that, a
-        list of SKUs sorted alphabetically stops being metadata and becomes a walking route — you
-        open box A once, take everything you need from it, and move on.
+        Stickers are stored in lettered boxes. <strong>F24 is the 24th sticker in box F.</strong>
+        Sorted alphabetically, the SKU list becomes a walking route: open box A once, take
+        everything from it, move on.
       </p>
 
       <div class="skukey">
         <div class="skukey-demo">
           <div class="skukey-pill">F<span>24</span></div>
           <div class="skukey-legs">
-            <div class="skukey-leg box"><span class="ln"></span><b>box F</b><i>the container on the shelf</i></div>
-            <div class="skukey-leg pos"><span class="ln"></span><b>sticker 24</b><i>its position in that box</i></div>
+            <div class="skukey-leg box"><span class="ln"></span><b>box F</b><i>container on the shelf</i></div>
+            <div class="skukey-leg pos"><span class="ln"></span><b>sticker 24</b><i>position in that box</i></div>
           </div>
         </div>
         <div class="skukey-notes">
-          <p>
-            Real SKUs carry more than that, and the panel reads all of it at a glance:
-          </p>
+          <p>Suffixes carry the packing rule:</p>
           <ul class="skukey-list">
-            <li><span class="sku demo-sku">E59B Dark side ×3</span> three of one SKU — the count that gets missed</li>
-            <li><span class="sku lg demo-sku">B01D 5in <b>Lg</b></span> an oversized print, different envelope</li>
-            <li><span class="sku manila demo-sku">M02</span> a set that needs a manila envelope</li>
-            <li><span class="sku demo-sku">F01 🇨🇦</span> going to Canada — international stamp</li>
+            <li><span class="sku demo-sku">E59B Bitcoin ×3</span> three of one SKU</li>
+            <li><span class="sku lg demo-sku">B01D 5in <b>Lg</b></span> oversized — different envelope</li>
+            <li><span class="sku manila demo-sku">M02</span> set — manila envelope</li>
+            <li><span class="sku demo-sku">F01 🇨🇦</span> Canada — international stamp</li>
           </ul>
         </div>
       </div>
 
       <p style="margin-top:2rem;">
-        The panel is the pick list eBay gestured at, made into the thing you actually work from:
-        one entry per SKU in the batch, grouped by letter with a rule between groups, click any of
-        them to jump to the order card, and a filter across SKU, buyer name and item title. Picked
-        orders strike through as they're confirmed rather than disappearing, so the list stays
-        stable under your hand while you work down it.
+        The panel lists one entry per SKU in the batch, grouped by letter. Click any to jump to its
+        order card. The filter matches SKU, buyer name and item title. Packed orders strike through
+        rather than disappearing, so the list doesn't shift while you work down it.
       </p>
       <p class="note" style="margin-top:1.3rem;">
-        Below is that panel and the order cards, rebuilt as live HTML. Filter it, click a SKU,
-        select a batch.
+        Live below — filter it, click a SKU, run a batch filter.
       </p>
     </div>
 
@@ -1879,10 +1866,9 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
         The checkbox answers “is this list filtered right now?” — not “did I click this a while ago?”
       </h2>
       <p>
-        Each batch filter carries its own checkbox. It is ticked only while the selection is
-        <em>exactly</em> what that filter would produce, indeterminate while the selection is a
-        subset, and clear the moment the selection reaches outside it. Untick one order by hand
-        in the demo above and the box drops immediately.
+        A filter's checkbox is ticked only while the selection is exactly what that filter would
+        produce, indeterminate while it's a subset, and clear once the selection reaches outside
+        it. Untick one order above and the box drops immediately.
       </p>
       <p>
         It reads correctly even where the sets overlap. Select 🇨🇦 Canada in the demo and the
@@ -1891,29 +1877,90 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
         stamp. The box is telling you the truth: what you have selected is <em>part</em> of that
         filter's work, not all of it.
       </p>
-      <blockquote>
-        The state is derived, never remembered. […] it answers “is this list filtered right now?”,
-        not “did I click this a while ago?”, and the second question is the one that lies.
-        <cite>CHANGELOG.md — v4.33</cite>
-      </blockquote>
       <p>
-        Already-shipped orders are excluded from both the counts and the selection — before v4.29
-        a filter could quietly re-add envelopes you packed an hour ago to the print run. And a
-        filter matching nothing stays visible but disabled, showing <span class="mono">(0)</span>
-        and a tooltip: controls that vanish make the bar jump around and leave you guessing whether
-        the feature broke or the orders ran out.
-      </p>
-      <p>
-        Getting these to sit flush with eBay's own “Select all” took three attempts at pixel
-        alignment before the right answer turned out to be structural — stop reconstructing their
-        markup and <strong>clone it</strong>, inheriting whatever their DOM really is, including the
-        parts nobody had seen.
+        Shipped orders are excluded from the counts and the selection, so a filter can't re-add
+        envelopes packed an hour ago. A filter matching nothing stays visible but disabled at
+        <span class="mono">(0)</span> rather than vanishing.
       </p>
     </div>
   </div>
 </section>
 
 <hr class="rule">
+
+
+<hr class="rule">
+
+<!-- ============================================================
+     ORDER WATCH — new orders without a reload
+     ============================================================ -->
+<section class="pad-y">
+  <div class="wrap">
+    <div class="col" style="margin-bottom:1.8rem;">
+      <div class="eyebrow">2 — new orders, no reload</div>
+      <h2 style="font-size:clamp(1.7rem,4vw,2.4rem);margin-bottom:1rem;">
+        The page is a snapshot. It checks for new sales in the background.
+      </h2>
+      <p>
+        eBay's page shows the orders that existed when it loaded. A sale landing twenty minutes
+        into a packing session is invisible until you reload — and reloading mid-batch loses
+        selections, half-typed address edits, and any automation in flight.
+      </p>
+      <p>
+        So the script polls instead. Every 5 minutes it asks eBay's own awaiting-shipment endpoint
+        for the current list of order ids and compares them to the ones captured at load.
+      </p>
+    </div>
+
+    <div style="display:grid;gap:1.4rem;grid-template-columns:minmax(0,1fr);" id="watchdemo">
+      <div style="display:flex;flex-wrap:wrap;gap:1.6rem;align-items:flex-start;">
+        <div class="skupanel" style="max-width:22rem;flex:1 1 18rem;">
+          <div class="head"><span>SKUs to Pick and Pack (15)</span></div>
+          <div id="w-pillslot"></div>
+          <div class="watchstatus" id="w-status"><span>· checked just now ·</span></div>
+          <div style="padding:0 13px 12px;">
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button class="btn" type="button" id="w-tick">Advance 5 min</button>
+              <button class="btn" type="button" id="w-sale">A sale lands</button>
+              <button class="btn" type="button" id="w-fail">Poll fails</button>
+              <button class="btn ghost" type="button" id="w-reset">Reset</button>
+            </div>
+          </div>
+        </div>
+        <div class="col" style="margin-inline:0;flex:1 1 18rem;min-width:0;">
+          <p class="caption" style="margin-top:0;">
+            <b>The pill only appears when there is news.</b> It never reloads on its own — clicking
+            it is the reload. Try a failed poll: the status line goes amber rather than staying
+            quiet, because a watcher that is silent when it's broken looks identical to one that
+            has nothing to report.
+          </p>
+        </div>
+      </div>
+
+      <div>
+        <div class="rules">
+          <div class="rule-row"><b>Never reloads by itself</b><span>Automation may be in flight and an address may be half-edited. The pill is an offer.</span></div>
+          <div class="rule-row"><b>Refuses mid-batch</b><span>Paused while a batch ship or an automation tab is running.</span></div>
+          <div class="rule-row"><b>Counts additions only</b><span>An id leaving the list means shipped or cancelled — never a reason to interrupt.</span></div>
+          <div class="rule-row"><b>Silent on anything inconclusive</b><span>A sign-in redirect or a changed response shape backs off to 15 minutes instead of raising a false alarm.</span></div>
+          <div class="rule-row"><b>Shows its heartbeat</b><span><span class="mono">· checked 2m ago · check now</span> — amber if a check failed or none has succeeded in two intervals. Not a countdown; a per-second timer turns an ambient check into something you watch.</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+.rules { display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+.rule-row {
+  display: grid; gap: .15rem .9rem; grid-template-columns: minmax(0,1fr);
+  padding: .6rem .85rem; background: var(--surface);
+  font-family: var(--display); font-size: .84rem; line-height: 1.45;
+}
+@media (min-width: 40rem) { .rule-row { grid-template-columns: 13rem minmax(0,1fr); } }
+.rule-row b { font-weight: 600; color: var(--ink); }
+.rule-row span { color: var(--ink-2); }
+</style>
 
 <!-- ============================================================
      POSTAGE + ENVELOPES
@@ -1926,17 +1973,14 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
         Every order is a hand-addressed envelope, an international one, or an eBay label with tracking.
       </h2>
       <p>
-        That decision drives almost everything else on the page. It comes from the order total
-        against one configurable threshold — above <span class="mono">$25</span>, the margin
-        carries a tracked label; at or under, it goes out as a plain #10 envelope, and the buyer is
-        told why in the message: <em>“To keep prices fair, orders at or under $25 ship without
-        tracking.”</em>
+        The split comes from the order total against one threshold. Above
+        <span class="mono">$25</span> the margin carries a tracked label; at or under, it goes out
+        as a plain #10 envelope and the buyer is told why in the message.
       </p>
       <p>
-        Because the split is derived from price rather than remembered, it stays consistent across
-        the three places it shows up: the <span class="mono">+tracking</span> link on the card, the
-        highlighted total, and whether the order is included in the
-        <em>Select standard envelope</em> batch filter.
+        Derived from price rather than remembered, so it stays consistent across the three places
+        it appears: the <span class="mono">+tracking</span> link, the highlighted total, and the
+        <em>Select standard envelope</em> filter.
       </p>
     </div>
 
@@ -1971,11 +2015,10 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 
     <div class="col" style="margin-top:2.5rem;">
       <p>
-        Printing them used to be the worst part of the evening. eBay gives you one print dialog per
-        envelope; forty orders is forty dialogs. <strong>Print All Envelopes</strong> consolidates
-        the whole batch into a single print window, one envelope per page, auto-scaled to the #10
-        format. There's also a <strong>Custom Envelope</strong> modal for one-offs — paste any
-        address block, it parses into editable fields, and prints.
+        eBay gives one print dialog per envelope. <strong>Print All Envelopes</strong> consolidates
+        the batch into a single print window, one envelope per page, scaled to #10.
+        <strong>Custom Envelope</strong> takes a pasted address block, parses it into editable
+        fields, and prints a one-off.
       </p>
     </div>
   </div>
@@ -2000,18 +2043,16 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
         state or territory code — all 59 of them, including the military ones.
       </p>
       <p>
-        Canada gets its own path: postal-code format and all thirteen province and territory
-        codes. Other international destinations are skipped rather than guessed at — there are too
-        many valid formats to lint honestly.
+        Canada is checked separately: postal-code format and all thirteen province codes. Other
+        international destinations are skipped — too many valid formats to lint reliably.
       </p>
       <p>
-        There is also one rule that exists purely because of an eBay quirk: a line after the name
-        that is <em>only</em> digits almost always means eBay split the street number away from the
-        street name, leaving it duplicated.
+        One rule exists for an eBay quirk: a line after the name containing only digits means eBay
+        split the street number from the street name, duplicating it.
       </p>
       <p class="note" style="margin-top:1.3rem;">
-        The validator below is the real <span class="mono">validateAddress()</span> function, ported
-        verbatim from the userscript. Edit the address, or load a broken one.
+        The real <span class="mono">validateAddress()</span> function, ported verbatim. Edit it, or
+        load a broken sample.
       </p>
     </div>
 
@@ -2056,9 +2097,9 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
         Forty orders, one at a time, each waiting for a real outcome before the next begins.
       </h2>
       <p>
-        Orders can't run in parallel: the thank-you message tab takes focus, so several at once
-        would fight over the browser. A pre-flight dialog tells you how many orders, how many
-        messages, and roughly how long — measured across real batches at 30s each, not guessed.
+        Orders run one at a time — the message tab takes focus, so parallel runs fight over the
+        browser. A pre-flight dialog states the order count, message count and estimated duration
+        (30s per order, measured).
       </p>
     </div>
 
@@ -2077,45 +2118,20 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 
         <div class="col" style="margin-inline:0;flex:1 1 18rem;min-width:0;">
           <p class="caption" style="margin-top:0;">
-            <b>Run it.</b> One of these eight will fail to ship, and one will ship but fail to
-            message. Watch what the dock does at the end — the rescue sweep takes one more
-            automated swing at the un-messaged buyer, in the background, and then reports
-            exactly what it managed.
+            <b>Run it.</b> One of the eight fails to ship; one ships but fails to message. At the
+            end the rescue sweep retries the un-messaged card once, in the background, and reports
+            the result.
           </p>
         </div>
       </div>
 
       <div class="col" style="margin-inline:0;">
-        <p>
-          The sweep exists because message failures used to land as pills the seller had to notice
-          and clear by hand, one card at a time, after the batch they had already walked away from.
-          Its guardrails are the interesting part:
-        </p>
         <ul style="padding-left:1.15em;margin:1rem 0;">
-          <li style="margin-bottom:.5em;">
-            <strong>Exactly one attempt per card, per batch.</strong> The marker is written
-            <em>before</em> the tab opens, so a throw, a reload or an eBay re-render can never turn
-            this into a loop that keeps mailing the same buyer.
-          </li>
-          <li style="margin-bottom:.5em;">
-            The draft's action is re-validated at the moment of use. An unknown action is
-            <em>skipped</em>, not defaulted to the auto path — which would peek the thank-you draft
-            and, with auto-send on, mail the buyer something the seller never chose.
-          </li>
-          <li style="margin-bottom:.5em;">
-            Two failures ends it. “Two automated failures is evidence that something needs eyes,
-            not that a third try would land.”
-          </li>
-          <li>
-            Retries open in the <strong>background</strong>, unlike the manual Retry button — that
-            one is a deliberate click and deserves focus; this is cleanup running after you've
-            looked away.
-          </li>
+          <li style="margin-bottom:.4em;"><strong>One attempt per card, per batch.</strong> The marker is written before the tab opens, so a crash or re-render can't loop into mailing the same buyer twice.</li>
+          <li style="margin-bottom:.4em;">An unknown draft action is skipped, not defaulted to auto-send.</li>
+          <li style="margin-bottom:.4em;">Two failures ends it — the card keeps its pill for you to finish.</li>
+          <li>Retries open in the background; the manual Retry button opens in the foreground.</li>
         </ul>
-        <p>
-          And it says so out loud, because <em>“a silent recovery is indistinguishable from never
-          having tried, and a silent failure reads as success.”</em>
-        </p>
       </div>
     </div>
   </div>
@@ -2178,14 +2194,10 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 
       <h3 style="font-size:1.15rem;margin-bottom:.8rem;">Sending it turned out to be the hard part</h3>
       <p>
-        For a long time the thank-you automation intermittently left the draft sitting in the box,
-        unsent. Four separate timing bugs, all of which made a failure look identical to a success:
-        the “Message buyer” button was clicked once before eBay had hydrated it; the composer
-        textarea was grabbed before its iframe had bound a submit handler; the Send button was taken
-        the first time it merely <em>looked</em> enabled — a server-rendered button carries no
-        <span class="mono">disabled</span> attribute until JS adds one — and clicked exactly once,
-        with the retry interval cleared immediately after; and nothing verified the outcome before
-        the tab closed itself 1.2 seconds later.
+        Sending it reliably took four fixes, all timing: the composer button clicked before React
+        had hydrated it, the textarea grabbed before its iframe bound a submit handler, Send clicked
+        once while it merely looked enabled, and nothing verified the outcome before the tab closed
+        itself.
       </p>
       <p>
         Now every step retries, and <strong>the tab only closes on positive evidence that the
@@ -2200,21 +2212,9 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
         <em>shipment</em> never mails the buyer twice.
       </p>
       <p>
-        And the draft's lifecycle is split in two — <span class="mono">peekBuyerMessage()</span>
-        reads it, <span class="mono">consumeBuyerMessage()</span> deletes it — with the delete moved
-        to the moment the text actually lands in the box. An earlier version read and deleted as its
-        first action, before the composer had even opened, so a failure discarded the message
-        entirely: the order shipped, the buyer heard nothing, and there was nothing left to retry.
-      </p>
-      <blockquote>
-        Everything before that point is now retryable; everything after it would double-paste,
-        so it isn't.
-        <cite>CHANGELOG.md — v4.23</cite>
-      </blockquote>
-      <p>
-        Retry is also only <em>offered</em> where it can work. If a card has lost the anchor the
-        button rebuilds from, Retry renders disabled with an explanation rather than looking
-        clickable and doing nothing — and the Open link stays as the working escape hatch.
+        The draft is read and deleted separately, with the delete happening only once the text is
+        in the box — so a failed attempt leaves the draft intact and Retry sends the same message
+        rather than an empty one.
       </p>
     </div>
   </div>
@@ -2226,17 +2226,11 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 <section class="tier">
   <div class="wrap">
     <div class="col">
-      <div class="lab">the second half of the problem</div>
-      <h2>Then the tool started doing things on my behalf, and a new failure appeared.</h2>
+      <div class="lab">the other half</div>
+      <h2>Once it could act on its own, it could be wrong about its own work.</h2>
       <p>
-        Everything above is about getting the right sticker into the right envelope. That part was
-        a design problem, and it was mostly finished by v4.00.
-      </p>
-      <p>
-        What followed was harder, and it is the part I did not see coming. Once the page could mark
-        orders shipped and message buyers by itself, it acquired the ability to be
-        <em>wrong about its own work</em> — to report that a batch was done when it wasn't. The
-        rest of this page is about closing that.
+        Everything above is layout and picking. Below is what changed when the page started
+        marking orders shipped and messaging buyers by itself.
       </p>
     </div>
   </div>
@@ -2263,9 +2257,8 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
         <cite>CHANGELOG.md — v4.21</cite>
       </blockquote>
       <p>
-        Worse: the tab-title counter of remaining work <em>also</em> counted the pending overlay,
-        so a silent failure made the batch look <strong>more finished than it was</strong>. The
-        tool wasn't merely failing to notice. It was actively arguing that everything was fine.
+        The tab counter also counted the pending overlay, so a silent failure made the batch look
+        more finished than it was.
       </p>
       <p>
         Fixing that took five versions, and it changed how everything after it is built. A
@@ -2330,13 +2323,11 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
         A card is pending, confirmed, or failed. Never a fourth thing wearing the face of the second.
       </h2>
       <p>
-        Pending is an amber spinner that says what it's actually doing. Confirmed is green, and
-        only arrives when eBay says so. Failed is a red banner that quotes eBay back at you and
-        leaves the tab open, because that is the one case where a human needs to look at the page.
+        Pending is an amber spinner. Confirmed is green and only arrives when eBay says so. Failed
+        is a red banner quoting eBay back, with the tab left open.
       </p>
       <p class="note" style="margin-top:1.2rem;">
-        Drive the state machine yourself — these are the real styles, the real copy, and the real
-        transitions.
+        Real styles, copy and transitions — drive it yourself.
       </p>
     </div>
 
@@ -2406,35 +2397,21 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
         Confirmation is a positive signal, not the absence of a button.
       </h2>
       <p>
-        The first version of the confirmation logic waited twelve seconds for eBay's
-        “Mark as shipped” button. If it never appeared, it concluded the order must already be
-        shipped and wrote a success. The changelog's own verdict on that:
+        The first version waited 12 seconds for eBay's “Mark as shipped” button and, if it never
+        appeared, concluded the order had already shipped — which is also what a slow page, a
+        markup change or a logged-out session look like.
       </p>
-      <blockquote>
-        which is true most of the time, and is also exactly what a slow page, a markup change
-        or a quietly logged-out session look like.
-        <cite>CHANGELOG.md — v4.24</cite>
-      </blockquote>
       <p>
-        Now it reads eBay's own progress stepper. And eBay <em>renames</em> that step rather than
-        restyling it — an unshipped order reads <span class="mono">“Ship by Aug 26”</span>, and only
-        once it ships does the same step become <span class="mono">“Shipped Aug 23”</span>. So the
-        match anchors on the <span class="mono">ship</span> prefix and lets the icon decide state,
-        reading two independent signals and accepting either. When neither is legible the answer
-        is <span class="mono">unknown</span> — guessed in neither direction.
+        It now reads eBay's progress stepper. eBay renames that step rather than restyling it:
+        <span class="mono">“Ship by Aug 26”</span> becomes <span class="mono">“Shipped Aug 23”</span>.
+        The match anchors on the <span class="mono">ship</span> prefix and lets the icon decide,
+        accepting either of two independent signals. When neither is legible the answer is
+        <span class="mono">unknown</span>.
       </p>
       <p>
         The failure message quotes the evidence: <em>eBay still shows this order as NOT shipped
         (eBay shows “Ship by Aug 26”)</em>. You are told what the tool saw, not what it concluded.
       </p>
-      <div style="margin-top:1.8rem;padding:1.1rem 1.2rem;border:1px solid var(--rule);border-left:2px solid var(--accent);border-radius:0 8px 8px 0;background:var(--surface);">
-        <p class="note" style="margin:0;">
-          The version after that is a post-mortem on its own tests. v4.24's suite passed only
-          because a fixture was invented — it kept the “Shipped” label and flipped the icon, a
-          combination eBay never renders. <b>A hand-made fixture confirmed the assumption it was
-          built from; the real markup did not.</b>
-        </p>
-      </div>
     </div>
   </div>
 </section>
@@ -2452,14 +2429,12 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
         You are not looking at the browser. You are at the table with a ziplock bag.
       </h2>
       <p>
-        So the count of remaining work lives where you'll see it anyway: drawn onto the favicon
-        and prefixed to the tab title. The badge went through seven iterations to stay legible at
-        16 pixels — a corner balloon, then full-bleed, and finally eBay's own favicon with a
-        translucent white box across the bottom-right at 65% of the icon's width. When the batch is
-        done, the box becomes a green check.
+        The count of remaining work is drawn onto the favicon and prefixed to the tab title:
+        eBay's own icon with a translucent white box across the bottom-right at 65% of its width.
+        When the batch is done the box becomes a green check.
       </p>
       <p class="note" style="margin-top:1.2rem;">
-        Drag the slider. This is the actual canvas drawing routine from the script.
+        Drag the slider — this is the script's own canvas routine.
       </p>
     </div>
 
@@ -2494,45 +2469,8 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
       </div>
     </div>
 
-    <div class="col">
-      <h3 style="font-size:1.15rem;margin-bottom:.8rem;">The page never refreshes itself. So it watches instead.</h3>
-      <p>
-        The bulk shipping page is a snapshot from the moment it loaded. A sale that lands twenty
-        minutes into a packing session is simply invisible. Every five minutes the script asks
-        eBay's own awaiting-shipment endpoint what it thinks the list is, and if new order ids
-        appear, a pill offers a reload.
-      </p>
-      <p>
-        Almost all of the design here is restraint. It <strong>never</strong> reloads on its own —
-        automation tabs may be in flight and an address may be half-edited. It refuses mid-batch.
-        It counts additions only, since an id leaving the list means shipped or cancelled and is
-        never a reason to nag. And any response that isn't a well-formed list — a sign-in redirect,
-        an interstitial, a shape change — is treated as inconclusive and backed off from rather
-        than badged as news.
-      </p>
-      <blockquote>
-        v4.26 was completely invisible until it had news, which made its silence ambiguous:
-        “no new orders” and “this died an hour ago” looked exactly the same from the outside.
-        <cite>CHANGELOG.md — v4.27</cite>
-      </blockquote>
-      <p>
-        Hence the thin status line under the pill — <span class="mono">· checked 2m ago · check now</span>
-        — which goes amber when a check has failed or hasn't succeeded in more than two intervals.
-        Deliberately not a countdown: a per-second timer would turn an ambient watcher into
-        something you watch.
-      </p>
-    </div>
   </div>
 </section>
-
-<style>
-.postagetabs { display: flex; flex-wrap: wrap; gap: 7px; }
-.postagetabs .btn[aria-pressed="true"] {
-  background: var(--ink); border-color: var(--ink); color: var(--ground);
-}
-</style>
-
-<hr class="rule">
 
 <!-- ============================================================
      DIAGNOSTICS
@@ -2545,14 +2483,12 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
         Every risky subsystem ships with a report, a dry run, and a simulator.
       </h2>
       <p>
-        Not scaffolding left behind — a feature. Each of these can drive the UI into any state
-        <strong>without contacting eBay</strong>, so a failure banner can be checked without
-        breaking a real order, and the end-of-batch sweep can be inspected before it runs.
+        Each drives the UI into any state <strong>without contacting eBay</strong>, so a failure
+        banner can be checked without breaking a real order.
       </p>
       <p>
-        They pay for themselves directly. The v4.22 bug — a card that became permanently
-        unshippable, silently, because two legitimate code paths removed its button and nothing put
-        it back — was caught by the dry run built one version earlier.
+        The dry run caught a real bug: cards becoming permanently unshippable because two code
+        paths removed the ship button and nothing put it back.
       </p>
     </div>
 
@@ -2575,155 +2511,6 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 
 <hr class="rule">
 
-<!-- ============================================================
-     PRINCIPLES
-     ============================================================ -->
-<section class="pad-y">
-  <div class="wrap">
-    <div class="col" style="margin-bottom:2.2rem;">
-      <div class="eyebrow">what 112 versions taught it</div>
-      <h2 style="font-size:clamp(1.7rem,4vw,2.4rem);margin-bottom:1rem;">
-        The rules this thing keeps rediscovering.
-      </h2>
-      <p>
-        None of these were decided up front. Each one is the residue of a specific evening where
-        something went quietly wrong.
-      </p>
-    </div>
-
-    <div class="principles">
-      <div class="principle">
-        <h4>A silent failure reads as success.</h4>
-        <p>
-          If an automation can fail without saying so, the interface is not neutral — it is actively
-          reporting a success. Every automated path needs a failure channel, and a way to be told
-          about it that survives the tab that was supposed to do the telling.
-        </p>
-        <span class="src">v4.16 · v4.17 · v4.21 · v4.35</span>
-      </div>
-      <div class="principle">
-        <h4>Never reason from an absence.</h4>
-        <p>
-          A missing button is not evidence the work is done. It is equally consistent with a slow
-          page, a markup change, and a logged-out session. Require a positive signal; when there
-          isn't one, the answer is <span class="mono">unknown</span>, not a guess in the
-          convenient direction.
-        </p>
-        <span class="src">v4.24 · v4.16</span>
-      </div>
-      <div class="principle">
-        <h4>Derive state; don't remember it.</h4>
-        <p>
-          Remembered state answers “did I click this a while ago?” Derived state answers “is this
-          true right now?” The second question is the only one worth asking, and the first one lies
-          the moment anything changes underneath it.
-        </p>
-        <span class="src">v4.33 · v3.88 · v4.36</span>
-      </div>
-      <div class="principle">
-        <h4>Guard every side effect that reaches a buyer.</h4>
-        <p>
-          Anything that messages a person is one-shot and flagged before the attempt, not after —
-          so a crash, a reload or a re-render can never turn a retry into a second email to
-          somebody's actual inbox.
-        </p>
-        <span class="src">v4.21 · v4.23 · v4.35</span>
-      </div>
-      <div class="principle">
-        <h4>Silence must be distinguishable from death.</h4>
-        <p>
-          An ambient feature that only speaks when it has news is indistinguishable from one that
-          died an hour ago. Show the heartbeat, not just the alarm — and make a control that has
-          nothing to do render disabled rather than vanishing.
-        </p>
-        <span class="src">v4.27 · v4.29</span>
-      </div>
-      <div class="principle">
-        <h4>Know where automation stops and a person starts.</h4>
-        <p>
-          Two automated failures is evidence that something needs eyes, not that a third try would
-          land. An invalid tracking number leaves the tab open rather than submitting a bad one.
-          The escape hatch is a feature, not a fallback.
-        </p>
-        <span class="src">v4.24 · v4.35 · v3.78</span>
-      </div>
-      <div class="principle">
-        <h4>Don't steal attention you haven't earned.</h4>
-        <p>
-          Cleanup that runs after the seller has looked away opens its tabs in the background. A
-          deliberate click gets focus; automated recovery doesn't. And an ambient watcher gets no
-          countdown, because a per-second timer turns it into something you watch.
-        </p>
-        <span class="src">v4.35 · v4.27 · v4.23</span>
-      </div>
-      <div class="principle">
-        <h4>Measure. Don't infer.</h4>
-        <p>
-          The batch time estimate was corrected from 20s to 30s per order across two real batches —
-          the old figure under-promised a ten-order run by 40%. Three attempts at pixel alignment
-          were resolved by measuring the type scale rather than eyeballing the gap.
-        </p>
-        <span class="src">v4.23 · v4.32 · v3.94</span>
-      </div>
-      <div class="principle">
-        <h4>Copy the platform's real markup — don't imitate it.</h4>
-        <p>
-          A hand-built lookalike of eBay's checkbox rendered nothing at all, because eBay hides the
-          raw input and draws the visible control from sibling icon markup. Cloning inherits
-          whatever their structure really is, including the parts you haven't seen — which is the
-          point, since guessing is what failed.
-        </p>
-        <span class="src">v4.34 · v4.33</span>
-      </div>
-      <div class="principle">
-        <h4>State what a removal costs.</h4>
-        <p>
-          When the hand-reclassify pill was cut, the changelog names the one behaviour genuinely
-          lost rather than describing the change as pure simplification. A feature removed without
-          an accounting is a feature that comes back as a bug report.
-        </p>
-        <span class="src">v4.36 · v4.30</span>
-      </div>
-    </div>
-  </div>
-</section>
-
-<style>
-.msggrid { display: grid; gap: 1rem; grid-template-columns: minmax(0,1fr); }
-@media (min-width: 44rem) { .msggrid { grid-template-columns: minmax(0,14rem) minmax(0,1fr); } }
-.msgctl { display: flex; flex-direction: column; gap: .6rem; }
-.msgctl label {
-  display: flex; flex-direction: column; gap: .25rem;
-  font-family: var(--mono); font-size: .62rem; letter-spacing: .1em;
-  text-transform: uppercase; color: var(--muted);
-}
-.msgctl input, .msgctl select {
-  font-family: var(--display); font-size: 12.5px;
-  padding: 6px 8px; border-radius: 5px;
-  border: 1px solid var(--rule-strong);
-  background: var(--ground); color: var(--ink);
-  text-transform: none; letter-spacing: 0;
-}
-.msgout {
-  background: var(--surface-2);
-  border: 1px solid var(--rule);
-  border-radius: 8px;
-  padding: 13px 15px;
-  font-family: var(--display);
-  font-size: 13px;
-  line-height: 1.62;
-  color: var(--ink-2);
-  white-space: pre-wrap;
-  min-height: 12rem;
-}
-.msgout mark {
-  background: var(--warn-soft);
-  color: var(--accent);
-  padding: 0;
-  border-radius: 0;
-  box-shadow: 0 1px 0 var(--accent-line);
-}
-</style>
 
 <hr class="rule">
 
@@ -2732,107 +2519,33 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
      ============================================================ -->
 <section class="pad-y">
   <div class="wrap">
-    <div class="col" style="margin-bottom:1rem;">
-      <div class="eyebrow">v3.26 → v4.38</div>
-      <h2 style="font-size:clamp(1.7rem,4vw,2.4rem);margin-bottom:1rem;">
-        Make the page readable, then the data trustworthy, then the automation honest.
+    <div class="col" style="margin-bottom:1.4rem;">
+      <div class="eyebrow">v3.26 &rarr; v4.38</div>
+      <h2 style="font-size:clamp(1.55rem,3.6vw,2.1rem);margin-bottom:1rem;">
+        Build order.
       </h2>
       <p>
-        Twelve eras, in order. The version numbers are the only structural device on this page that
-        encodes something real — they're a sequence, and the sequence is the argument.
+        Layout first, then the data on the page, then the automation, then making the automation
+        honest.
       </p>
     </div>
 
-    <div class="timeline">
-      <div class="era">
-        <div class="vrange">3.26–3.33</div>
-        <div>
-          <h4>Make it legible</h4>
-          <p>Envelope #10 print layout, one print window instead of N dialogs, SKU pill consolidation, a 40-colour palette for multi-item orders. Already accessibility-literate: one entry swaps an orange at contrast ratio 1.97 for one at 5.02.</p>
-        </div>
-      </div>
-      <div class="era">
-        <div class="vrange">3.34–3.43</div>
-        <div>
-          <h4>The address as data</h4>
-          <p><span class="mono">validateAddress()</span> as a pure function, ⚠ and ✔ badges inline with the recipient name, then Canada, then PO Boxes, then eBay's habit of splitting a street number onto its own line. Three consecutive versions are pure DOM archaeology about where a badge is allowed to sit.</p>
-        </div>
-      </div>
-      <div class="era">
-        <div class="vrange">3.55–3.68</div>
-        <div>
-          <h4>Panel furniture</h4>
-          <p>The configuration panel splits into its own floating box, an address-warning banner gets jump-links, scroll-to-top arrives. Includes the project's one full reversion — an elevation reskin backed out the next version because “the skin didn't render in practice.”</p>
-        </div>
-      </div>
-      <div class="era">
-        <div class="vrange">3.69–3.78</div>
-        <div>
-          <h4>What the buyer is told</h4>
-          <p>An ambiguous “ship tomorrow” toggle becomes an explicit Today | Tomorrow control with a live preview of the resolved date. The button is relabelled “Mark as Shipped &amp; Msg” so it's clear a message rides along. The concern shifts from layout to promises made to a person.</p>
-        </div>
-      </div>
-      <div class="era">
-        <div class="vrange">3.79–3.88</div>
-        <div>
-          <h4>The tab becomes a dashboard</h4>
-          <p>Seven iterations on the favicon badge for legibility at 16px, then two more to make it <em>correct</em> — first so the number moves the instant you click, then so that selecting orders stops changing the count.</p>
-        </div>
-      </div>
-      <div class="era">
-        <div class="vrange">3.90–3.98</div>
-        <div>
-          <h4>Fighting a React form</h4>
-          <p>Six versions to make three dimension fields hold their values against eBay's debounced rate-refetch. The root cause was set <em>order</em>, not timing — and eBay clamps a 4.125in length because the longest side must go in the length box.</p>
-        </div>
-      </div>
-      <div class="era">
-        <div class="vrange">4.00–4.14</div>
-        <div>
-          <h4>Surviving re-renders</h4>
-          <p>The US country line inferred from eBay <em>omitting</em> a country span; buyer notes rescued from a hidden summary element; a MutationObserver watchdog for combined-order cards that eBay re-renders after the initial pass, wiping everything injected into them.</p>
-        </div>
-      </div>
-      <div class="era">
-        <div class="vrange">4.15–4.20</div>
-        <div>
-          <h4>Messaging honesty</h4>
-          <p>A send becomes verifiable. A crash that killed the manual path is traced to a temporal dead zone — masked on the auto path by a single <span class="mono">await</span> that yielded long enough for the file to finish evaluating. The dispatcher stops swallowing exceptions.</p>
-        </div>
-      </div>
-      <div class="era" style="background:var(--surface);margin-inline:calc(var(--pad) * -0.5);padding-inline:calc(var(--pad) * 0.5);">
-        <div class="vrange" style="color:var(--accent);font-weight:700;">4.21–4.25</div>
-        <div>
-          <h4>Shipping honesty <span style="font-family:var(--mono);font-size:.6rem;letter-spacing:.1em;color:var(--accent);text-transform:uppercase;vertical-align:middle;margin-left:.5rem;">the core</span></h4>
-          <p>Failure channels, three card states, dual failure detection, button recovery, a message-failure channel, the death of “assume shipped after 12 seconds” — and finally a post-mortem that indicts its own test fixture. v4.21 states the remaining gap out loud; v4.24 closes it three versions later.</p>
-        </div>
-      </div>
-      <div class="era">
-        <div class="vrange">4.26–4.28</div>
-        <div>
-          <h4>Ambient awareness</h4>
-          <p>A background order watch with more restraint written into it than feature. The next version gives it a face so its silence isn't ambiguous; the one after fixes its colours, because amber already means LG on this page and a notification has no business borrowing a colour that carries packing meaning.</p>
-        </div>
-      </div>
-      <div class="era">
-        <div class="vrange">4.29–4.36</div>
-        <div>
-          <h4>Batch safety</h4>
-          <p>Filters with counts and shipped-order exclusion, three rounds of alignment chasing resolved by adopting eBay's own markup, derived checkbox states, the end-of-batch message rescue sweep, and one deliberate feature removal with its cost stated plainly.</p>
-        </div>
-      </div>
-      <div class="era">
-        <div class="vrange">4.37–4.38</div>
-        <div>
-          <h4>Defaults that persist</h4>
-          <p>The last real bug in the file is a repaint quietly overwriting the seller's own choices — plus a line commented “Reset auto-send toggle to OFF at start for safety” that set it to <em>true</em> on every page load.</p>
-        </div>
-      </div>
+    <div class="rules">
+      <div class="rule-row"><b>3.26&ndash;3.33</b><span>Envelope #10 print layout, one print window instead of N dialogs, SKU pills, colour coding.</span></div>
+      <div class="rule-row"><b>3.34&ndash;3.43</b><span>Address validation: US, then Canada, then PO Boxes, then eBay's split street number.</span></div>
+      <div class="rule-row"><b>3.55&ndash;3.68</b><span>Floating panels, address-warning banner, scroll-to-top.</span></div>
+      <div class="rule-row"><b>3.69&ndash;3.78</b><span>Today/Tomorrow ship date with a live preview; “&amp; Msg” added to the ship button.</span></div>
+      <div class="rule-row"><b>3.79&ndash;3.88</b><span>Favicon and tab-title counter, legible at 16px and correct under selection changes.</span></div>
+      <div class="rule-row"><b>3.90&ndash;3.98</b><span>Label dimension fields made to survive eBay's debounced re-render. Root cause was set order, not timing.</span></div>
+      <div class="rule-row"><b>4.00&ndash;4.14</b><span>Surviving re-renders: US country line, buyer notes, a MutationObserver for combined orders.</span></div>
+      <div class="rule-row"><b>4.15&ndash;4.20</b><span>Verified message sending; the dispatcher stops swallowing exceptions.</span></div>
+      <div class="rule-row"><b>4.21&ndash;4.25</b><span>Failure channels, three card states, dual failure detection, message-failure channel.</span></div>
+      <div class="rule-row"><b>4.26&ndash;4.28</b><span>Background order watch, then its status line, then its colours.</span></div>
+      <div class="rule-row"><b>4.29&ndash;4.36</b><span>Batch filters with counts and derived checkboxes; end-of-batch message rescue sweep.</span></div>
+      <div class="rule-row"><b>4.37&ndash;4.38</b><span>Panel defaults persist and stop overwriting per-order choices.</span></div>
     </div>
   </div>
 </section>
-
-<hr class="rule">
 
 <!-- ============================================================
      FULL REFERENCE
@@ -3973,8 +3686,8 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
     var cap = $("#ba-cap"), url = $("#ba-url");
 
     var CAP = {
-      before: "<b>eBay's stock page.</b> Per order: a weight box, three dimension boxes, a service dropdown and an insurance choice — six inputs for a one-ounce envelope whose size never changes. The SKU and quantity, which are the only two things I need to go and pick the item, sit in 12px grey under the title.",
-      after: "<b>The same page, rebuilt.</b> A picking panel listing every SKU in the batch, grouped by container. Batch filters that select exactly the plain-envelope or Canadian orders. Cards that lead with the SKU and quantity at full size, colour-coded by the envelope they need, each carrying its own print, label, message and ship controls."
+      before: "<b>eBay's stock page.</b> Six inputs per order — weight, three dimensions, service, insurance — for a one-ounce envelope that never changes. SKU and quantity are 12px grey under the title.",
+      after: "<b>The same page, rebuilt.</b> Picking panel grouped by storage box, batch filters by envelope type, and cards led by SKU and quantity, colour-coded by the envelope they need."
     };
 
     function show(k) {
@@ -4001,30 +3714,32 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 
     /* x / y are percentages of the screenshot */
     var PINS = [
-      { x: 24.0, y: 12.9, t: "The picking panel",
-        b: "Every SKU in the batch, in one list, sorted alphabetically so it maps to the order of the containers on the shelf. A rule separates each letter group. The count in the title is the work remaining, and it also drives the browser tab's title and favicon so it's visible while you're away from the screen." },
-      { x: 24.0, y: 24.9, t: "A SKU carries its packing rules",
-        b: "B01D is box B, sticker 1. The “Lg” tag and yellow outline mean it's an oversized print that needs a different envelope; amber-bordered pills like A09 ×2 mean more than one of the same sticker. Colour here is instruction, not decoration — you can sort the batch into piles before opening a single order." },
+      { x: 24.0, y: 11.8, t: "Picking panel",
+        b: "Every SKU in the batch, alphabetical, grouped by letter. The count is work remaining and also drives the tab title and favicon." },
+      { x: 24.0, y: 18.8, t: "Background order watch",
+        b: "The page is a snapshot from load. Every 5 minutes the script asks eBay's awaiting-shipment endpoint for the current order list and compares ids. New sale mid-session, no reload needed to know. The status line reads \u201cchecked 2m ago\u201d so silence is never ambiguous." },
+      { x: 24.0, y: 26.5, t: "SKU carries the packing rule",
+        b: "B01D = box B, sticker 1. \u201cLg\u201d and the yellow outline mean oversized; amber pills like A09 \u00d72 mean more than one. Sort the batch into piles before opening an order." },
       { x: 24.0, y: 42.9, t: "Destination on the pill",
-        b: "F01 carries a 🇨🇦. Canadian orders need an international stamp rather than a domestic one, and knowing that at picking time — not at the printer — is what keeps the batch moving in one direction." },
-      { x: 24.0, y: 50.7, t: "Print all ten envelopes at once",
-        b: "The single most valuable button on the page. eBay gives you one print dialog per order; this consolidates every selected address into one print job, one #10 envelope per page, scaled for a home printer. Below it, Custom Envelope prints a one-off for an address that isn't in the batch at all." },
+        b: "F01 shows \ud83c\udde8\ud83c\udde6 \u2014 Canada needs an international stamp. Known at picking time, not at the printer." },
+      { x: 24.0, y: 50.7, t: "Print all envelopes",
+        b: "One print job for the whole selection, one #10 envelope per page, sized for a home printer. eBay gives one dialog per order. Custom Envelope prints a one-off for an address not in the batch." },
       { x: 24.0, y: 58.5, t: "Defaults for all orders",
-        b: "Thank-you messages, auto-send, and whether buyers are told the order ships today or tomorrow — set once for the batch, stored between sessions, and overridable per card. Dark mode lives in this panel's header so it stays reachable while the panel is collapsed." },
+        b: "Thank-you message, auto-send, and ship date \u2014 set once, stored between sessions, overridable per card." },
       { x: 63.5, y: 17.1, t: "Batch filters",
-        b: "One click selects exactly the plain-envelope orders, or exactly the Canadian ones. Each carries a checkbox showing whether that filter is what's currently selected, derived from the live selection rather than remembered. Canada shows (0) here and is correctly disabled rather than hidden — the bar never changes shape underneath you." },
-      { x: 60.5, y: 32.0, t: "SKU and quantity, at full size",
-        b: "The two things eBay put in small grey text are now the headline of the card. Quantity is amber and oversized whenever it's more than one, because sending one sticker to someone who bought three is the error that costs a replacement, a refund and the postage twice." },
+        b: "Selects exactly the plain-envelope orders, or exactly the Canadian ones. Each checkbox is derived from the live selection, not remembered. Canada shows (0) and is disabled rather than hidden." },
+      { x: 60.5, y: 32.0, t: "SKU and quantity, full size",
+        b: "Both were 12px grey on eBay's page. Quantity turns amber above 1 \u2014 shipping one when three were bought costs a replacement plus postage twice." },
       { x: 45.0, y: 40.0, t: "Print this envelope",
-        b: "Per-card printing for the one you missed, using the same #10 layout as the batch run. The address above it has already been checked — line count, house number, a real state code — and badged ✔ or ⚠ before it can reach the printer." },
+        b: "Single envelope, same #10 layout as the batch run." },
       { x: 50.5, y: 45.2, t: "Buy shipping label",
-        b: "For orders above the value threshold, where the margin carries tracking. This opens eBay's single-label page and fills it for an eBay Standard Envelope — custom size, 1oz, 9 × 4.1 × 0.1in — leaving one confirming click. Making those three dimension fields survive eBay's own re-render took six versions." },
-      { x: 66.5, y: 27.0, t: "The address, validated",
-        b: "Copy-ready and linted: minimum line count, a name that isn't a number, a street line starting with a house number unless it's a PO Box, and a valid City ST ZIP with a real state code. US orders get the country line added back, since eBay omits it domestically. Hovering a ⚠ lists every issue found." },
+        b: "For orders above the tracking threshold. Opens eBay's label page pre-filled for an eBay Standard Envelope \u2014 custom size, 1oz, 9 \u00d7 4.1 \u00d7 0.1in \u2014 one click to confirm." },
+      { x: 66.5, y: 27.0, t: "Validated address",
+        b: "Checked before printing: line count, house number, valid City ST ZIP, real state code. US orders get the country line added back. \u2714 or \u26a0 with the issues on hover." },
       { x: 66.5, y: 44.3, t: "Mark as Shipped & Msg",
-        b: "One button for the two things that end an order: telling eBay it shipped, and telling the buyer. The label says “& Msg” only when a message will actually go out. What happens after this click is the part that took the longest to get right." },
-      { x: 69.5, y: 50.5, t: "Ships today or tomorrow",
-        b: "An explicit choice, per order and globally, with the resolved date previewed beside it — and it rolls past Sunday, because nothing ships on a Sunday. It decides what the buyer is promised, so it is never left to be inferred." }
+        b: "Marks the order shipped on eBay and sends the buyer a message. \u201c& Msg\u201d appears only when a message will actually go out." },
+      { x: 69.5, y: 50.5, t: "Ship date",
+        b: "Today or tomorrow, per order and globally, with the resolved date shown. Rolls past Sunday." }
     ];
 
     var numEl = $("#tour-num"), titleEl = $("#tour-title"), bodyEl = $("#tour-body"),
@@ -4056,6 +3771,49 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
     $("#tour-next").addEventListener("click", function () { show(cur + 1); });
     show(0);
   })();
+})();
+</script>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (s) { return document.querySelector(s); };
+
+  /* ==========================================================
+     ORDER WATCH demo
+     ========================================================== */
+  var slot = $("#w-pillslot"), st = $("#w-status");
+  if (!slot) return;
+
+  var mins = 0, newOrders = 0, failed = false;
+
+  function render() {
+    slot.innerHTML = newOrders > 0
+      ? '<div class="watchpill" role="button" tabindex="0" id="w-pill">' +
+        '<span>\u{1F514} ' + newOrders + ' new order' + (newOrders > 1 ? "s" : "") +
+        ' since load</span><span class="act">Reload</span></div>'
+      : "";
+    var ago = mins === 0 ? "just now" : mins + "m ago";
+    if (failed) {
+      st.className = "watchstatus warn";
+      st.innerHTML = "<span>· last check failed · backing off to 15m ·</span>" +
+                     '<span class="act" id="w-now">check now</span>';
+    } else {
+      st.className = "watchstatus";
+      st.innerHTML = "<span>· checked " + ago + " ·</span>" +
+                     '<span class="act" id="w-now">check now</span>';
+    }
+    var p = $("#w-pill");
+    if (p) p.addEventListener("click", function () { newOrders = 0; mins = 0; render(); });
+    var n = $("#w-now");
+    if (n) n.addEventListener("click", function () { failed = false; mins = 0; render(); });
+  }
+
+  $("#w-tick").addEventListener("click", function () { mins += 5; if (!failed) mins = 0; render(); });
+  $("#w-sale").addEventListener("click", function () { failed = false; mins = 0; newOrders += 1; render(); });
+  $("#w-fail").addEventListener("click", function () { failed = true; render(); });
+  $("#w-reset").addEventListener("click", function () { mins = 0; newOrders = 0; failed = false; render(); });
+  render();
 })();
 </script>
 
