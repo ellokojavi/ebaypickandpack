@@ -1,5 +1,37 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.43
+- **Auto-send works again — the Send button was never being found.** eBay's
+  composer Send control now labels itself three times over:
+  `<button id="imageupload__send--button" data-testid="message-send-button"
+  title="Send message" aria-label="Send message" type="button">Send message</button>`.
+  `findComposerSendButton` glued `value + textContent + aria-label` into a single
+  string, so this button read as `"Send message Send message"` and failed the
+  `/^send( message)?$/` test; the only fallback looked for `type="submit"`, which
+  this button is not. The locator returned **null**, so `sendComposedMessage`
+  spun its full 25s without ever finding a control, clicked nothing, logged no
+  "Clicking Send" line, and ended in *"Could not confirm the send after 0
+  click(s)"* — draft sitting in the box the whole time. Exactly the reported
+  symptom, and a pure locator bug: nothing to do with trusted events, realms or
+  Tampermonkey (v4.41's realm work is still correct and still in place).
+- The locator now tries eBay's stable identifiers first
+  (`#imageupload__send--button`, `[data-testid="message-send-button"]`,
+  `.imageupload__sendbutton`) and, failing that, matches each label source
+  **separately** — value, textContent, aria-label, title — so a control that
+  repeats its own label still matches. `title` is newly consulted; "Send coupon",
+  "Copy", "Attach photo" and friends stay excluded. Verified against six DOM
+  fixtures in jsdom: today's live markup, the older icon-only button, a plain
+  text button, a no-id duplicate-label button, a submit input, and a decoys-only
+  document that must return null — 6/6, with no regression on the shapes v4.42
+  already handled.
+- **The silent failure is no longer silent.** When no control matches, the send
+  loop now logs the miss once and `console.table`s every button in the composer
+  (tag, type, id, text, aria-label, disabled). v4.42 failed this case with no
+  output at all, which is why the regression was invisible from the console.
+- **New no-op check: `altheastixSendLocatorTest()`.** Builds today's eBay markup
+  in a detached document and runs the real locator against it. Touches no eBay
+  page and sends nothing — safe to paste anywhere.
+
 ## v4.42
 - **Bulk shipping now actually applies its notes.** The batch path always called
   the same `runShipForCard` as the per-card button, and the pre-flight dialog
