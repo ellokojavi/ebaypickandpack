@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260828-v4.42-ship-notes
+// @version      20260831-v4.43-send-locator
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -5859,18 +5859,79 @@
         return null;
     }
 
-    // Deliberately strict. The old locator took any button whose text merely
+    // Deliberately strict. An older locator took any button whose text merely
     // contained "send", which on an order-details page also matches
     // "Send coupon".
+    //
+    // v4.43 — THE AUTO-SEND BUG. eBay's composer Send button now carries a text
+    // label AND an identical aria-label AND an identical title:
+    //   <button id="imageupload__send--button" data-testid="message-send-button"
+    //           title="Send message" aria-label="Send message"
+    //           class="imageupload__sendbutton" type="button">Send message</button>
+    // v4.42 glued value + textContent + aria-label into ONE string, so this
+    // button read as "Send message Send message" and failed /^send( message)?$/.
+    // The second pass only considered type="submit", which this button is not.
+    // findComposerSendButton therefore returned null: sendComposedMessage looped
+    // for 25s without ever finding a control, clicked nothing, logged no
+    // "Clicking Send" line, and ended in "Could not confirm the send after 0
+    // click(s)" — the draft sitting in the box the whole time. That is the exact
+    // reported symptom, and it is a pure locator failure: nothing to do with
+    // trusted events, realms or Tampermonkey.
+    //
+    // Two changes: try eBay's own stable ids first, and match each label source
+    // SEPARATELY so a control that labels itself three times still matches.
     function findComposerSendButton(doc) {
         if (!doc) return null;
+
+        // 1. eBay's own identifiers. Cheapest, most stable, and immune to
+        //    whatever the visible label happens to say next month.
+        const byIdentifier = [
+            '#imageupload__send--button',
+            'button[data-testid="message-send-button"]',
+            'button.imageupload__sendbutton'
+        ];
+        for (const sel of byIdentifier) {
+            let el = null;
+            try { el = doc.querySelector(sel); } catch (e) { continue; }
+            if (el) return el;
+        }
+
+        // 2. Label match, per source. Never concatenated.
         let candidates = [];
         try { candidates = Array.from(doc.querySelectorAll('button, input[type="submit"]')); } catch (e) { return null; }
-        const labelOf = b => ((b.value || '') + ' ' + (b.textContent || '') + ' ' + (b.getAttribute('aria-label') || ''))
-            .replace(/\s+/g, ' ').trim();
-        let btn = candidates.find(b => /^send( message)?$/i.test(labelOf(b)));
-        if (!btn) btn = candidates.find(b => b.type === 'submit' && /\bsend\b/i.test(labelOf(b)) && !/coupon|copy|resend/i.test(labelOf(b)));
+        const labelsOf = b => [b.value, b.textContent, b.getAttribute('aria-label'), b.getAttribute('title')]
+            .map(v => (v || '').replace(/\s+/g, ' ').trim())
+            .filter(Boolean);
+        const isSend = /^send( message)?$/i;
+        const banned = /coupon|copy|resend|cancel|attach|photo|image|offer/i;
+        const clean = b => {
+            const labels = labelsOf(b);
+            return labels.length && !labels.some(l => banned.test(l)) ? labels : null;
+        };
+
+        let btn = candidates.find(b => { const l = clean(b); return l && l.some(x => isSend.test(x)); });
+        if (!btn) btn = candidates.find(b => { const l = clean(b); return b.type === 'submit' && l && l.some(x => /\bsend\b/i.test(x)); });
         return btn || null;
+    }
+
+    // No-op locator test. Builds the exact markup eBay serves today in a
+    // detached document and runs the real locator against it — no eBay contact,
+    // safe on any page. Run altheastixSendLocatorTest() in the console.
+    function altheastixSendLocatorTest() {
+        const doc = document.implementation.createHTMLDocument('locator-test');
+        doc.body.innerHTML =
+            '<textarea id="imageupload__sendmessage--textbox"></textarea>' +
+            '<button type="button" aria-label="Attach photo" title="Attach photo"></button>' +
+            '<button type="button">Send coupon</button>' +
+            '<div class="imageupload__send-btn-wrapper"><button data-testid="message-send-button" ' +
+            'id="imageupload__send--button" title="Send message" class="imageupload__sendbutton" ' +
+            'type="button" aria-label="Send message">Send message</button></div>';
+        const found = findComposerSendButton(doc);
+        const ok = !!found && found.id === 'imageupload__send--button';
+        console.log('[Altheastix][sendlocator] ' + (ok ? 'PASS' : 'FAIL') +
+            ' — locator returned ' + (found ? '#' + (found.id || '(no id)') + ' "' +
+            (found.textContent || '').trim() + '"' : 'null'));
+        return ok;
     }
 
     // Click "Message buyer" until the composer iframe actually loads. Only
@@ -6013,6 +6074,7 @@
         let lastClick = 0;
         let lastNudge = 0;
         let forced = false;
+        let warnedNoButton = false;
         const clickSend = (btn) => {
             clicks++;
             lastClick = Date.now();
@@ -6031,6 +6093,25 @@
 
             const btn = findComposerSendButton(doc);
             const enabled = !!btn && !btn.disabled && btn.getAttribute('aria-disabled') !== 'true';
+
+            // v4.43: silence here used to be total. If the locator matches
+            // nothing the loop simply spun for 25s and reported "0 click(s)"
+            // with no clue why, which is how the v4.42 regression stayed
+            // invisible. Say so once, and dump what the composer does contain.
+            if (!btn && !warnedNoButton && (Date.now() - start) > 2000) {
+                warnedNoButton = true;
+                let all = [];
+                try { all = Array.from(doc.querySelectorAll('button, input[type="submit"]')); } catch (e) {}
+                console.error('[Buyer-Msg] No Send control matched the locator — ' + all.length +
+                    ' candidate(s) in the composer. Nothing will be clicked.');
+                try {
+                    console.table(all.slice(0, 40).map(b => ({
+                        tag: b.tagName, type: b.type, id: b.id,
+                        text: (b.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 30),
+                        aria: b.getAttribute('aria-label') || '', disabled: b.disabled
+                    })));
+                } catch (e) {}
+            }
 
             if (clicks === 0) {
                 if (enabled) {
@@ -6185,8 +6266,10 @@
     // Background (2026-08-28): eBay migrated the composer. The panel iframe is
     // pointed at /contact/sendmsg, which now 302s to /cnt/ViewMessage. On that
     // page the Send control is <button id="imageupload__send--button"
-    // aria-label="Send message" type="button">, an ICON button with NO text —
-    // it is reachable only via aria-label, and it is `disabled` until eBay's
+    // data-testid="message-send-button" aria-label="Send message"
+    // title="Send message" type="button">Send message</button> — it repeats its
+    // own label three times (which is what broke the v4.42 locator), and it is
+    // `disabled` until eBay's
     // own (asynchronous, debounced) input handler runs. Confirmed by hand:
     // insertComposerText's synthetic events DO clear that flag, but only after
     // a delay, so anything reading `disabled` synchronously reads stale state.
@@ -6309,8 +6392,12 @@
     }
     try {
         unsafeWindow.altheastixMsgProbe = altheastixMsgProbe;
+        unsafeWindow.altheastixSendLocatorTest = altheastixSendLocatorTest;
     } catch (e) {
-        try { window.altheastixMsgProbe = altheastixMsgProbe; } catch (e2) {
+        try {
+            window.altheastixMsgProbe = altheastixMsgProbe;
+            window.altheastixSendLocatorTest = altheastixSendLocatorTest;
+        } catch (e2) {
             console.warn('[Altheastix][msgprobe] not reachable from the page console.');
         }
     }
