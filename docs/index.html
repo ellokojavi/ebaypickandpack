@@ -422,12 +422,12 @@ h1.title .lied { white-space: normal; }
   transition: opacity .25s, border-color .25s;
 }
 .card + .card { margin-top: 11px; }
-.card.manila { border: 2px solid #E09A3C; }
-.card.lg     { border: 2px solid #D9D98F; }
-.card.multi  { background: var(--multi-tint, #2a4a3f); }
-.card.multi.t1 { --multi-tint: #2a4a3f; }
-.card.multi.t2 { --multi-tint: #2a3f4a; }
-.card.multi.t3 { --multi-tint: #3a3350; }
+.card.manila { border: 3px solid #E09A3C; }
+.card.lg     { border: 3px solid #ffffb1; }
+/* one SKU, two or more of it: the green wash */
+.card.multiqty { background: #2a4a3f; }
+/* two or more SKUs: the order's own palette colour, shared with its pills */
+.card.multi { background: color-mix(in srgb, var(--order-tint, #CAFFBF) 22%, #242424); border-left: 5px solid var(--order-tint, #CAFFBF); }
 .card.shipped { opacity: .6; border-left: 5px solid #4caf50; }
 .card.failed  { border-left: 5px solid #f87171; }
 .card.dim { opacity: .18; }
@@ -754,6 +754,7 @@ h1.title .lied { white-space: normal; }
    signals stack instead of overwriting each other. Border rules come last so
    they win over .multiqty. */
 .sku.multiqty { background: #2d2a1f; border-color: #755d31; color: #bf9240; }
+.sku.tinted, .sku.tinted.multiqty { background: var(--order-tint); color: #111; font-weight: 700; border-color: #666; }
 .sku.lg     { border: 3px solid #ffffb1; }
 .sku.manila { border: 3px solid #ffd54f; }
 .sku.done { opacity: .42; text-decoration: line-through; }
@@ -2223,11 +2224,11 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
       </div>
 
       <p style="margin-top:2rem;">
-        The panel lists one entry per SKU, not per order, so the same sticker sold three times is one
-        pill reading <span class="mono">×3</span>, so you open its box once and count out the
-        total. Grouped by letter, click any to jump to its order card. The filter matches SKU,
-        buyer name and item title. Packed orders strike through rather than disappearing, so the
-        list doesn't shift while you work down it.
+        The panel lists one pill per order line, sorted by SKU, so every box is visited once and
+        a pill always points at exactly one order. A pill reading <span class="mono">×3</span> means
+        count out three of that sticker for that buyer. Grouped by letter, click any to jump to its
+        order card. The filter matches SKU, buyer name and item title. Packed orders strike through
+        rather than disappearing, so the list doesn't shift while you work down it.
       </p>
       <p class="note" style="margin-top:1.3rem;">
         Live below: filter it, click a SKU, run a batch filter and watch the panel's bulk actions
@@ -2320,11 +2321,13 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
 
       <div class="col" style="margin-inline:0;">
         <p class="caption" id="pp-caption">
-          <b>Colour is physical, not decorative.</b> Orange border means the sticker needs a manila
-          envelope. Pale yellow means an LG item. A green wash means multiple items in one order,
-          each order getting its own tint from a 40-colour palette so two adjacent multi-item
-          orders never look like one. The amber <span class="qty" style="font-size:1em;">×2</span>
-          pill means one SKU, more than one of it, the single most common packing mistake.
+          <b>Colour is physical, not decorative.</b> An order with two or more SKUs takes its own
+          colour from a 40-colour palette, and every one of its pills in the panel carries that
+          colour, so the pills that go into the same envelope read as one group even when they sit
+          in different boxes. A green wash means one SKU, two or more of it, and the amber
+          <span class="qty" style="font-size:1em;">×2</span> pill says the same thing in the panel:
+          the single most common packing mistake. A thick yellow border means a large sticker and a
+          different envelope; orange means manila.
         </p>
       </div>
     </div>
@@ -3447,7 +3450,7 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
         a: "One panel lists every SKU in the batch, alphabetically grouped. Click any SKU to jump straight to its card. Pick the whole batch in one pass through the containers." },
       { t: "Count", tag: "×N pills",
         b: "Quantity hides in eBay's item details as “Qty: 2”, in the same grey as everything else. Sending one when they bought two is the classic error.",
-        a: "Multi-quantity SKUs get an amber pill at 1.5× size, “B01 ×2”, on both the card and the panel. Multi-item orders get a green wash and their own tint from a 40-colour palette." },
+        a: "Multi-quantity SKUs get an amber pill at 1.5× size, “B01 ×2”, in the panel and a green wash on the card. Multi-item orders get their own colour from a 40-colour palette, on the card and on every one of its pills." },
       { t: "Bag", tag: "colour coding",
         b: "Nothing on the page tells you what an order physically needs until you've opened it and read the item titles.",
         a: "The border is the instruction. Orange means a manila envelope. Pale yellow means an LG item. You can sort the whole batch into piles before opening anything." },
@@ -3540,13 +3543,27 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
 
     function money(n) { return "$" + n.toFixed(2); }
 
-    function cardClass(o) {
+    /* The script's own pastel palette: a multi-item order takes the next colour,
+       and every pill of that order plus its card carry it. */
+    var PALETTE = ["#FFADAD", "#A0C4FF", "#CAFFBF", "#FFC6FF", "#FDFFB6", "#9BF6FF", "#FFD6A5", "#BDB2FF"];
+    var tintOf = {};
+    (function () {
+      var n = 0;
+      ORDERS.forEach(function (o, i) { if (o.items.length > 1) tintOf[i] = PALETTE[n++ % PALETTE.length]; });
+    })();
+    function isMultiQty(o) { return o.items.length === 1 && o.items[0].qty > 1; }
+
+    function cardClass(o, i) {
       var c = ["card"];
       if (o.shipped) c.push("shipped");
-      else if (o.kind === "manila") c.push("manila");
-      else if (o.kind === "lg") c.push("lg");
-      else if (o.items.length > 1) { c.push("multi"); c.push("t" + o.tint); }
+      if (o.kind === "manila") c.push("manila");
+      if (o.kind === "lg") c.push("lg");
+      if (o.items.length > 1) c.push("multi");
+      else if (isMultiQty(o)) c.push("multiqty");
       return c.join(" ");
+    }
+    function cardStyle(o, i) {
+      return tintOf[i] ? ' style="--order-tint:' + tintOf[i] + '"' : "";
     }
 
     function renderOrders() {
@@ -3571,7 +3588,7 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
         }).join("");
 
         return (
-          '<div class="' + cardClass(o) + '" data-i="' + i + '" id="ord-' + i + '">' +
+          '<div class="' + cardClass(o, i) + '"' + cardStyle(o, i) + ' data-i="' + i + '" id="ord-' + i + '">' +
             '<div class="cardhead">' +
               '<input type="checkbox" data-sel="' + i + '"' + (o.shipped ? " disabled" : "") +
                 ' aria-label="Select order ' + o.id + '">' +
@@ -3611,44 +3628,37 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
     }
 
     function renderSkus() {
-      /* One pill per SKU, not per order line. If the same sticker appears in
-         three orders you want to open its box once and count out the total,
-         that aggregation is the whole point of a picking list. */
-      var bySku = {};
+      /* One pill per order line, sorted by SKU. A pill belongs to exactly one
+         order, which is what lets a multi-item order colour all of its pills
+         alike so they read as one trip to the table. */
+      var rows = [];
       ORDERS.forEach(function (o, i) {
         o.items.forEach(function (it) {
-          var r = bySku[it.sku];
-          if (!r) {
-            r = bySku[it.sku] = { sku: it.sku, qty: 0, packed: 0, i: i, orders: 0,
-                                  manila: false, lg: false, canada: false, allDone: true, hay: "" };
-          }
-          r.orders += 1;
-          if (o.shipped) { r.packed += it.qty; } else { r.qty += it.qty; r.allDone = false; }
-          if (!o.shipped && r.i === undefined) r.i = i;
-          if (o.kind === "manila") r.manila = true;
-          if (o.kind === "lg") r.lg = true;
-          if (o.kind === "canada") r.canada = true;
-          r.hay += " " + (it.sku + " " + it.title + " " + o.who).toLowerCase();
+          rows.push({ sku: it.sku, qty: it.qty, i: i, o: o,
+                      multi: o.items.length > 1, tint: tintOf[i],
+                      manila: o.kind === "manila", lg: o.kind === "lg", canada: o.kind === "canada",
+                      done: !!o.shipped,
+                      hay: (it.sku + " " + it.title + " " + o.who).toLowerCase() });
         });
       });
-
-      var rows = Object.keys(bySku).map(function (k) { return bySku[k]; });
-      rows.sort(function (a, b) { return a.sku < b.sku ? -1 : a.sku > b.sku ? 1 : 0; });
+      rows.sort(function (a, b) { return a.sku < b.sku ? -1 : a.sku > b.sku ? 1 : a.i - b.i; });
 
       var html = "", prev = null;
       rows.forEach(function (r) {
         if (prev !== null && r.sku[0] !== prev) html += '<span class="skusep"></span>';
         prev = r.sku[0];
-        var cls = ["sku"];
-        if (r.manila) cls.push("manila");
-        if (r.lg) cls.push("lg");
-        if (r.qty > 1) cls.push("multiqty");
-        if (r.allDone) cls.push("done");
-        var n = r.allDone ? r.packed : r.qty;
-        html += '<button class="' + cls.join(" ") + '" type="button" data-jump="' + r.i +
-          '" title="' + (r.orders > 1 ? r.orders + " orders" : "1 order") + '"' +
-          ' data-hay="' + esc(r.hay.trim()) + '">' + (r.allDone ? "\u2714\uFE0F " : "") + r.sku +
-          (n > 1 ? " \u00d7" + n : "") + (r.canada ? " \uD83C\uDDE8\uD83C\uDDE6" : "") + "</button>";
+        var cls = ["sku"], style = "";
+        if (r.multi) { cls.push("tinted"); style = ' style="--order-tint:' + r.tint + '"'; }
+        else {
+          if (r.manila) cls.push("manila");
+          if (r.lg) cls.push("lg");
+        }
+        if (r.qty > 1 && !r.manila) cls.push("multiqty");
+        if (r.done) cls.push("done");
+        html += '<button class="' + cls.join(" ") + '"' + style + ' type="button" data-jump="' + r.i +
+          '" title="' + esc(r.o.who) + '"' +
+          ' data-hay="' + esc(r.hay) + '">' + (r.done ? "\u2714\uFE0F " : "") + r.sku +
+          (r.qty > 1 ? " \u00d7" + r.qty : "") + (r.canada ? " \uD83C\uDDE8\uD83C\uDDE6" : "") + "</button>";
       });
       list.innerHTML = html;
       $("#sku-title").textContent = "SKUs to Pick and Pack (" + rows.length + ")";
