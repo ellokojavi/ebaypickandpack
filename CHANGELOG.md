@@ -1,5 +1,32 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.44
+- **No more blank second page when printing an envelope.** Since v4.39 the
+  envelope box was sized to the *full* declared page — `width: 8.93in;
+  height: 3.878in` against `@page { size: 8.93in 3.878in }`. That only fits if
+  the printer can image the whole sheet edge to edge. The Epson ET-2750 cannot:
+  with the dialog's **Margins: Minimum** it reserves hardware margins (a big one
+  at the bottom), so the printable box is roughly 7% shorter than the sheet, the
+  3.878in-tall envelope overflowed it, and Chrome fragmented the overflow onto a
+  second, empty page. Scaling to 93% made it fit — exactly the ratio you'd
+  expect — which is what pinned the diagnosis.
+- The envelope box no longer tries to span the sheet. It is now only as tall as
+  the ink it carries (`inkHeightIn`: 3.1in for #10, 4.2in for large) and
+  `width: 100%` with `max-width` at the format width, so it shrinks into
+  whatever printable area the driver offers instead of spilling out of it. On a
+  single-format job it also carries `max-height: 100%`, so even a printer with
+  brutal margins can't push it onto a second page.
+- The address is now placed by an absolute offset from the top of the envelope
+  (`addressTopIn`: 1.37in for #10, 2.07in for large) instead of by percentage
+  spacer rows in a 100%-height table, which is what tied its position to the box
+  height in the first place. Measured against the old markup in Chromium: the
+  address block lands at 1.37in vs. the old 1.366in — the same spot on the
+  envelope, now independent of the paper.
+- Verified with Playwright + Chromium against a simulated hardware-margin sheet:
+  the old markup produces 2 pages, the new one 1. A two-envelope job still
+  paginates 2, and a mixed #10/large job still comes out 3 pages at
+  8.93×3.88 / 7×5 / 8.93×3.88 via the named-page path.
+
 ## v4.43
 - **Auto-send works again — the Send button was never being found.** eBay's
   composer Send control now labels itself three times over:

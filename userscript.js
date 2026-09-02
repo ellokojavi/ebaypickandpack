@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260831-v4.43-send-locator
+// @version      20260902-v4.44-envelope-blank-page
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -124,78 +124,100 @@
     // whatever paper the print dialog happened to have selected. The syntax
     // below is valid, which means the print dialog will now actually be driven
     // by these numbers.
+    //
+    // NOTE on `inkHeightIn` (v4.44): `heightIn`/`widthIn` describe the SHEET and
+    // are only ever used for `@page size`. The envelope box itself is sized to
+    // `inkHeightIn`, which is deliberately shorter, because a printer's
+    // printable area is smaller than the sheet — the ET-2750 on "Minimum"
+    // margins loses about 7% of a #10's height. A box sized to the full sheet
+    // overflows that area and Chrome fragments the overflow onto a blank second
+    // page, which is exactly the bug v4.44 fixes. Never set the envelope box
+    // back to `heightIn`.
     const ENVELOPE_FORMATS = {
         standard: {
             key: 'standard',
             label: '#10 envelope',
-            sizeLabel: '8.93 × 3.878 in',
+            sizeLabel: '8.93 \u00d7 3.878 in',
             pageName: 'envstandard',
             widthIn: 8.93,
             heightIn: 3.878,
+            // How tall the printed block actually is. Deliberately shorter than
+            // heightIn — see the note above.
+            inkHeightIn: 3.1,
+            // Distance from the top edge of the envelope to the top of the
+            // delivery address. Measured off the pre-v4.44 table markup in
+            // Chromium so the address lands where it always has.
+            addressTopIn: 1.37,
             // Type scale is per-format: the large envelope is only 78% as wide,
             // so the delivery address comes down a step or long street lines
             // wrap in the middle.
             returnFontPx: 14,
             addressFontPx: 24,
             addressIndent: '20%',
-            spacerTop: '10%',
-            spacerBottom: '30%',
             stampTopPx: 40
         },
         large: {
             key: 'large',
             label: 'Large envelope',
-            sizeLabel: '7 × 5 in',
+            sizeLabel: '7 \u00d7 5 in',
             pageName: 'envlarge',
             widthIn: 7,
             heightIn: 5,
+            inkHeightIn: 4.2,
+            addressTopIn: 2.07,
             returnFontPx: 13,
             addressFontPx: 21,
             addressIndent: '18%',
-            spacerTop: '16%',
-            spacerBottom: '26%',
             stampTopPx: 30
         }
     };
 
     // One envelope's markup, sized for `format`. `stampReminderHTML` is the
-    // faint 🇨🇦 int'l-stamp box (empty for domestic orders).
+    // faint \ud83c\udde8\ud83c\udde6 int'l-stamp box (empty for domestic orders).
+    //
+    // The address is absolutely positioned at `addressTopIn` from the top edge
+    // rather than pushed down by percentage spacer rows in a 100%-height table
+    // (the pre-v4.44 shape), so where it lands no longer depends on how tall the
+    // box is — which is what let the box shrink to `inkHeightIn`.
     function buildEnvelopeHTML(addressHTML, format, stampReminderHTML) {
         const f = format || ENVELOPE_FORMATS.standard;
         const stamp = stampReminderHTML || '';
-        return `<div class="envelope envelope--${f.key}" style="position:relative;">${stamp}` +
-            `<table style="font-family: Arial; width: 100%; height: 100%; border-collapse: collapse;">` +
-            `<tr style="vertical-align: top;"><td style="width: 100%; padding: 14px 0 0 18px; font-size: ${f.returnFontPx}px;">${USER_CONFIG.returnAddress}</td></tr>` +
-            `<tr style="height: ${f.spacerTop};"><td></td></tr>` +
-            `<tr style="vertical-align: top;"><td style="text-align: left; padding-left: ${f.addressIndent}; font-size: ${f.addressFontPx}px;">${addressHTML}</td></tr>` +
-            `<tr style="height: ${f.spacerBottom};"><td></td></tr>` +
-            `</table></div>`;
+        return `<div class="envelope envelope--${f.key}">${stamp}` +
+            `<div class="envelope__return" style="font-size: ${f.returnFontPx}px;">${USER_CONFIG.returnAddress}</div>` +
+            `<div class="envelope__address" style="top: ${f.addressTopIn}in; padding-left: ${f.addressIndent}; font-size: ${f.addressFontPx}px;">${addressHTML}</div>` +
+            `</div>`;
     }
 
     // The <style> for a print job containing `formats` (an array of format
     // objects, possibly with repeats).
     //
     // A job that is all one size gets a plain unnamed `@page` — the simple,
-    // long-standing path. Only a genuinely mixed job reaches for CSS named
-    // pages (`@page envlarge { … }` + `page: envlarge`), which Firefox has
-    // supported since 110. The unnamed rule is still emitted in that case as
-    // the fallback, so on a browser that ignores named pages a mixed job comes
-    // out entirely at #10 rather than at some unrelated default paper size.
+    // long-standing path — plus `max-height: 100%`, which clamps the envelope to
+    // the real printable box no matter how greedy the driver's margins are.
+    // Only a genuinely mixed job reaches for CSS named pages
+    // (`@page envlarge { ... }` + `page: envlarge`), which Firefox has supported
+    // since 110. The unnamed rule is still emitted in that case as the fallback,
+    // so on a browser that ignores named pages a mixed job comes out entirely at
+    // #10 rather than at some unrelated default paper size. `max-height` is NOT
+    // applied to a mixed job: percentages there resolve against the first page,
+    // which would crop the large envelopes.
     function envelopePrintCSS(formats) {
         const used = [];
         (formats || []).forEach(f => { if (f && !used.some(u => u.key === f.key)) used.push(f); });
         if (used.length === 0) used.push(ENVELOPE_FORMATS.standard);
 
         const boxRules = used.map(f =>
-            `.envelope--${f.key} { width: ${f.widthIn}in; height: ${f.heightIn}in; }`
+            `.envelope--${f.key} { max-width: ${f.widthIn}in; height: ${f.inkHeightIn}in; }`
         ).join(' ');
-        const common = `html, body { margin: 0; padding: 0; } ` +
-            `.envelope { padding: 10px; font-family: Arial; box-sizing: border-box; overflow: hidden; } ` +
+        const common = `html, body { margin: 0; padding: 0; height: 100%; } ` +
+            `.envelope { position: relative; width: 100%; padding: 10px; font-family: Arial; box-sizing: border-box; overflow: hidden; } ` +
+            `.envelope__return { padding: 14px 0 0 18px; } ` +
+            `.envelope__address { position: absolute; left: 10px; right: 10px; text-align: left; line-height: 1.3; } ` +
             `${boxRules} .envelope + .envelope { break-before: page; page-break-before: always; }`;
 
         if (used.length === 1) {
             const f = used[0];
-            return `@page { size: ${f.widthIn}in ${f.heightIn}in; margin: 0; } ${common}`;
+            return `@page { size: ${f.widthIn}in ${f.heightIn}in; margin: 0; } ${common} .envelope { max-height: 100%; }`;
         }
         const named = used.map(f =>
             `@page ${f.pageName} { size: ${f.widthIn}in ${f.heightIn}in; margin: 0; } ` +
