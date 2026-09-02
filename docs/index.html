@@ -1173,10 +1173,13 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
     <button class="toc-close" id="toc-close" type="button" aria-label="Close the section index">&times;</button>
   </div>
   <ol class="toc-list" id="toc-list">
+    <li class="toc-group">The 5-minute version</li>
     <li><a href="#s-top">Overview</a></li>
-    <li><a href="#s-problem">The problem</a></li>
-    <li><a href="#s-job">The job</a></li>
     <li><a href="#s-history">How it grew</a></li>
+    <li><a href="#s-job">The job</a></li>
+    <li><a href="#s-picking">Picking</a></li>
+    <li><a href="#s-failure">The silent failure</a></li>
+    <li><a href="#s-howiwork">How I work</a></li>
     <li class="toc-group">What was built</li>
     <li><a href="#s-built">The rebuilt page</a></li>
     <li><a href="#s-picking">Picking</a></li>
@@ -1194,6 +1197,7 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
     <li><a href="#s-dashboard">The tab as dashboard</a></li>
     <li><a href="#s-diagnostics">Diagnostics</a></li>
     <li class="toc-group">Reference</li>
+    <li><a href="#s-howiwork">How I work</a></li>
     <li><a href="#s-timeline">Timeline</a></li>
     <li><a href="#s-inventory">Full inventory</a></li>
   </ol>
@@ -1408,12 +1412,6 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
   <div class="wrap">
     <div class="kicker">Altheastix eBay Order Manager<span>, a Tampermonkey userscript</span></div>
     <h1 class="title">Making eBay picking, packing, and shipping<br><span class="lied">scalable and efficient</span></h1>
-    <p class="lede">
-      eBay tells me what's sold but doesn't tell me which warehouse box the sticker is in, what
-      envelope it needs, or what I've already packed and marked as shipped. This product (a
-      Tampermonkey userscript of 6,000+ lines) streamlines the orders processing and saves me over
-      70% in time spent in picking, shipping, packing (from 45 mins daily to roughly 12 mins).
-    </p>
 
     <div class="ba" id="ba">
       <div class="ba-tabs" role="group" aria-label="Compare the original page with the rebuilt one">
@@ -1437,85 +1435,63 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
       </figure>
     </div>
 
+    <p class="lede">
+      eBay tells me what sold, not which warehouse box the sticker is in, what envelope it needs,
+      or what I've already packed and marked as shipped. A 6,700-line Tampermonkey userscript
+      fixes that, and cut my daily order processing from 45 minutes to about 12.
+    </p>
+
     <div class="herometa">
       <span><b>350</b> items a month</span>
       <span><b>10–15</b> orders a day</span>
       <span><b>~70%</b> less work</span>
-      <span><b>1</b> file, <b>6,215</b> lines</span>
+      <span><b>45 → 12</b> min a day</span>
+      <span><b>1</b> file, <b>6,700+</b> lines</span>
     </div>
+
+    <nav class="quick" aria-label="Five-minute tour">
+      <div class="quick-head"><span class="eyebrow">the 5-minute tour</span><span class="quick-sub">five things worth seeing, in order</span></div>
+      <ol class="quick-list">
+        <li><a class="quick-card" href="#s-history"><span class="qn">1</span><b>Grew from a print button</b><span>Five stages, each the smallest fix to the day's most tedious step.</span><em>see it &rarr;</em></a></li>
+        <li><a class="quick-card" href="#s-job"><span class="qn">2</span><b>Cut 45 minutes a day to 12</b><span>Eight physical steps, each one shortened.</span><em>see it &rarr;</em></a></li>
+        <li><a class="quick-card" href="#s-picking"><span class="qn">3</span><b>Turned an order list into a walking route</b><span>Every SKU is a box letter and a position. Pick the batch in one pass.</span><em>see it &rarr;</em></a></li>
+        <li><a class="quick-card" href="#s-failure"><span class="qn">4</span><b>Made the automation admit when it fails</b><span>Pending, confirmed or failed. Never a green tick that lied.</span><em>see it &rarr;</em></a></li>
+        <li><a class="quick-card" href="#s-messages"><span class="qn">5</span><b>Writes to buyers like a person would</b><span>A thank-you filled from the order itself, sent exactly once.</span><em>see it &rarr;</em></a></li>
+      </ol>
+    </nav>
   </div>
 </header>
 
-<!-- ============================================================
-     THE PROBLEM
-     ============================================================ -->
-<section class="pad-y" id="s-problem">
-  <div class="wrap">
-    <div class="col">
-      <div class="eyebrow">the problem</div>
-      <h2 style="font-size:clamp(1.7rem,4vw,2.4rem);margin-bottom:1.2rem;">
-        eBay's page buys postage. I needed one that runs a pick-and-pack.
-      </h2>
-      <p>
-        Each eBay order gets a weight box, three dimension boxes, a service dropdown and an
-        insurance radio, adding to a total you pay at the top. For ~$5 stickers none of that
-        matters: shipping is always one ounce, and most of the times the same envelope.
-      </p>
-      <p>
-        The two fields that decide what I physically go and fetch, SKU and quantity, are 12px
-        grey under the title. Everything else about packing is absent. <strong>BUT:</strong> almost
-        all info is there to make it a great tool for picking, packing, and shipping.
-      </p>
-
-      <div class="gap-table">
-        <div class="gap-row gap-head">
-          <span>What packing needs</span><span>What eBay's page gives</span>
-        </div>
-        <div class="gap-row">
-          <span><b>Which box the sticker is in</b></span>
-          <span class="miss">SKU, 12px grey, under the title</span>
-        </div>
-        <div class="gap-row">
-          <span><b>How many to count out</b></span>
-          <span class="miss">“Qty: 3”, same grey, same size</span>
-        </div>
-        <div class="gap-row">
-          <span><b>One list of everything to pick</b></span>
-          <span class="miss">A pick list, per order</span>
-        </div>
-        <div class="gap-row">
-          <span><b>Printable addresses for a home printer</b></span>
-          <span class="none">None. Labels are bought, not printed</span>
-        </div>
-        <div class="gap-row">
-          <span><b>Which orders need a manila envelope</b></span>
-          <span class="none">None. Open each one and read it</span>
-        </div>
-        <div class="gap-row">
-          <span><b>Orders that arrived since the page loaded</b></span>
-          <span class="none">None. The page is a snapshot</span>
-        </div>
-        <div class="gap-row">
-          <span><b>What's already packed</b></span>
-          <span class="none">None</span>
-        </div>
-        <div class="gap-row">
-          <span><b>Weight and dimensions</b></span>
-          <span class="has">Six inputs per order</span>
-        </div>
-        <div class="gap-row">
-          <span><b>Insurance</b></span>
-          <span class="has">Two radios per order</span>
-        </div>
-      </div>
-
-      <p style="margin-top:1.8rem;">
-        The pick list was the one thing on the page shaped like the job. The rest is a rebuild of
-        that page, in the browser, around the eight steps below.
-      </p>
-    </div>
-  </div>
-</section>
+<style>
+/* ============================================================
+   FIVE-MINUTE TOUR STRIP
+   ============================================================ */
+.quick { margin-top: clamp(2rem, 4vw, 3rem); }
+.quick-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: .4rem 1rem; margin-bottom: .8rem; }
+.quick-sub { font-family: var(--display); font-size: .82rem; color: var(--muted); }
+.quick-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .6rem; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); }
+@media (min-width: 60rem) { .quick-list { grid-template-columns: repeat(5, 1fr); } }
+.quick-card {
+  display: flex; flex-direction: column; gap: .3rem; height: 100%;
+  padding: .85rem .95rem .8rem;
+  border: 1px solid var(--rule); border-radius: 10px; background: var(--surface);
+  text-decoration: none; color: inherit;
+  transition: border-color .15s, transform .15s, box-shadow .15s;
+}
+.quick-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: var(--shadow-lift); }
+.quick-card .qn { font-family: var(--mono); font-size: .62rem; letter-spacing: .1em; color: var(--accent); }
+.quick-card b { font-family: var(--display); font-size: 1rem; line-height: 1.25; letter-spacing: -0.01em; color: var(--ink); }
+.quick-card span:not(.qn) { font-family: var(--display); font-size: .8rem; line-height: 1.45; color: var(--ink-2); }
+.quick-card em { margin-top: auto; padding-top: .35rem; font-style: normal; font-family: var(--mono); font-size: .64rem; letter-spacing: .06em; color: var(--muted); }
+.quick-card:hover em { color: var(--accent); }
+/* a bigger before/after switch, since it now leads the page */
+.ba { margin-top: clamp(1.4rem, 3vw, 2.2rem); }
+.ba-tabs { max-width: 40rem; }
+.ba-tabs button { padding: .8rem 1.1rem; }
+.ba-tabs button .l { font-size: 1.05rem; }
+.ba-tabs button .d { font-size: .66rem; }
+.lede { margin-top: clamp(1.4rem, 3vw, 2rem); }
+</style>
 
 <style>
 /* ============================================================
@@ -1825,6 +1801,36 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 </style>
 
 <!-- ============================================================
+     HISTORY: how the tool grew
+     ============================================================ -->
+<section class="pad-y" id="s-history">
+  <div class="wrap">
+    <div class="col" style="margin-bottom:1.4rem;">
+      <div class="eyebrow">how it grew</div>
+      <h2 style="font-size:clamp(1.55rem,3.6vw,2.1rem);margin-bottom:1rem;">
+        It started as a print button.
+      </h2>
+      <p>
+        Nothing here was planned as a product. Each stage was the smallest thing that removed the
+        day's most tedious step, and each one made the next step obvious.
+      </p>
+    </div>
+
+    <div class="rules">
+      <div class="rule-row three head"><span>Stage</span><span>What it did</span><span class="tools">Built with</span></div>
+      <div class="rule-row three"><b>Print envelope</b><span>A few lines of JavaScript on eBay's original page: paste the address into a div, print that div at envelope size.</span><span class="tools">JS + a lot of StackOverflow + CotEditor</span></div>
+      <div class="rule-row three"><b>Picking and packing</b><span>As volume grew, picking was organised around box letter plus sticker number, which forced the SKUs into a layout that scales.</span><span class="tools">JS + a lot of StackOverflow + CotEditor</span></div>
+      <div class="rule-row three"><b>Mark as shipped</b><span>Became a mark-as-shipped handler, so no order had to be opened and clicked through by hand.</span><span class="tools">ChatGPT + Grok + VS Code</span></div>
+      <div class="rule-row three"><b>Talking to buyers</b><span>Every shipped order gets a customised &ldquo;your order is on its way&rdquo; message; stock-outs get a kind, pre-canned ask to wait.</span><span class="tools">ChatGPT + Gemini + VS Code</span></div>
+      <div class="rule-row three"><b>Talking to buyers v2</b><span>Sends verified against eBay, a retry that can never message twice, and the code moved into a GitHub repo that now handles versioning.</span><span class="tools">Claude Code + GitHub</span></div>
+      <div class="rule-row three"><b>Destinations and envelopes</b><span>Canada visually separated from the US, and several envelope formats instead of one, each a versioned commit.</span><span class="tools">Claude Code + GitHub</span></div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ============================================================
      THE JOB: the physical work the script is compressing
      ============================================================ -->
 <section class="pad-y" id="s-job" style="background:var(--ground-deep);border-bottom:1px solid var(--rule);">
@@ -1914,8 +1920,100 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
         afterwards to find out what actually went out.
       </p>
     </div>
+
+    <details class="more" id="s-problem">
+      <summary><span class="more-lbl">Why eBay's own page doesn't work for this</span><span class="more-hint">show</span></summary>
+      <div class="more-body col">
+        <h3 class="more-title">eBay's page buys postage. I needed one that runs a pick-and-pack.</h3>
+      <p>
+        Each eBay order gets a weight box, three dimension boxes, a service dropdown and an
+        insurance radio, adding to a total you pay at the top. For ~$5 stickers none of that
+        matters: shipping is always one ounce, and most of the times the same envelope.
+      </p>
+      <p>
+        The two fields that decide what I physically go and fetch, SKU and quantity, are 12px
+        grey under the title. Everything else about packing is absent. <strong>BUT:</strong> almost
+        all info is there to make it a great tool for picking, packing, and shipping.
+      </p>
+
+      <div class="gap-table">
+        <div class="gap-row gap-head">
+          <span>What packing needs</span><span>What eBay's page gives</span>
+        </div>
+        <div class="gap-row">
+          <span><b>Which box the sticker is in</b></span>
+          <span class="miss">SKU, 12px grey, under the title</span>
+        </div>
+        <div class="gap-row">
+          <span><b>How many to count out</b></span>
+          <span class="miss">“Qty: 3”, same grey, same size</span>
+        </div>
+        <div class="gap-row">
+          <span><b>One list of everything to pick</b></span>
+          <span class="miss">A pick list, per order</span>
+        </div>
+        <div class="gap-row">
+          <span><b>Printable addresses for a home printer</b></span>
+          <span class="none">None. Labels are bought, not printed</span>
+        </div>
+        <div class="gap-row">
+          <span><b>Which orders need a manila envelope</b></span>
+          <span class="none">None. Open each one and read it</span>
+        </div>
+        <div class="gap-row">
+          <span><b>Orders that arrived since the page loaded</b></span>
+          <span class="none">None. The page is a snapshot</span>
+        </div>
+        <div class="gap-row">
+          <span><b>What's already packed</b></span>
+          <span class="none">None</span>
+        </div>
+        <div class="gap-row">
+          <span><b>Weight and dimensions</b></span>
+          <span class="has">Six inputs per order</span>
+        </div>
+        <div class="gap-row">
+          <span><b>Insurance</b></span>
+          <span class="has">Two radios per order</span>
+        </div>
+      </div>
+
+      <p style="margin-top:1.8rem;">
+        The pick list was the one thing on the page shaped like the job. The rest is a rebuild of
+        that page, in the browser, around the eight steps above.
+      </p>
+      </div>
+    </details>
   </div>
 </section>
+
+<style>
+/* ============================================================
+   COLLAPSED DETAIL BLOCKS
+   ============================================================ */
+details.more { margin-top: 1.6rem; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+details.more > summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center; gap: .8rem;
+  padding: .8rem 1rem; font-family: var(--display); font-size: .92rem; font-weight: 600; color: var(--ink);
+}
+details.more > summary::-webkit-details-marker { display: none; }
+details.more > summary::before {
+  content: ""; width: .5rem; height: .5rem; flex: none;
+  border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
+  transform: rotate(-45deg); transition: transform .15s; margin-left: .1rem;
+}
+details.more[open] > summary::before { transform: rotate(45deg); }
+details.more > summary .more-hint { margin-left: auto; font-family: var(--mono); font-size: .62rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+details.more[open] > summary .more-hint::after { content: " less"; }
+details.more:not([open]) > summary .more-hint::after { content: " the details"; }
+details.more > summary:hover { background: var(--surface-2); border-radius: 10px; }
+details.more[open] > summary { border-bottom: 1px solid var(--rule); }
+details.more > .more-body { padding: 1.2rem 1rem 1.4rem; }
+details.more .more-title { font-family: var(--display); font-size: 1.15rem; line-height: 1.3; margin: 0 0 .9rem; color: var(--ink); letter-spacing: -0.01em; }
+.more-body.col { max-width: none; }
+.more-body > p, .more-body > .note { max-width: 62ch; }
+section[data-collapse] .more-body > *:first-child { margin-top: 0; }
+</style>
 
 <style>
 /* ============================================================
@@ -2049,36 +2147,6 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
   color: var(--ink-2); margin: 0;
 }
 </style>
-
-<hr class="rule">
-
-<!-- ============================================================
-     HISTORY: how the tool grew
-     ============================================================ -->
-<section class="pad-y" id="s-history">
-  <div class="wrap">
-    <div class="col" style="margin-bottom:1.4rem;">
-      <div class="eyebrow">how it grew</div>
-      <h2 style="font-size:clamp(1.55rem,3.6vw,2.1rem);margin-bottom:1rem;">
-        It started as a print button.
-      </h2>
-      <p>
-        Nothing here was planned as a product. Each stage was the smallest thing that removed the
-        most tedious step of the day, and each one made the next step obvious.
-      </p>
-    </div>
-
-    <div class="rules">
-      <div class="rule-row three head"><span>Stage</span><span>What it did</span><span class="tools">Built with</span></div>
-      <div class="rule-row three"><b>Print envelope</b><span>A few lines of JavaScript on top of eBay's original page. Paste the buyer's address into a div, call the print dialog, and have that div come out formatted to the size of an envelope. That was the whole tool.</span><span class="tools">JS + a lot of StackOverflow + CotEditor</span></div>
-      <div class="rule-row three"><b>Picking and packing</b><span>As order volume grew, the script started organising the picking itself around a numbering mechanism: box letter plus sticker number. That forced the SKUs to be arranged in a way that scales, and turned the order list into a walking route through the containers.</span><span class="tools">JS + a lot of StackOverflow + CotEditor</span></div>
-      <div class="rule-row three"><b>Mark as shipped</b><span>Next it became a mark-as-shipped handler, so every order no longer had to be opened and clicked through by hand once it was in the mailbox.</span><span class="tools">ChatGPT + Grok + VS Code</span></div>
-      <div class="rule-row three"><b>Talking to buyers</b><span>Then it learned to communicate. Every time an order goes out, the buyer gets a customised, relevant &ldquo;your order is being shipped&rdquo; message. When stock is the problem, pre-canned messages ask them, kindly, to wait.</span><span class="tools">ChatGPT + Gemini + VS Code</span></div>
-      <div class="rule-row three"><b>Talking to buyers v2</b><span>Messaging made trustworthy: every send verified against eBay before the tab closes, a retry that can never message a buyer twice, and an end-of-batch sweep that catches the ones that slipped. The code also moved into a GitHub repository, which now lives online and handles versioning.</span><span class="tools">Claude Code + GitHub</span></div>
-      <div class="rule-row three"><b>Destinations and envelopes</b><span>After that, visually separating Canada from US destinations, and handling several envelope formats rather than one, came in the way and were absorbed too, each one a versioned commit in the GitHub repo.</span><span class="tools">Claude Code + GitHub</span></div>
-    </div>
-  </div>
-</section>
 
 <hr class="rule">
 
@@ -2268,7 +2336,7 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 <!-- ============================================================
      DERIVED STATE
      ============================================================ -->
-<section class="pad-y" id="s-filters">
+<section class="pad-y" id="s-filters" data-collapse="More on this">
   <div class="wrap">
     <div class="col">
       <div class="eyebrow"><span class="v">v4.29–4.34</span> filters that can't lie either</div>
@@ -2304,7 +2372,7 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 <!-- ============================================================
      ORDER WATCH: new orders without a reload
      ============================================================ -->
-<section class="pad-y" id="s-watch">
+<section class="pad-y" id="s-watch" data-collapse>
   <div class="wrap">
     <div class="col" style="margin-bottom:1.8rem;">
       <div class="eyebrow">2 &middot; new orders, no reload</div>
@@ -2380,7 +2448,7 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 <!-- ============================================================
      POSTAGE + ENVELOPES
      ============================================================ -->
-<section class="pad-y" id="s-postage">
+<section class="pad-y" id="s-postage" data-collapse>
   <div class="wrap">
     <div class="col" style="margin-bottom:2rem;">
       <div class="eyebrow"><span class="v">v3.26–4.36</span> three kinds of postage</div>
@@ -2444,7 +2512,7 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 <!-- ============================================================
      ADDRESS VALIDATION: live
      ============================================================ -->
-<section class="pad-y" id="s-addresses">
+<section class="pad-y" id="s-addresses" data-collapse>
   <div class="wrap">
     <div class="col" style="margin-bottom:2rem;">
       <div class="eyebrow"><span class="v">v3.34–3.43</span> the address as data to be linted</div>
@@ -2504,7 +2572,7 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 <!-- ============================================================
      THE BATCH
      ============================================================ -->
-<section class="pad-y" id="s-batch">
+<section class="pad-y" id="s-batch" data-collapse>
   <div class="wrap">
     <div class="col" style="margin-bottom:2rem;">
       <div class="eyebrow"><span class="v">v4.23–4.35</span> a batch you can walk away from</div>
@@ -2557,7 +2625,7 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 <!-- ============================================================
      MESSAGING
      ============================================================ -->
-<section class="pad-y" id="s-messages">
+<section class="pad-y" id="s-messages" data-collapse>
   <div class="wrap">
     <div class="col" style="margin-bottom:2rem;">
       <div class="eyebrow"><span class="v">v4.15–4.23</span> what the buyer is told</div>
@@ -2845,7 +2913,7 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 <!-- ============================================================
      REASONING FROM AN ABSENCE
      ============================================================ -->
-<section class="pad-y" id="s-knows">
+<section class="pad-y" id="s-knows" data-collapse="More on this">
   <div class="wrap">
     <div class="col">
       <div class="eyebrow"><span class="v">v4.24–4.25</span> how it knows</div>
@@ -2877,7 +2945,7 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 <!-- ============================================================
      AMBIENT STATUS
      ============================================================ -->
-<section class="pad-y" id="s-dashboard">
+<section class="pad-y" id="s-dashboard" data-collapse>
   <div class="wrap">
     <div class="col" style="margin-bottom:2rem;">
       <div class="eyebrow"><span class="v">v3.79–4.28</span> the tab as a dashboard</div>
@@ -2931,7 +2999,7 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 <!-- ============================================================
      DIAGNOSTICS
      ============================================================ -->
-<section class="pad-y" id="s-diagnostics">
+<section class="pad-y" id="s-diagnostics" data-collapse>
   <div class="wrap">
     <div class="col" style="margin-bottom:2rem;">
       <div class="eyebrow">diagnostics</div>
@@ -2971,12 +3039,47 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 <hr class="rule">
 
 <!-- ============================================================
+     HOW I WORK
+     ============================================================ -->
+<section class="pad-y" id="s-howiwork" style="background:var(--ground-deep);border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);">
+  <div class="wrap">
+    <div class="col">
+      <div class="eyebrow">what this says about how I work</div>
+      <h2 style="font-size:clamp(1.55rem,3.6vw,2.1rem);margin-bottom:1rem;">
+        I build for the job on the table, not the screen.
+      </h2>
+      <p>
+        Every feature here started with a physical step: a walk to a box, a count, an envelope,
+        a stamp. The screen is only the part where you find out what to go and get, so the page
+        was rebuilt around the walk rather than around eBay's data model.
+      </p>
+      <p>
+        I made the automation honest before I made it faster. A tool that acts on its own has to
+        be able to say when it failed; the five versions spent on that one green checkmark changed
+        how everything after it was built, and every risky subsystem now ships with a report, a
+        dry run and a simulator.
+      </p>
+      <p>
+        I used whatever tool removed the most drudgery at each stage, from StackOverflow and a text
+        editor to ChatGPT, Gemini, Grok and now Claude Code with GitHub for versioning, while keeping
+        the design decisions, the scope and the order of work my own.
+      </p>
+      <p>
+        And I shipped small: 112 versions to a single user, me, each one the smallest change that
+        removed the day's most tedious step. That is how a print button became a 6,700-line
+        pick-and-pack system without ever being planned as one.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
      TIMELINE
      ============================================================ -->
 <section class="pad-y" id="s-timeline">
   <div class="wrap">
     <div class="col" style="margin-bottom:1.4rem;">
-      <div class="eyebrow">v3.26 &rarr; v4.38</div>
+      <div class="eyebrow">v3.26 &rarr; today</div>
       <h2 style="font-size:clamp(1.55rem,3.6vw,2.1rem);margin-bottom:1rem;">
         Build order.
       </h2>
@@ -3049,6 +3152,49 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
   </div>
 </section>
 
+
+<script>
+/* Secondary sections keep their eyebrow, headline and first paragraph in view;
+   everything after that folds into a details block. Navigating to the section
+   (contents, tour strip, a hash) unfolds it. */
+(function () {
+  var secs = document.querySelectorAll("section[data-collapse]");
+  Array.prototype.forEach.call(secs, function (sec) {
+    var wrap = sec.querySelector(":scope > .wrap"); if (!wrap) return;
+    var col = wrap.querySelector(":scope > .col"); if (!col) return;
+    var det = document.createElement("details"); det.className = "more";
+    var sum = document.createElement("summary");
+    sum.innerHTML = '<span class="more-lbl"></span><span class="more-hint">show</span>';
+    sum.querySelector(".more-lbl").textContent = sec.getAttribute("data-collapse") || "See it working";
+    var body = document.createElement("div"); body.className = "more-body";
+    det.appendChild(sum); det.appendChild(body);
+    /* everything in the col after the first paragraph */
+    var kids = Array.prototype.slice.call(col.children), seenP = false, moved = [];
+    kids.forEach(function (k) {
+      if (seenP) moved.push(k);
+      else if (k.tagName === "P") seenP = true;
+    });
+    /* everything in the wrap after the col */
+    var sib = col.nextElementSibling;
+    while (sib) { moved.push(sib); sib = sib.nextElementSibling; }
+    moved.forEach(function (n) { body.appendChild(n); });
+    col.style.marginBottom = "0";
+    wrap.appendChild(det);
+  });
+  function openFor(hash) {
+    if (!hash) return;
+    var el = document.getElementById(hash.replace(/^#/, "")); if (!el) return;
+    var det = el.matches("details.more") ? el : el.querySelector("details.more");
+    if (det && !det.open) det.open = true;
+  }
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest("a[href^='#']"); if (a) openFor(a.getAttribute("href"));
+  });
+  window.addEventListener("hashchange", function () { openFor(location.hash); });
+  openFor(location.hash);
+})();
+</script>
+
 <!-- ============================================================
      COLOPHON
      ============================================================ -->
@@ -3059,14 +3205,14 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
         <h5>Altheastix eBay Order Manager</h5>
         <p>
           A single Tampermonkey userscript that rebuilds eBay's bulk shipping page into a
-          pick-and-pack tool. Built by Javier for a sticker shop that ships about 350 items a month,
-          with modifications from Grok, Gemini, Claude and GitHub Copilot.
+          pick-and-pack tool. Designed and built by Javier for a sticker shop that ships about
+          350 items a month, with AI coding tools as pair programmers along the way.
         </p>
       </div>
       <div>
         <h5>By the numbers</h5>
         <ul class="tnum">
-          <li>6,215 lines, one file</li>
+          <li>6,700+ lines, one file</li>
           <li>112 versions</li>
           <li>228 commits</li>
           <li>7 eBay pages matched</li>
