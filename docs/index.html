@@ -502,42 +502,78 @@ h1.title .lied { white-space: normal; }
 .addrpanel {
   background: var(--ebay-card);
   border: 1px solid var(--ebay-line);
-  border-radius: 8px;
-  padding: 10px 11px;
-  font-size: 11.5px; line-height: 1.45;
+  border-radius: 10px;
+  padding: 12px 13px;
+  font-size: 12.5px; line-height: 1.5;
   align-self: start;
 }
 .card.multi .addrpanel { background: rgba(0,0,0,.18); }
-.aname { font-weight: 700; font-size: 12.5px; color: #fff; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.aname { font-weight: 700; font-size: 13.5px; color: #fff; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .alines { color: var(--ebay-txt); margin-top: 2px; font-variant-numeric: tabular-nums; }
-.alinks { margin-top: 6px; display: flex; gap: 10px; }
+.alinks { margin-top: 8px; display: flex; gap: 12px; font-size: 13px; }
 .alinks span { color: var(--ebay-link2); font-weight: 600; cursor: pointer; }
 .alinks span:hover { text-decoration: underline; }
-.msgrow { display: flex; gap: 6px; margin-top: 9px; }
-.msgrow .fakesel {
-  flex: 1 1 auto; min-width: 0;
-  background: var(--ebay-btn); border: 1px solid var(--ebay-btn-bd);
-  border-radius: 5px; padding: 5px 7px; font-size: 11px; color: var(--ebay-txt);
-  display: flex; align-items: center; justify-content: space-between; gap: 4px;
-  cursor: pointer; white-space: nowrap; overflow: hidden;
+.msgrow { display: flex; gap: 8px; margin-top: 10px; }
+.msgrow .msgsel {
+  flex: 1 1 auto; min-width: 0; appearance: none; -webkit-appearance: none;
+  background: var(--ebay-btn) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%23e0e0e0' stroke-width='1.5'/></svg>") no-repeat right 9px center;
+  border: 1px solid var(--ebay-btn-bd);
+  border-radius: 7px; padding: 6px 24px 6px 9px; font-size: 12.5px; color: var(--ebay-txt);
+  font-family: inherit; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.msgrow .msgsel:focus { outline: none; border-color: var(--ebay-blue); }
 .btnblue {
   font-family: var(--display); font-weight: 700; font-size: 11.5px;
   background: var(--ebay-blue); color: #fff; border: 0;
-  border-radius: 5px; padding: 6px 11px; cursor: pointer; white-space: nowrap;
+  border-radius: 7px; padding: 7px 13px; cursor: pointer; white-space: nowrap;
 }
 .btnblue:hover:not(:disabled) { background: #3355d8; }
-.btnblue.full { display: block; width: 100%; margin-top: 8px; padding: 8px; font-size: 12.5px; }
+.btnblue.full { display: block; width: 100%; margin-top: 10px; padding: 9px; font-size: 13px; border-radius: 8px; }
 .btnblue:disabled { opacity: .5; cursor: not-allowed; }
-.thankrow { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 11.5px; cursor: pointer; }
-.thankrow input { accent-color: var(--ebay-blue); margin: 0; }
-.shiprow { display: flex; align-items: center; gap: 5px; margin-top: 7px; font-size: 10px; color: var(--ebay-sold); white-space: nowrap; }
-.seg { display: inline-flex; border-radius: 5px; overflow: hidden; border: 1px solid var(--ebay-btn-bd); }
+.thankrow { display: flex; align-items: center; gap: 7px; margin-top: 10px; font-size: 12.5px; cursor: pointer; }
+.thankrow input { accent-color: var(--ebay-blue); margin: 0; width: 14px; height: 14px; }
+.shiprow { display: flex; align-items: center; gap: 7px; margin-top: 9px; font-size: 11.5px; color: var(--ebay-sold); white-space: nowrap; }
+.seg { display: inline-flex; border-radius: 8px; overflow: hidden; border: 1px solid var(--ebay-btn-bd); }
 .seg span {
-  padding: 2px 7px; font-size: 10px; font-weight: 600;
+  padding: 3px 9px; font-size: 11.5px; font-weight: 600;
   background: var(--ebay-btn); color: var(--ebay-txt); cursor: pointer;
 }
 .seg span.on { background: var(--ebay-blue); color: #fff; }
+
+/* --- the canned-message modal, styles lifted from the script --- */
+.cmdemo { display: grid; gap: 14px; grid-template-columns: minmax(0,1fr); align-items: start; }
+@media (min-width: 52rem) { .cmdemo { grid-template-columns: 280px minmax(0,1fr); } }
+.cm-card { max-width: 300px; }
+.thankrow { color: var(--ebay-txt); }
+.cm-hint { margin: 10px 0 0; font-size: 11px; color: var(--ebay-sold); }
+.canned-modal-content {
+  background: #2a2a2a; padding: 20px; border-radius: 8px; max-width: 420px;
+  display: flex; flex-direction: column; gap: 15px; border: 1px solid #555;
+  box-shadow: 0 18px 50px rgba(0,0,0,.5);
+}
+.canned-modal-content h3 { margin: 0 0 10px; font-size: 18px; color: #e0e0e0; font-weight: 700; }
+.canned-modal-input {
+  width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #3f7a55;
+  background-color: #3a3a3a; color: #5fd98a; font-weight: 600; font-family: inherit; font-size: 13px; box-sizing: border-box;
+}
+.canned-modal-input::placeholder { color: #8a8a8a; font-weight: 400; }
+.canned-modal-input:focus { outline: none; border-color: #5fd98a; }
+.canned-modal-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
+.canned-modal-button { padding: 8px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: 700; font-family: inherit; font-size: 13px; }
+.canned-modal-button.primary { background-color: #3665f3; color: #fff; }
+.canned-modal-button.secondary { background-color: #555; color: #e0e0e0; }
+.canned-modal-preview-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; margin-bottom: -8px; color: #9aa0a6; }
+.canned-modal-preview-status { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.canned-modal-preview-status a { color: #5fd98a; }
+.canned-modal-preview {
+  white-space: pre-wrap; word-break: break-word; background-color: #1f1f1f; border: 1px dashed #666;
+  border-radius: 6px; padding: 10px 12px; font-size: 13px; line-height: 1.45; min-height: 40px; max-height: 240px; overflow-y: auto; color: #d0d0d0; cursor: text;
+}
+.canned-modal-preview:focus { outline: none; border-style: solid; border-color: #3665f3; }
+.canned-modal-token { color: #5fd98a; font-weight: 600; }
+.canned-modal-pill { display: inline-block; padding: 1px 8px; margin: 0 1px; border-radius: 9px; font-size: 11px; font-weight: 600; line-height: 1.5; color: #5fd98a; background-color: rgba(95,217,138,.14); border: 1px dashed #3f7a55; }
+.cm-done { font-size: 12.5px; color: #d0d0d0; background: #1f2a22; border: 1px solid #3f7a55; border-radius: 8px; padding: 10px 12px; max-width: 420px; }
+.cm-done b { color: #5fd98a; }
 
 /* address validation badge */
 .badge {
@@ -1053,24 +1089,61 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
   font-family: var(--display);
   container-type: inline-size;
 }
+/* Sizes match the script's real print output: a small return block top-left,
+   the recipient about a third of the way down at roughly 1.5× that size. */
 .envelope .ret {
-  font-size: 3.1cqw; line-height: 1.35; color: #4c4130;
+  position: absolute; left: 4.3%; top: 8.5%;
+  font-size: 2cqw; line-height: 1.32; color: #111;
 }
 .envelope .to {
   position: absolute;
-  left: 38%; top: 46%;
-  font-size: 4.1cqw; line-height: 1.42; font-weight: 500;
+  left: 21.5%; top: 36%;
+  font-size: 3.05cqw; line-height: 1.28; font-weight: 400; color: #111;
 }
 .envelope .stamp {
   position: absolute; right: 5.5%; top: 8%;
-  width: 15%; aspect-ratio: 1 / 1.15;
-  border: 1px dashed #BCA98A;
-  border-radius: 2px;
+  width: 13%; aspect-ratio: 1 / 1.15;
   display: grid; place-items: center; gap: 2%;
-  font-size: 2.6cqw; text-align: center; color: #8a7a5c;
+  font-size: 2.1cqw; text-align: center; color: #b9ad95;
   line-height: 1.2;
 }
-.envelope .stamp .flag { font-size: 5cqw; }
+.envelope .stamp .flag { font-size: 4.2cqw; opacity: .55; }
+.envelope .stamp:empty { display: none; }
+#watchdemo .skupanel.ui .btn { font-size: 12px; font-weight: 600; padding: 5px 9px; }
+
+/* --- the eBay-printed envelope: what an ESE label actually looks like --- */
+.envelope .env-label { display: none; }
+.envelope.is-label .env-plain { display: none; }
+.envelope.is-label .env-label { display: block; }
+.envelope.is-label { background: #F4F1E6; }
+.env-label { position: absolute; inset: 0; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; color: #1c1c1c; }
+.env-label .lbl-corner { position: absolute; left: 4%; top: 9%; font-size: 1.75cqw; line-height: 1.3; }
+.env-label .lbl-corner b { display: block; font-size: 2cqw; font-weight: 700; margin-bottom: .2em; }
+.env-label .lbl-corner .lbl-trk { display: block; font-weight: 700; }
+.env-label .lbl-corner .lbl-from { display: block; margin-top: .35em; font-size: 1.75cqw; }
+.env-label .lbl-fim { position: absolute; left: 47%; top: 7%; height: 12%; display: flex; gap: .55cqw; align-items: stretch; }
+.env-label .lbl-fim i { display: block; width: .55cqw; background: #111; }
+.env-label .lbl-fim i:nth-child(2), .env-label .lbl-fim i:nth-child(5), .env-label .lbl-fim i:nth-child(8) { width: .2cqw; }
+.env-label .lbl-meter { position: absolute; right: 5%; top: 7%; display: flex; gap: 1.2cqw; align-items: flex-start; }
+.env-label .lbl-meter-txt { text-align: right; font-size: 1.15cqw; line-height: 1.15; }
+.env-label .lbl-meter-txt span { display: block; }
+.env-label .lbl-meter-txt .pb { letter-spacing: .05em; font-size: 1.05cqw; }
+.env-label .lbl-meter-txt .amt { font-size: 2.6cqw; font-weight: 700; line-height: 1; margin: .1em 0; }
+.env-label .lbl-meter-txt .amt sup { font-size: .5em; font-weight: 700; text-decoration: underline; }
+.env-label .lbl-meter-txt .cls { font-weight: 700; font-size: 1.25cqw; }
+.env-label .lbl-meter-txt .num { margin-top: .25em; font-size: 1.05cqw; }
+.env-label .lbl-dm { width: 8.5cqw; height: 8.5cqw; display: grid; grid-template-columns: repeat(18, 1fr); grid-template-rows: repeat(18, 1fr); border-left: .45cqw solid #111; border-bottom: .45cqw solid #111; box-sizing: border-box; }
+.env-label .lbl-dm i { display: block; }
+.env-label .lbl-dm i.on { background: #111; }
+.env-label .lbl-to { position: absolute; left: 30%; top: 47%; }
+.env-label .lbl-imb { display: flex; align-items: center; gap: .32cqw; height: 4.2cqw; margin-bottom: .6cqw; }
+.env-label .lbl-imb i { display: block; width: .28cqw; background: #111; }
+.env-label .lbl-imb i.t { height: 45%; align-self: flex-start; margin-top: 0; }
+.env-label .lbl-imb i.a { height: 70%; align-self: flex-start; }
+.env-label .lbl-imb i.d { height: 70%; align-self: flex-end; }
+.env-label .lbl-imb i.f { height: 100%; }
+.env-label .lbl-imb i.t { height: 45%; align-self: center; }
+.env-label .lbl-addr { font-size: 3cqw; line-height: 1.25; text-transform: uppercase; letter-spacing: .01em; }
 
 /* ============================================================
    FOOTER
@@ -1184,7 +1257,6 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
     <li class="toc-group">What was built</li>
     <li><a href="#s-built">The rebuilt page</a></li>
     <li><a href="#s-picking">Picking</a></li>
-    <li><a href="#s-filters">Filters</a></li>
     <li><a href="#s-watch">Order watch</a></li>
     <li><a href="#s-postage">Postage</a></li>
     <li><a href="#s-addresses">Addresses</a></li>
@@ -2334,40 +2406,7 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
   </div>
 </section>
 
-<hr class="rule">
 
-<!-- ============================================================
-     DERIVED STATE
-     ============================================================ -->
-<section class="pad-y" id="s-filters" data-collapse="More on this">
-  <div class="wrap">
-    <div class="col">
-      <div class="eyebrow"><span class="v">v4.29–4.34</span> filters that can't lie either</div>
-      <h2 style="font-size:clamp(1.55rem,3.6vw,2.1rem);margin-bottom:1rem;">
-        The checkbox answers “is this list filtered right now?”, not “did I click this a while ago?”
-      </h2>
-      <p>
-        A filter's checkbox is ticked only while the selection is exactly what that filter would
-        produce, indeterminate while it's a subset, and clear once the selection reaches outside
-        it. Untick one order above and the box drops immediately.
-      </p>
-      <p>
-        It reads correctly even where the sets overlap. Select 🇨🇦 Canada in the demo and the
-        <em>standard envelope</em> box goes indeterminate rather than clear. A Canadian order under
-        the threshold is still a hand-addressed envelope, just one that needs an international
-        stamp. The box is telling you the truth: what you have selected is <em>part</em> of that
-        filter's work, not all of it.
-      </p>
-      <p>
-        Shipped orders are excluded from the counts and the selection, so a filter can't re-add
-        envelopes packed an hour ago. A filter matching nothing stays visible but disabled at
-        <span class="mono">(0)</span> rather than vanishing.
-      </p>
-    </div>
-  </div>
-</section>
-
-<hr class="rule">
 
 
 <hr class="rule">
@@ -2395,7 +2434,7 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
 
     <div style="display:grid;gap:1.4rem;grid-template-columns:minmax(0,1fr);" id="watchdemo">
       <div style="display:flex;flex-wrap:wrap;gap:1.6rem;align-items:flex-start;">
-        <div class="skupanel" style="max-width:22rem;flex:1 1 18rem;">
+        <div class="skupanel ui" style="max-width:22rem;flex:1 1 18rem;">
           <div class="head"><span>SKUs to Pick and Pack (15)</span></div>
           <div id="w-pillslot"></div>
           <div class="watchstatus" id="w-status"><span>· checked just now ·</span></div>
@@ -2485,11 +2524,35 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
         </div>
         <div class="instrument-body" style="background:var(--surface-2);padding:1.5rem;">
           <div class="envelope" id="envelope">
-            <div class="ret">
-              Altheastix ⚡<br>3015 E Howell St.<br>Seattle, WA 98122<br>USA
+            <div class="env-plain">
+              <div class="ret">
+                Altheastix ⚡<br>3015 E Howell St.<br>Seattle, WA 98122<br>USA
+              </div>
+              <div class="to" id="env-to"></div>
+              <div class="stamp" id="env-stamp"></div>
             </div>
-            <div class="to" id="env-to"></div>
-            <div class="stamp" id="env-stamp"></div>
+            <div class="env-label" aria-label="An eBay Standard Envelope as eBay prints it">
+              <div class="lbl-corner">
+                <b>eBay standard envelope</b>
+                <span class="lbl-trk">Trk#: ESUS182805798</span>
+                <span class="lbl-trk">Ref: 166557998782</span>
+                <span class="lbl-from">Altheastix<br>3015 E Howell St<br>Seattle WA 98122-4014</span>
+              </div>
+              <div class="lbl-fim" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              <div class="lbl-meter" aria-hidden="true">
+                <div class="lbl-meter-txt">
+                  <span class="pb">PITNEY BOWES</span>
+                  <span class="amt">$0.64<sup>0</sup></span>
+                  <span class="cls">US POSTAGE<br>FIRST-CLASS</span>
+                  <span class="num">026W0004897659<br>3000156428<br>ZIP 98122<br>Jan 29 2024</span>
+                </div>
+                <div class="lbl-dm" id="lbl-dm"></div>
+              </div>
+              <div class="lbl-to">
+                <div class="lbl-imb" id="lbl-imb" aria-hidden="true"></div>
+                <div class="lbl-addr" id="lbl-addr">TOMÁS BELTRÁN<br>24 CAMINO DEL MONTE<br>SANTA FE NM 87501-2517</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -2642,9 +2705,65 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
       </p>
     </div>
 
+    <div class="instrument ui" style="margin-bottom:1.6rem;">
+      <div class="instrument-head">
+        <span class="dot"></span><span>canned message &middot; live preview</span>
+        <span class="spacer"></span><span class="live">interactive</span>
+      </div>
+      <div class="instrument-body" style="background:#1a1a1a;padding:14px;">
+        <div class="cmdemo">
+          <div class="addrpanel cm-card">
+            <div class="aname">Will Harper<span class="badge ok" tabindex="0">✔<span class="tip">Address looks correct</span></span></div>
+            <div class="alines">1307 Falcon Oaks Dr<br>Leander TX 78641-8843<br>United States</div>
+            <div class="alinks"><span>Edit</span><span>Copy</span></div>
+            <div class="msgrow">
+              <select class="msgsel" id="cm-select" aria-label="Canned message">
+                <option value="">Empty Message</option>
+                <option value="canned1">Late + Gift</option>
+                <option value="canned3">Late, no gift</option>
+                <option value="canned4">Preorder Sticker</option>
+              </select>
+              <button class="btnblue" type="button" id="cm-open">Message</button>
+            </div>
+            <button class="btnblue full" type="button">Mark as Shipped &amp; Msg</button>
+            <label class="thankrow"><input type="checkbox" checked> Send thank you msg</label>
+            <div class="shiprow">Ships <span class="seg"><span class="on">Today</span><span>Tomorrow</span></span> <span id="cm-date"></span></div>
+            <p class="cm-hint">Pick a draft, then <b>Message</b>.</p>
+          </div>
+          <div class="canned-modal-content" id="cm-modal" hidden>
+            <h3 id="cm-title">Customize "Late + Gift" Message</h3>
+            <input type="text" class="canned-modal-input" id="cm-sticker" placeholder="Sticker Name" value="Lazy Cat">
+            <input type="text" class="canned-modal-input" id="cm-date-in" placeholder="Expected Arrival Date" value="Aug 16th">
+            <input type="text" class="canned-modal-input" id="cm-gift" placeholder="Surprise Sticker Name" value="funny meme">
+            <div class="canned-modal-preview-label">Live preview <span class="canned-modal-preview-status" id="cm-status" hidden>— edited by hand (<a href="#" id="cm-reset">reset</a>)</span></div>
+            <div class="canned-modal-preview" id="cm-preview" contenteditable="true" spellcheck="true"></div>
+            <div class="canned-modal-buttons">
+              <button class="canned-modal-button secondary" type="button" id="cm-cancel">Cancel</button>
+              <button class="canned-modal-button primary" type="button" id="cm-generate">Generate Message</button>
+            </div>
+          </div>
+          <div class="cm-done" id="cm-done" hidden>
+            <b>Pasted into eBay's composer.</b> The text sent is exactly the preview, hand edits included. The modal closes; the tab that sends it stays open until eBay confirms.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col">
+      <p class="caption" style="margin-top:0;margin-bottom:1.8rem;">
+        <b>The real modal, verbatim.</b> Three drafts live in the dropdown: <em>Late + Gift</em>,
+        <em>Late, no gift</em> and <em>Preorder Sticker</em>. The buyer's first name comes from the
+        order; eBay hands over ALL-CAPS names and <span class="mono">WILL</span> becomes “Will”,
+        because a machine-looking greeting undoes the point of writing one. Every field you type
+        lands in the preview in green as you type, an empty field shows as a pill rather than a
+        gap, and the preview itself is editable: touch it and template sync stops, an “edited by
+        hand” flag appears, and what you send is exactly what you see.
+      </p>
+    </div>
+
     <div class="instrument" style="margin-bottom:1.6rem;">
       <div class="instrument-head">
-        <span class="dot"></span><span>thank-you draft</span>
+        <span class="dot"></span><span>automatic thank-you draft</span>
         <span class="spacer"></span><span class="live">interactive</span>
       </div>
       <div class="instrument-body">
@@ -2671,11 +2790,10 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
 
     <div class="col">
       <p class="caption" style="margin-top:0;margin-bottom:1.8rem;">
-        <b>Note the small things.</b> <span class="mono">GEORGE</span> becomes “George”. eBay hands
-        over ALL-CAPS names, and a machine-looking greeting undoes the point of writing one. The
-        product noun and every pronoun agree with the quantity. The tracking sentence disappears
-        entirely above the threshold. And “tomorrow” rolls to Monday if it would land on a Sunday,
-        because nothing ships on a Sunday.
+        <b>The automatic thank-you gets the same care.</b> The product noun and every pronoun
+        agree with the quantity. The tracking sentence disappears entirely above the threshold.
+        And “tomorrow” rolls to Monday if it would land on a Sunday, because nothing ships on a
+        Sunday.
       </p>
 
       <h3 style="font-size:1.15rem;margin-bottom:.8rem;">Sending it turned out to be the hard part</h3>
@@ -2795,7 +2913,7 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
                 <div class="alinks"><span>Edit</span><span>Copy</span></div>
                 <div id="lie-actions">
                   <div class="msgrow">
-                    <span class="fakesel">Empty Message <span style="opacity:.6">▾</span></span>
+                    <select class="msgsel" aria-label="Canned message"><option>Empty Message</option><option>Late + Gift</option><option>Late, no gift</option><option>Preorder Sticker</option></select>
                     <button class="btnblue" type="button">Message</button>
                   </div>
                   <button class="btnblue full" type="button" id="lie-ship">Mark as Shipped &amp; Msg</button>
@@ -2876,7 +2994,7 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
                 <div class="alinks"><span>Edit</span><span>Copy</span></div>
                 <div id="state-actions">
                   <div class="msgrow">
-                    <span class="fakesel">Empty Message <span style="opacity:.6">▾</span></span>
+                    <select class="msgsel" aria-label="Canned message"><option>Empty Message</option><option>Late + Gift</option><option>Late, no gift</option><option>Preorder Sticker</option></select>
                     <button class="btnblue" type="button">Message</button>
                   </div>
                   <button class="btnblue full" type="button" data-state="pending">Mark as Shipped &amp; Msg</button>
@@ -3613,7 +3731,7 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
                 (o.shipped
                   ? '<div class="shipped-label">\u2713 Shipped</div>'
                   : '<div class="msgrow">' +
-                      '<span class="fakesel">Empty Message <span style="opacity:.6">\u25be</span></span>' +
+                      '<select class="msgsel" aria-label="Canned message"><option>Empty Message</option><option>Late + Gift</option><option>Late, no gift</option><option>Preorder Sticker</option></select>' +
                       '<button class="btnblue" type="button">Message</button>' +
                     "</div>" +
                     '<button class="btnblue full" type="button">Mark as Shipped &amp; Msg</button>' +
@@ -3897,8 +4015,8 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
     var DATA = {
       us: {
         to: "Marisol Vega<br>1188 Cascade Ave<br>Bellingham WA 98225<br>United States",
-        stamp: "<span>stamp</span>",
-        head: "Envelope #10 \u00b7 9.5in × 4.125in",
+        stamp: "",
+        head: "Envelope #10 \u00b7 9.5in × 4.125in \u00b7 as printed",
         cap: "<b>The country line is added back.</b> eBay renders a country only for international destinations, so a US address arrives with none at all. Its absence is the reliable US signal, so the script appends “United States” explicitly, and because Copy and Print both read the address block's text, they pick it up automatically."
       },
       ca: {
@@ -3910,13 +4028,35 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
       label: {
         to: "Tomás Beltrán<br>24 Camino del Monte<br>Santa Fe NM 87501<br>United States",
         stamp: "<span>eBay<br>label</span>",
-        head: "eBay Standard Envelope \u00b7 with tracking",
-        cap: "<b>This one never gets hand-addressed.</b> At $41.00 it's above the threshold, so it's excluded from the plain-envelope filter and the card grows a +tracking link instead. That link opens eBay's single-label page and pre-fills it for an eBay Standard Envelope: custom size, 1 oz, 9 × 4.1 × 0.1in, leaving you one confirming click. Getting those three dimension fields to survive eBay's debounced re-render took six versions, and the answer was set order, not timing."
+        head: "eBay Standard Envelope \u00b7 printed by eBay, with tracking",
+        cap: "<b>This one never gets hand-addressed.</b> eBay prints it: tracking and reference numbers in the corner, metered postage top-right, and an Intelligent Mail barcode over an all-caps address. At $41.00 it's above the threshold, so it's excluded from the plain-envelope filter and the card grows a +tracking link instead. That link opens eBay's single-label page and pre-fills it for an eBay Standard Envelope: custom size, 1 oz, 9 × 4.1 × 0.1in, leaving you one confirming click. Getting those three dimension fields to survive eBay's debounced re-render took six versions, and the answer was set order, not timing."
       }
     };
 
+    /* fake-but-plausible barcodes for the eBay-printed envelope: an Intelligent
+       Mail barcode above the address and a Data Matrix in the meter indicia */
+    (function () {
+      var imb = $("#lbl-imb"), dm = $("#lbl-dm");
+      if (imb) {
+        var seed = 7, kinds = ["t", "a", "d", "f"], html = "";
+        for (var i = 0; i < 65; i++) { seed = (seed * 9301 + 49297) % 233280; html += '<i class="' + kinds[Math.floor(seed / 233280 * 4)] + '"></i>'; }
+        imb.innerHTML = html;
+      }
+      if (dm) {
+        var s2 = 13, cells = "";
+        for (var r = 0; r < 18; r++) for (var c = 0; c < 18; c++) {
+          s2 = (s2 * 9301 + 49297) % 233280;
+          var on = (r === 0 && c % 2 === 0) || (c === 17 && r % 2 === 1) || (s2 / 233280 < 0.5);
+          cells += '<i class="' + (on ? "on" : "") + '"></i>';
+        }
+        dm.innerHTML = cells;
+      }
+    })();
+
+    var env = $("#envelope");
     function show(k) {
       tabs.forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-post") === k)); });
+      env.classList.toggle("is-label", k === "label");
       to.innerHTML = DATA[k].to;
       stamp.innerHTML = DATA[k].stamp;
       head.textContent = DATA[k].head;
@@ -4103,6 +4243,70 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
     if (!range) return;
     range.addEventListener("input", drawFavicons);
     drawFavicons();
+  })();
+
+  /* ==========================================================
+     CANNED MESSAGE MODAL — the script's own templates and preview logic
+     ========================================================== */
+  (function () {
+    var sel = $("#cm-select"), modal = $("#cm-modal");
+    if (!sel || !modal) return;
+    var DRAFTS = {
+      canned1: { title: "Late + Gift",
+        t: "Hi {BUYER_FIRST}. Thanks for your order. Wanted to let you know that due to sudden high demand we ran out of these {STICKER_NAME} stickers, so your order won't ship until roughly {ARRIVAL_DATE}.\n\nIf you can wait, thanks a lot for it \u2014 we'll toss in a {SURPRISE_STICKER} sticker as a gift for the hassle, and we'll ship ASAP and personally let you know the moment it goes out. If you're not cool with waiting, we can issue a refund, no questions asked. Either way, just let us know.\n\nThanks a lot for your patience and apologies! These stickers have been a whole hit." },
+      canned3: { title: "Late, no gift",
+        t: "Hi {BUYER_FIRST}. Thanks for your order. Wanted to let you know that due to sudden high demand we ran out of these {STICKER_NAME} stickers, so your order won't ship until roughly {ARRIVAL_DATE}.\n\nIf you can wait, thanks a lot for it \u2014 we'll ship ASAP and personally let you know the moment it goes out. If you're not cool with waiting, we can issue a refund, no questions asked. Either way, just let us know.\n\nThanks a lot for your patience and apologies! These stickers have been a whole hit.\n\nA.\n\nP.S. eBay may auto-send you a shipping notice before the sticker actually leaves \u2014 feel free to ignore it. Ours is the one that counts." },
+      canned4: { title: "Preorder Sticker",
+        t: "Hi {BUYER_FIRST}. Thanks for your pre-order of the {STICKER_NAME} sticker. As stated in the product details, this item is a pre-order and will ship by {SHIPPING_DATE}. Please disregard any automated eBay message stating that your item has shipped. We will personally contact you as soon as it's on its way.\n\nThanks a lot for your patience!\n\nA." }
+    };
+    var FIELDS = {
+      STICKER_NAME:     { el: $("#cm-sticker"), label: "sticker name" },
+      ARRIVAL_DATE:     { el: $("#cm-date-in"), label: "arrival date" },
+      SHIPPING_DATE:    { el: $("#cm-date-in"), label: "shipping date" },
+      SURPRISE_STICKER: { el: $("#cm-gift"),    label: "surprise sticker" }
+    };
+    var preview = $("#cm-preview"), status = $("#cm-status"), title = $("#cm-title"), done = $("#cm-done");
+    var key = "canned1", edited = false;
+
+    var d = new Date();
+    $("#cm-date").textContent = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+
+    function render() {
+      if (edited) return;
+      var t = DRAFTS[key].t, html = "", last = 0, m, re = /\{([A-Z_]+)\}/g;
+      while ((m = re.exec(t)) !== null) {
+        html += esc(t.slice(last, m.index));
+        var f = FIELDS[m[1]];
+        if (m[1] === "BUYER_FIRST") html += "Will";
+        else if (f) {
+          var v = (f.el.value || "").trim();
+          html += v ? '<span class="canned-modal-token">' + esc(v) + "</span>"
+                    : '<span class="canned-modal-pill">' + esc(f.label) + "</span>";
+        } else html += esc(m[0]);
+        last = m.index + m[0].length;
+      }
+      preview.innerHTML = html + esc(t.slice(last));
+    }
+    function open(k) {
+      key = k; edited = false; status.hidden = true; done.hidden = true;
+      title.textContent = 'Customize "' + DRAFTS[k].title + '" Message';
+      $("#cm-date-in").placeholder = k === "canned4" ? "Shipping Date" : "Expected Arrival Date";
+      $("#cm-gift").hidden = k !== "canned1";
+      modal.hidden = false;
+      render();
+    }
+    function close() { modal.hidden = true; }
+
+    $("#cm-open").addEventListener("click", function () {
+      if (!sel.value) { sel.focus(); return; }
+      open(sel.value);
+    });
+    sel.addEventListener("change", function () { if (sel.value) open(sel.value); else close(); });
+    ["#cm-sticker", "#cm-date-in", "#cm-gift"].forEach(function (id) { $(id).addEventListener("input", render); });
+    preview.addEventListener("input", function () { if (!edited) { edited = true; status.hidden = false; } });
+    $("#cm-reset").addEventListener("click", function (e) { e.preventDefault(); edited = false; status.hidden = true; render(); });
+    $("#cm-cancel").addEventListener("click", function () { close(); sel.value = ""; });
+    $("#cm-generate").addEventListener("click", function () { close(); done.hidden = false; sel.value = ""; });
   })();
 
   /* ==========================================================
