@@ -4,11 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Altheastix eBay Order Manager</title>
-<meta name="description" content="A Tampermonkey userscript that rebuilds eBay's bulk shipping page into a pick-and-pack workstation for a one-person sticker shop.">
+<meta name="description" content="Making eBay picking, packing, and shipping scalable and efficient: a 6,000+ line Tampermonkey userscript that rebuilds eBay's bulk shipping page into a pick-and-pack tool and cuts daily order processing from 45 minutes to about 12.">
 <style>:root{color-scheme:light dark}*{box-sizing:border-box}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
 <body>
-<title>The Checkmark That Lied</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,400&family=JetBrains+Mono:wght@400;500;700&display=swap">
@@ -1177,6 +1176,7 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
     <li><a href="#s-top">Overview</a></li>
     <li><a href="#s-problem">The problem</a></li>
     <li><a href="#s-job">The job</a></li>
+    <li><a href="#s-history">How it grew</a></li>
     <li class="toc-group">What was built</li>
     <li><a href="#s-built">The rebuilt page</a></li>
     <li><a href="#s-picking">Picking</a></li>
@@ -1407,10 +1407,12 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 <header class="hero" id="s-top">
   <div class="wrap">
     <div class="kicker">Altheastix eBay Order Manager<span>, a Tampermonkey userscript</span></div>
-    <h1 class="title">Ten orders a day,<br>and <span class="lied">no way to pack them</span></h1>
+    <h1 class="title">Making eBay picking, packing, and shipping<br><span class="lied">scalable and efficient</span></h1>
     <p class="lede">
-      eBay tells you what sold. It doesn't tell you which box the sticker is in, what envelope it
-      needs, or what you've already packed. This rebuilds the page that came closest.
+      eBay tells me what's sold but doesn't tell me which warehouse box the sticker is in, what
+      envelope it needs, or what I've already packed and marked as shipped. This product (a
+      Tampermonkey userscript of 6,000+ lines) streamlines the orders processing and saves me over
+      70% in time spent in picking, shipping, packing (from 45 mins daily to roughly 12 mins).
     </p>
 
     <div class="ba" id="ba">
@@ -1455,13 +1457,14 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
         eBay's page buys postage. I needed one that runs a pick-and-pack.
       </h2>
       <p>
-        <em>Get labels in bulk</em> is a checkout. Each order gets a weight box, three dimension
-        boxes, a service dropdown and an insurance radio, adding to a total you pay at the top.
-        For $5 stickers none of that varies: always one ounce, always the same envelope.
+        Each eBay order gets a weight box, three dimension boxes, a service dropdown and an
+        insurance radio, adding to a total you pay at the top. For ~$5 stickers none of that
+        matters: shipping is always one ounce, and most of the times the same envelope.
       </p>
       <p>
         The two fields that decide what I physically go and fetch, SKU and quantity, are 12px
-        grey under the title. Everything else about packing is absent.
+        grey under the title. Everything else about packing is absent. <strong>BUT:</strong> almost
+        all info is there to make it a great tool for picking, packing, and shipping.
       </p>
 
       <div class="gap-table">
@@ -1829,17 +1832,20 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
     <div class="col" style="margin-bottom:2.2rem;">
       <div class="eyebrow">the job</div>
       <h2 style="font-size:clamp(1.7rem,4vw,2.4rem);margin-bottom:1rem;">
-        Ten to fifteen orders a day, and every one of them is a physical object in a numbered box.
+        10-15 orders a day. Every one of them is a physical object in a numbered box.
       </h2>
       <p>
-        Altheastix ships around <strong>350 items a month</strong>, mostly stickers. An order isn't
-        a database row; it's a trip to a container, a count, a ziplock, an envelope, a decision about
-        postage, and a walk to the mailbox. The eBay page is only the part where you find out what to
-        go and get.
+        Altheastix ships around <strong>350 items a month</strong>, mostly stickers. An order is a
+        trip to a container, a count, a ziplock, an envelope, a decision about postage, and a walk
+        to the mailbox. The eBay page where you find out what to go and get, to then pack and ship.
       </p>
       <p>
-        Which is why the SKU on the card matters so much: <span class="mono">B04</span> is not an
-        identifier, it's <em>a drawer</em>. The panel isn't a list of orders. It's a picking list.
+        This is why the SKU on the card matters so much: <span class="mono">B04</span> is not an
+        identifier, it's <em>a drawer and a position in the box</em>. The panel isn't a list of
+        orders. It's a picking list.
+      </p>
+      <p>
+        Orders processing in Altheastix follow 8 steps:
       </p>
     </div>
 
@@ -2044,7 +2050,35 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 }
 </style>
 
+<hr class="rule">
 
+<!-- ============================================================
+     HISTORY: how the tool grew
+     ============================================================ -->
+<section class="pad-y" id="s-history">
+  <div class="wrap">
+    <div class="col" style="margin-bottom:1.4rem;">
+      <div class="eyebrow">how it grew</div>
+      <h2 style="font-size:clamp(1.55rem,3.6vw,2.1rem);margin-bottom:1rem;">
+        It started as a print button.
+      </h2>
+      <p>
+        Nothing here was planned as a product. Each stage was the smallest thing that removed the
+        most tedious step of the day, and each one made the next step obvious.
+      </p>
+    </div>
+
+    <div class="rules">
+      <div class="rule-row three head"><span>Stage</span><span>What it did</span><span class="tools">Built with</span></div>
+      <div class="rule-row three"><b>Print envelope</b><span>A few lines of JavaScript on top of eBay's original page. Paste the buyer's address into a div, call the print dialog, and have that div come out formatted to the size of an envelope. That was the whole tool.</span><span class="tools">JS + a lot of StackOverflow + CotEditor</span></div>
+      <div class="rule-row three"><b>Picking and packing</b><span>As order volume grew, the script started organising the picking itself around a numbering mechanism: box letter plus sticker number. That forced the SKUs to be arranged in a way that scales, and turned the order list into a walking route through the containers.</span><span class="tools">JS + a lot of StackOverflow + CotEditor</span></div>
+      <div class="rule-row three"><b>Mark as shipped</b><span>Next it became a mark-as-shipped handler, so every order no longer had to be opened and clicked through by hand once it was in the mailbox.</span><span class="tools">ChatGPT + Grok + VS Code</span></div>
+      <div class="rule-row three"><b>Talking to buyers</b><span>Then it learned to communicate. Every time an order goes out, the buyer gets a customised, relevant &ldquo;your order is being shipped&rdquo; message. When stock is the problem, pre-canned messages ask them, kindly, to wait.</span><span class="tools">ChatGPT + Gemini + VS Code</span></div>
+      <div class="rule-row three"><b>Talking to buyers v2</b><span>Messaging made trustworthy: every send verified against eBay before the tab closes, a retry that can never message a buyer twice, and an end-of-batch sweep that catches the ones that slipped. The code also moved into a GitHub repository, which now lives online and handles versioning.</span><span class="tools">Claude Code + GitHub</span></div>
+      <div class="rule-row three"><b>Destinations and envelopes</b><span>After that, visually separating Canada from US destinations, and handling several envelope formats rather than one, came in the way and were absorbed too, each one a versioned commit in the GitHub repo.</span><span class="tools">Claude Code + GitHub</span></div>
+    </div>
+  </div>
+</section>
 
 <hr class="rule">
 
@@ -2336,6 +2370,11 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 @media (min-width: 40rem) { .rule-row { grid-template-columns: 13rem minmax(0,1fr); } }
 .rule-row b { font-weight: 600; color: var(--ink); }
 .rule-row span { color: var(--ink-2); }
+.rule-row.three { grid-template-columns: minmax(0,1fr); }
+@media (min-width: 40rem) { .rule-row.three { grid-template-columns: 11rem minmax(0,1fr) 13rem; } }
+.rule-row.three .tools { color: var(--muted); font-family: var(--mono); font-size: .68rem; line-height: 1.5; letter-spacing: .02em; }
+.rule-row.head { padding: .4rem .85rem; background: var(--surface-2); }
+.rule-row.head span, .rule-row.head .tools { font-family: var(--mono); font-size: .62rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
 </style>
 
 <!-- ============================================================
