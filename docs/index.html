@@ -1977,16 +1977,6 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
         <div class="vb-num tnum">≈70<span>%</span></div>
         <div class="vb-cap">less work across picking, packing,<br>printing and shipping</div>
       </div>
-      <div class="vb-bars" aria-hidden="true">
-        <div class="vb-row">
-          <span class="vb-lab">before</span>
-          <div class="vb-track"><div class="vb-fill full"></div></div>
-        </div>
-        <div class="vb-row">
-          <span class="vb-lab">after</span>
-          <div class="vb-track"><div class="vb-fill part"></div></div>
-        </div>
-      </div>
       <p class="vb-note">
         The saving isn't any single feature. It's that a batch of fifteen stops requiring fifteen
         separate rounds of attention, and more quietly, that the batch no longer needs re-checking
@@ -2189,7 +2179,7 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
   border-top: 1px solid var(--rule);
 }
 @media (min-width: 52rem) {
-  .valueband { grid-template-columns: auto minmax(9rem, 15rem) minmax(0, 1fr); }
+  .valueband { grid-template-columns: auto minmax(0, 1fr); }
 }
 .vb-fig { display: flex; align-items: baseline; gap: .9rem; }
 .vb-num {
@@ -2205,16 +2195,6 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
   font-family: var(--display); font-size: .78rem; line-height: 1.4;
   color: var(--muted); font-weight: 500;
 }
-.vb-bars { display: flex; flex-direction: column; gap: .5rem; }
-.vb-row { display: flex; align-items: center; gap: .6rem; }
-.vb-lab {
-  font-family: var(--mono); font-size: .62rem; letter-spacing: .1em;
-  text-transform: uppercase; color: var(--muted); width: 3.4rem; flex: none;
-}
-.vb-track { flex: 1 1 auto; height: 9px; border-radius: 2px; background: var(--surface-2); border: 1px solid var(--rule); overflow: hidden; }
-.vb-fill { height: 100%; border-radius: 1px; }
-.vb-fill.full { width: 100%; background: var(--rule-strong); }
-.vb-fill.part { width: 30%; background: var(--accent); }
 .vb-note {
   font-family: var(--display); font-size: .84rem; line-height: 1.55;
   color: var(--ink-2); margin: 0;
