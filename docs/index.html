@@ -2708,7 +2708,7 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
             <button class="btnblue full" type="button">Mark as Shipped &amp; Msg</button>
             <label class="thankrow"><input type="checkbox" checked> Send thank you msg</label>
             <div class="shiprow">Ships <span class="seg"><span class="on">Today</span><span>Tomorrow</span></span> <span id="cm-date"></span></div>
-            <p class="cm-hint">Pick a draft, then <b>Message</b>.</p>
+            <p class="cm-hint">Switch the draft, or type in any field.</p>
           </div>
           <div class="canned-modal-content" id="cm-modal" hidden>
             <h3 id="cm-title">Customize "Late + Gift" Message</h3>
@@ -2741,39 +2741,12 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
       </p>
     </div>
 
-    <div class="instrument" style="margin-bottom:1.6rem;">
-      <div class="instrument-head">
-        <span class="dot"></span><span>automatic thank-you draft</span>
-        <span class="spacer"></span><span class="live">interactive</span>
-      </div>
-      <div class="instrument-body">
-        <div class="msggrid">
-          <div class="msgctl">
-            <label>Buyer name<input type="text" id="m-name" value="GEORGE MCDONALD" spellcheck="false"></label>
-            <label>Quantity
-              <select id="m-qty"><option value="1">1 sticker</option><option value="3">3 stickers</option></select>
-            </label>
-            <label>Destination
-              <select id="m-dest"><option value="us">United States</option><option value="ca">Canada</option></select>
-            </label>
-            <label>Order total
-              <select id="m-total"><option value="6.5">$6.50</option><option value="41">$41.00</option></select>
-            </label>
-            <label>Ships
-              <select id="m-when"><option value="tom">Tomorrow</option><option value="today">Today</option></select>
-            </label>
-          </div>
-          <div class="msgout" id="m-out"></div>
-        </div>
-      </div>
-    </div>
-
     <div class="col">
-      <p class="caption" style="margin-top:0;margin-bottom:1.8rem;">
-        <b>The automatic thank-you gets the same care.</b> The product noun and every pronoun
-        agree with the quantity. The tracking sentence disappears entirely above the threshold.
-        And “tomorrow” rolls to Monday if it would land on a Sunday, because nothing ships on a
-        Sunday.
+      <p style="margin-top:0;">
+        The automatic thank-you that rides along with a shipment is built the same way. The product
+        noun and every pronoun agree with the quantity. The tracking sentence disappears entirely
+        above the threshold. And “tomorrow” rolls to Monday if it would land on a Sunday, because
+        nothing ships on a Sunday.
       </p>
 
       <h3 style="font-size:1.15rem;margin-bottom:.8rem;">Sending it turned out to be the hard part</h3>
@@ -4287,76 +4260,10 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
     $("#cm-reset").addEventListener("click", function (e) { e.preventDefault(); edited = false; status.hidden = true; render(); });
     $("#cm-cancel").addEventListener("click", function () { close(); sel.value = ""; });
     $("#cm-generate").addEventListener("click", function () { close(); done.hidden = false; sel.value = ""; });
-  })();
 
-  /* ==========================================================
-     MESSAGE PREVIEW
-     ========================================================== */
-  (function () {
-    var out = $("#m-out");
-    if (!out) return;
-
-    function humanizeName(name) {
-      if (!name) return name;
-      return String(name).replace(/\S+/g, function (word) {
-        if (/[a-z]/.test(word)) return word;
-        if (!/[A-Z]/.test(word)) return word;
-        return word.toLowerCase().replace(/(^|[\s'’\-])([a-z])/g, function (m, sep, ch) {
-          return sep + ch.toUpperCase();
-        });
-      });
-    }
-
-    function shipDate(when) {
-      var d = new Date();
-      d.setHours(0, 0, 0, 0);
-      if (when === "tom") {
-        d.setDate(d.getDate() + 1);
-        if (d.getDay() === 0) d.setDate(d.getDate() + 1);   /* never a Sunday */
-      }
-      return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-    }
-
-    function render() {
-      var raw = $("#m-name").value;
-      var first = humanizeName(raw).split(/\s+/)[0] || "there";
-      var qty = parseInt($("#m-qty").value, 10);
-      var plural = qty > 1;
-      var dest = $("#m-dest").value;
-      var total = parseFloat($("#m-total").value);
-      var when = $("#m-when").value;
-
-      var word = plural ? "stickers" : "sticker";
-      var subj = plural ? "they" : "it";
-      var obj = plural ? "them" : "it";
-      var dem = plural ? "these" : "this";
-
-      var delivery = dest === "ca"
-        ? "Orders to Canada may take several weeks to arrive, so please be patient."
-        : (plural ? "They usually arrive within 5–7 business days" : "It usually arrives within 5–7 business days") +
-          ", thanks for your patience.";
-
-      var tracking = total > 25 ? "" : "To keep prices fair, orders at or under $25 ship without tracking.";
-
-      var text =
-        "Hi <mark>" + esc(first) + "</mark>, thanks so much for your order!\n\n" +
-        "I'm packing " + esc(dem) + " <mark>" + word + "</mark> up and " + esc(subj) +
-        " " + (plural ? "go" : "goes") + " out on <mark>" +
-        (when === "today" ? "today, " : "") + esc(shipDate(when)) + "</mark>. " +
-        "<mark>" + esc(delivery) + "</mark>" +
-        (tracking ? "\n\n<mark>" + esc(tracking) + "</mark>" : "") +
-        "\n\nHope " + esc(subj) + " " + (plural ? "brighten" : "brightens") +
-        " something up. Let me know if " + esc(subj) + " " +
-        (plural ? "don't" : "doesn't") + " arrive and I'll sort " + esc(obj) + " out.\n\nA.";
-
-      out.innerHTML = text;
-    }
-
-    ["#m-name", "#m-qty", "#m-dest", "#m-total", "#m-when"].forEach(function (s) {
-      var el = $(s);
-      if (el) { el.addEventListener("input", render); el.addEventListener("change", render); }
-    });
-    render();
+    /* open on load: the modal is the thing this section is about */
+    sel.value = "canned1";
+    open("canned1");
   })();
 
   /* ==========================================================
