@@ -1,5 +1,27 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.45
+- **SKU pills now flag the orders that ship with tracking.** Any pill whose
+  order sits above `trackingOrderAmountThreshold` — the same test that paints
+  the card's `Total:` pill yellow — gets a bold `*` in `#ffd54f` at the end of
+  the pill, so the tracked-label orders are visible from the panel without
+  cross-referencing the cards.
+- The flag rides on `orderEl.dataset.shipsWithLabel`, which `processOrderCard`
+  already sets, carried through `createSKUPackingList` into each SKU object
+  (same route as `isCanadian`). No new price parsing, and the two signals can't
+  drift apart.
+- Appended with `insertAdjacentHTML('beforeend', …)` *after* the shipped `✔️`
+  prefix, so it stays at the end of the pill in every state. Its own colour rule
+  carries `!important` so it survives the pill-level overrides (`sku-multi-qty`'s
+  `!important` colour, the inline dark-mode colour on multi-item pills).
+- Verified in Chromium across light and dark mode over eight pill states
+  (plain, lg, manila, multi-qty, multi-item, shipped, Canadian, and a
+  below-threshold control): the mark is present exactly when it should be, is
+  always the last child, and computes to `rgb(255, 213, 79)` at weight 900.
+- **Known collision:** on a *manila* pill in light mode the pill background is
+  itself `#FFD54F`, so the asterisk is invisible there. Everywhere else it
+  reads clearly.
+
 ## v4.44
 - **No more blank second page when printing an envelope.** Since v4.39 the
   envelope box was sized to the *full* declared page — `width: 8.93in;
