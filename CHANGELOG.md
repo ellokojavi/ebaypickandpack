@@ -1,5 +1,29 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.46
+- **The v4.45 tracking asterisk is now actually visible on every pill.** The
+  spec'd `#ffd54f` is the right colour against the default pill, but it is the
+  *exact* fill of a light-mode manila pill (`#FFD54F`), where the glyph measured
+  1.0:1 against its own background — present in the DOM, invisible on screen.
+  The mark now carries `text-shadow: 0 0 1.5px rgba(0,0,0,.9)`: the fill stays
+  exactly `#ffd54f`, and a 1.5px dark halo separates it from whatever is behind
+  it. Chosen over three heavier outline variants by rendering all four at 4×
+  against manila, order-tint, plain, LG, multi-qty and dark backgrounds — this
+  one is the only one that reads on manila without muddying the glyph on the
+  dark-mode default pill.
+- **The project site was carrying the same defect, plus two older ones.**
+  `docs/index.html` now (a) renders the yellow `Total:` pill on the card — its
+  `hot` flag had been computed since the demo was written and then spent on a
+  no-op ternary, so the highlighted total the docs describe was never actually
+  shown; (b) marks the SKU pills of its one over-threshold order; (c) stops
+  claiming the threshold "appears in three places" now that there are four; and
+  (d) documents the marker in the SKU legend, the colour caption, the full
+  reference grid and the build-order list. Its single tracked order is a
+  multi-item one, so its pills take a salmon order tint where the bare mark
+  measured 1.26:1 — the same halo fixes it.
+- No behaviour change beyond the marker's rendering: the trigger is still
+  `orderEl.dataset.shipsWithLabel`, set from the one price test.
+
 ## v4.45
 - **SKU pills now flag the orders that ship with tracking.** Any pill whose
   order sits above `trackingOrderAmountThreshold` — the same test that paints

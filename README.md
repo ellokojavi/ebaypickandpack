@@ -176,8 +176,9 @@ everything from it, move on.
 - **Bold yellow `*`** at the end of any pill whose order ships with tracking —
   the same `#ffd54f` as the yellow `Total:` pill on the card, driven by the same
   `trackingOrderAmountThreshold` test, so the tracked-label orders stand out in
-  the panel. (On a manila pill in light mode the pill background is that same
-  yellow, so the mark doesn't show there.)
+  the panel. It carries a thin dark halo so it stays readable on every pill
+  background, including a manila pill in light mode, whose fill is that same
+  yellow.
 - Packed SKUs strike through rather than disappearing, so the list doesn't shift
   under you while you work down it.
 - **Favicon and tab-title badge** — the browser tab shows eBay's favicon with a
