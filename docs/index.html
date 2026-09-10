@@ -796,8 +796,12 @@ h1.title .lied { white-space: normal; }
 .sku.manila { border: 3px solid #ffd54f; }
 /* Ships-with-tracking marker: same #ffd54f as the highlighted total on the
    card, so the pill and the card carry one signal. Own colour rule, so it
-   survives .multiqty's colour and the dark text of a tinted pill. */
-.sku .trackmark { color: #ffd54f; font-weight: 900; margin-left: 2px; }
+   survives .multiqty's colour and the dark text of a tinted pill. Selector is
+   unscoped because the mark is also used inline in the prose below.
+   The 1.5px dark halo is load-bearing: at #ffd54f on a 40-colour order tint
+   (or, in the script's light mode, on a manila pill whose fill IS #FFD54F) the
+   bare glyph measures 1.0-1.3:1 against its own background and disappears. */
+.trackmark { color: #ffd54f; font-weight: 900; margin-left: 2px; text-shadow: 0 0 1.5px rgba(0,0,0,.9); }
 .sku.done { opacity: .42; text-decoration: line-through; }
 .sku.hide { display: none; }
 .skusep { flex-basis: 100%; height: 0; margin-top: 7px; margin-bottom: 2px; border-top: 1px solid #3d3d3d; }
