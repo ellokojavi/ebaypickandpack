@@ -451,6 +451,7 @@ h1.title .lied { white-space: normal; }
 }
 .cardhead .hmeta { color: var(--ebay-sold); }
 .cardhead .hmeta b { color: var(--ebay-txt); font-weight: 700; }
+.cardhead .hmeta b.tothot { color: #000; background: #ffd54f; padding: 1px 6px; border-radius: 4px; }
 .cardhead .flag { font-size: 12px; }
 
 /* --- body: items | address panel --- */
@@ -793,6 +794,10 @@ h1.title .lied { white-space: normal; }
 .sku.tinted, .sku.tinted.multiqty { background: var(--order-tint); color: #111; font-weight: 700; border-color: #666; }
 .sku.lg     { border: 3px solid #ffffb1; }
 .sku.manila { border: 3px solid #ffd54f; }
+/* Ships-with-tracking marker: same #ffd54f as the highlighted total on the
+   card, so the pill and the card carry one signal. Own colour rule, so it
+   survives .multiqty's colour and the dark text of a tinted pill. */
+.sku .trackmark { color: #ffd54f; font-weight: 900; margin-left: 2px; }
 .sku.done { opacity: .42; text-decoration: line-through; }
 .sku.hide { display: none; }
 .skusep { flex-basis: 100%; height: 0; margin-top: 7px; margin-bottom: 2px; border-top: 1px solid #3d3d3d; }
@@ -2271,6 +2276,7 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
             <li><span class="sku lg demo-sku">B01D 5in <b>Lg</b></span> oversized, different envelope</li>
             <li><span class="sku manila demo-sku">M02</span> set, manila envelope</li>
             <li><span class="sku demo-sku">F01 🇨🇦</span> Canada, international stamp</li>
+            <li><span class="sku demo-sku">A07<span class="trackmark">*</span></span> over $25, goes out as an eBay label with tracking</li>
           </ul>
         </div>
       </div>
@@ -2379,7 +2385,10 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
           in different boxes. A green wash means one SKU, two or more of it, and the amber
           <span class="qty" style="font-size:1em;">×2</span> pill says the same thing in the panel:
           the single most common packing mistake. A thick yellow border means a large sticker and a
-          different envelope; orange means manila.
+          different envelope; orange means manila. A bold yellow
+          <span class="trackmark" style="font-size:1.15em;">*</span> at the end of a pill means
+          that order clears the $25 threshold and ships with a tracked label &mdash; the same
+          yellow as the highlighted total on its card.
         </p>
       </div>
     </div>
@@ -2483,9 +2492,10 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
         as a plain #10 envelope and the buyer is told why in the message.
       </p>
       <p>
-        Derived from price rather than remembered, so it stays consistent across the three places
-        it appears: the <span class="mono">+tracking</span> link, the highlighted total, and the
-        <em>Select standard envelope</em> filter.
+        Derived from price rather than remembered, so it stays consistent across the four places
+        it appears: the <span class="mono">+tracking</span> link, the highlighted total, the bold
+        yellow <span class="trackmark" style="font-size:1.15em;">*</span> on the order's SKU pills,
+        and the <em>Select standard envelope</em> filter.
       </p>
     </div>
 
@@ -3176,6 +3186,7 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
       <div class="rule-row"><b>4.26&ndash;4.28</b><span>Background order watch, then its status line, then its colours.</span></div>
       <div class="rule-row"><b>4.29&ndash;4.36</b><span>Batch filters with counts and derived checkboxes; end-of-batch message rescue sweep.</span></div>
       <div class="rule-row"><b>4.37&ndash;4.38</b><span>Panel defaults persist and stop overwriting per-order choices.</span></div>
+      <div class="rule-row"><b>4.39&ndash;4.45</b><span>Envelope geometry from one source of truth, the blank-second-page fix, and the tracked-label marker on SKU pills.</span></div>
     </div>
   </div>
 </section>
@@ -3665,7 +3676,7 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
                 ' aria-label="Select order ' + o.id + '">' +
               '<span class="oid">' + o.id + "</span>" +
               '<span class="notepill">+note</span>' +
-              '<span class="hmeta">| <b>Total: ' + money(o.total) + "</b> | Free Shipping</span>" +
+              '<span class="hmeta">| <b' + (hot ? ' class="tothot"' : "") + ">Total: " + money(o.total) + "</b> | Free Shipping</span>" +
               (o.kind === "canada" ? '<span class="flag">\uD83C\uDDE8\uD83C\uDDE6</span>' : "") +
             "</div>" +
             '<div class="cardbody">' +
@@ -3708,6 +3719,8 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
           rows.push({ sku: it.sku, qty: it.qty, i: i, o: o,
                       multi: o.items.length > 1, tint: tintOf[i],
                       manila: o.kind === "manila", lg: o.kind === "lg", canada: o.kind === "canada",
+                      /* Same test as the highlighted total on the card. */
+                      hot: o.total > 25,
                       done: !!o.shipped,
                       hay: (it.sku + " " + it.title + " " + o.who).toLowerCase() });
         });
@@ -3729,7 +3742,8 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
         html += '<button class="' + cls.join(" ") + '"' + style + ' type="button" data-jump="' + r.i +
           '" title="' + esc(r.o.who) + '"' +
           ' data-hay="' + esc(r.hay) + '">' + (r.done ? "\u2714\uFE0F " : "") + r.sku +
-          (r.qty > 1 ? " \u00d7" + r.qty : "") + (r.canada ? " \uD83C\uDDE8\uD83C\uDDE6" : "") + "</button>";
+          (r.qty > 1 ? " \u00d7" + r.qty : "") + (r.canada ? " \uD83C\uDDE8\uD83C\uDDE6" : "") +
+          (r.hot ? '<span class="trackmark">*</span>' : "") + "</button>";
       });
       list.innerHTML = html;
       $("#sku-title").textContent = "SKUs to Pick and Pack (" + rows.length + ")";
@@ -4384,6 +4398,7 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
       ["sku", "Click-to-scroll", "", "Any SKU in the panel scrolls to and flashes its order card."],
       ["sku", "Alphabetical grouping", "", "Separators between letter groups, so a panel of forty pills is still scannable."],
       ["sku", "Shipped SKUs strike through", "", "Confirmed shipments mark their SKUs done in the panel rather than removing them, so the picking list stays stable."],
+      ["sku", "Tracked-label marker", "v4.45", "A bold yellow * at the end of any pill whose order clears the $25 threshold, in the same #ffd54f as the highlighted total on the card, so the orders needing a tracked label are visible from the panel without cross-referencing the cards."],
       ["sku", "Favicon + tab-title badge", "v3.79–3.88", "The count of orders still to pack, drawn onto the favicon and prefixed to the tab title. Counts confirmed shipments only."],
       ["sku", "New-order watch", "v4.26–4.28", "Polls eBay's awaiting-shipment endpoint every 5 minutes. Never reloads on its own, refuses mid-batch, pauses during automation, and stays silent on any inconclusive response."],
       ["print", "Print All Envelopes", "v3.27", "The whole batch in one print window, one envelope per page, instead of one dialog per order."],
