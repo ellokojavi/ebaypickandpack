@@ -173,6 +173,11 @@ everything from it, move on.
 - **Click-to-scroll** from any SKU entry to its order card.
 - Alphabetical grouping with horizontal separators between letter groups.
 - Special styling for manila, LG and multi-quantity SKUs.
+- **Bold yellow `*`** at the end of any pill whose order ships with tracking —
+  the same `#ffd54f` as the yellow `Total:` pill on the card, driven by the same
+  `trackingOrderAmountThreshold` test, so the tracked-label orders stand out in
+  the panel. (On a manila pill in light mode the pill background is that same
+  yellow, so the mark doesn't show there.)
 - Packed SKUs strike through rather than disappearing, so the list doesn't shift
   under you while you work down it.
 - **Favicon and tab-title badge** — the browser tab shows eBay's favicon with a
