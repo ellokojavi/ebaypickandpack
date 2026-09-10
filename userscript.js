@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260910-v4.45-sku-tracking-mark
+// @version      20260910-v4.46-sku-tracking-mark-legibility
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -520,7 +520,11 @@
                    signal. Own colour rule so it survives the pill-level
                    colour overrides (multi-qty's !important, the inline
                    dark-mode colour on multi-item pills). */
-                .${CONFIG.classNames.skuItem} .${CONFIG.classNames.skuTrackingMark} { color: #ffd54f !important; font-weight: 900; margin-left: 2px; }
+                /* The halo is load-bearing, not decoration: a light-mode manila
+                   pill's fill IS #FFD54F, so the bare glyph measures 1.0:1
+                   against its own background and vanishes. Fill stays exactly
+                   #ffd54f; the 1.5px dark halo does the separating. */
+                .${CONFIG.classNames.skuItem} .${CONFIG.classNames.skuTrackingMark} { color: #ffd54f !important; font-weight: 900; margin-left: 2px; text-shadow: 0 0 1.5px rgba(0, 0, 0, 0.9); }
                 .${CONFIG.classNames.highlightYellow} { color: #111; background-color: #ffffb1; padding: 1px 2px; border-radius: 2px; }
                 .${CONFIG.classNames.zoomOverlay} { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); z-index: 10000; display: flex; justify-content: center; align-items: center; }
                 .${CONFIG.classNames.zoomContainer} { max-width: 80%; max-height: 80%; position: relative; }
