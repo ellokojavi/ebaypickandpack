@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260902-v4.44-envelope-blank-page
+// @version      20260910-v4.45-sku-tracking-mark
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -252,7 +252,7 @@
                 copyAddressButton: 'copyAddressButton', editAddressButton: 'editAddressButton', createTemplateButton: 'createTemplateButton', printEnvelopeHTML: 'HTMLEnvelopeToPrint', printAllEnvelopesButton: 'printAllEnvelopesButton', skuPanelContainer: 'SKUListContainer', skuList: 'SKUsToPackContainer', skuContentWrapper: 'sku-content-wrapper'
             },
             classNames: {
-                addressContainer: 'en-US', editAddressBtn: 'edit-address-btn', cancelAddressBtn: 'cancel-address-btn', copyAddressBtn: 'copy-address-btn', addressEditInput: 'address-edit-input', cancelWrapper: 'cancel-wrapper', addressFullname: 'print__address__fullname', itemContainer: 'item', shippingInfoBlock: 'shipping-info-block', buyerNoteCallout: 'buyer-note-callout', quantityMulti: 'quantity-multi', markAsShippedBtn: 'mark-as-shipped-btn', isEditingAddress: 'is-editing-address', highlightManila: 'order-highlight-manila', highlightLg: 'order-highlight-lg', highlightMultiItem: 'order-highlight-multi-item', borderLg: 'order-border-lg', borderManila: 'order-border-manila', highlightYellow: 'highlight-yellow', skuItem: 'sku-item', skuGroupSeparator: 'sku-group-separator', skuLg: 'sku-lg', skuManila: 'sku-manila', skuMultiQty: 'sku-multi-qty', multiItemSkuOrder: 'order-multi-item', darkModeSwitch: 'dark-mode-switch', darkModeSlider: 'slider', zoomOverlay: 'zoomed-image-overlay', zoomContainer: 'zoomed-image-container', zoomImage: 'zoomed-image', zoomCloseButton: 'close-zoom-button',
+                addressContainer: 'en-US', editAddressBtn: 'edit-address-btn', cancelAddressBtn: 'cancel-address-btn', copyAddressBtn: 'copy-address-btn', addressEditInput: 'address-edit-input', cancelWrapper: 'cancel-wrapper', addressFullname: 'print__address__fullname', itemContainer: 'item', shippingInfoBlock: 'shipping-info-block', buyerNoteCallout: 'buyer-note-callout', quantityMulti: 'quantity-multi', markAsShippedBtn: 'mark-as-shipped-btn', isEditingAddress: 'is-editing-address', highlightManila: 'order-highlight-manila', highlightLg: 'order-highlight-lg', highlightMultiItem: 'order-highlight-multi-item', borderLg: 'order-border-lg', borderManila: 'order-border-manila', highlightYellow: 'highlight-yellow', skuItem: 'sku-item', skuTrackingMark: 'sku-tracking-mark', skuGroupSeparator: 'sku-group-separator', skuLg: 'sku-lg', skuManila: 'sku-manila', skuMultiQty: 'sku-multi-qty', multiItemSkuOrder: 'order-multi-item', darkModeSwitch: 'dark-mode-switch', darkModeSlider: 'slider', zoomOverlay: 'zoomed-image-overlay', zoomContainer: 'zoomed-image-container', zoomImage: 'zoomed-image', zoomCloseButton: 'close-zoom-button',
                 printEnvelopeBtn: 'print-envelope-btn', markAsShippedWaiting: 'waiting-confirmation', orderShipped: 'shipped-state', shippedLabel: 'shipped-label', orderPendingShipment: 'order-pending-shipment', pendingOverlay: 'pending-overlay', pendingOverlayContent: 'pending-overlay-content', processingIcon: 'processing-icon', skuShipped: 'sku-shipped', addTrackingLink: 'add-tracking-link', trackingLinkSubmitted: 'tracking-link-submitted', reviseLink: 'revise-link', addNoteLink: 'add-note-link', noteLinkSubmitted: 'note-link-submitted',
                 orderShipFailed: 'ship-failed-state', shipFailedBanner: 'ship-failed-banner', shipQueuedBadge: 'ship-queued-badge', shipSelectedBtn: 'ship-selected-btn',
                 msgFailedPill: 'msg-failed-pill',
@@ -515,6 +515,12 @@
                 .${CONFIG.classNames.skuItem}.${CONFIG.classNames.skuLg} { background-color: ${isDarkMode ? '#2a3f4a' : '#B3E5FC'}; font-weight: bold; border: 2px solid #ffffb1 !important; }
                 .${CONFIG.classNames.skuItem}.${CONFIG.classNames.skuManila} { background-color: ${isDarkMode ? '#4a3f2a' : '#FFD54F'}; font-weight: bold; border: 3px solid orange !important; }
                 .${CONFIG.classNames.skuItem}.${CONFIG.classNames.skuMultiQty} { background-color: ${isDarkMode ? '#2e2a1e' : '#FAF3E0'}; color: ${isDarkMode ? '#c8902a' : '#8a5c00'} !important; border: 1px solid ${isDarkMode ? '#7a5c28' : '#c8a060'} !important; }
+                /* Ships-with-tracking marker. Same #ffd54f as the yellow
+                   "Total:" pill on the order card, so the two read as one
+                   signal. Own colour rule so it survives the pill-level
+                   colour overrides (multi-qty's !important, the inline
+                   dark-mode colour on multi-item pills). */
+                .${CONFIG.classNames.skuItem} .${CONFIG.classNames.skuTrackingMark} { color: #ffd54f !important; font-weight: 900; margin-left: 2px; }
                 .${CONFIG.classNames.highlightYellow} { color: #111; background-color: #ffffb1; padding: 1px 2px; border-radius: 2px; }
                 .${CONFIG.classNames.zoomOverlay} { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); z-index: 10000; display: flex; justify-content: center; align-items: center; }
                 .${CONFIG.classNames.zoomContainer} { max-width: 80%; max-height: 80%; position: relative; }
@@ -4284,6 +4290,12 @@
                              skuItemLink.innerHTML = '✔️ ' + skuItemLink.innerHTML;
                              skuItemLink.classList.add(CONFIG.classNames.skuShipped);
                         }
+                        // Orders above the tracking threshold ship with a
+                        // tracked label. Appended last so it stays at the end
+                        // of the pill even after the shipped ✔️ is prepended.
+                        if (skuObject.shipsWithLabel) {
+                            skuItemLink.insertAdjacentHTML('beforeend', `<span class="${CONFIG.classNames.skuTrackingMark}">*</span>`);
+                        }
                         if (skuObject.isMultiItemOrder) {
                             skuItemLink.style.backgroundColor = orderIdToColorMap[skuObject.orderId];
                             skuItemLink.style.fontWeight = 'bold';
@@ -4607,6 +4619,10 @@
                         parsedOrders.push({
                             orderId: globalOrderIndex,
                             isCanadian: orderEl.dataset.isCanadian === 'true',
+                            // Set by processOrderCard from the order total vs.
+                            // trackingOrderAmountThreshold — the same test that
+                            // paints the "Total:" pill yellow.
+                            shipsWithLabel: orderEl.dataset.shipsWithLabel === 'true',
                             isMarkedAsShipped: orderEl.classList.contains(CONFIG.classNames.orderShipped),
                             items: itemsInThisOrder
                         });
@@ -4635,6 +4651,7 @@
                             isMultiItemOrder,
                             orderId: order.orderId,
                             isCanadian: order.isCanadian,
+                            shipsWithLabel: order.shipsWithLabel,
                             isMarkedAsShipped: order.isMarkedAsShipped
                         });
                     });
