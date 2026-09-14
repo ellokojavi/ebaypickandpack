@@ -270,6 +270,19 @@ tracking above `trackingOrderAmountThreshold`.
   editable fields, and print a one-off envelope for an order not in the queue.
 - **Canadian envelopes** carry a faint 🇨🇦 + "Int'l Stamp" reminder, sized to be
   covered by an international stamp.
+- **Envelope history** (since v4.51) — every envelope sent to the printer and
+  every shipment eBay confirms is recorded in GM storage, so the record survives
+  reloads and tab closes. Open it from **🧾 Envelope history** in the SKU panel:
+  filter by date range, by order id / buyer / SKU, or by *printed but not
+  shipped*, and export exactly what the filter shows to CSV. A card whose
+  envelope was printed before carries an amber **already printed 2× · 3d ago**
+  pill next to Print Envelope — a warning, not a block, since a jam or a smudge
+  is a good reason to reprint. Rows are keyed by order id (eBay confirms
+  shipment per order id) and each carries the envelope group it was printed
+  with, so a combined card counts as one envelope and two orders. Printing is
+  recorded when the job reaches the printer — the browser never reports whether
+  the dialog was confirmed or cancelled — while shipping is recorded only on
+  eBay's confirmation.
 - **Buy shipping label** — a link under each card's Print Envelope button opens
   eBay's single-label page in a focused tab and auto-fills it for an eBay
   Standard Envelope: Custom size, 1 oz, 9 × 4.1 × 0.1 in. You click "Buy
@@ -497,6 +510,8 @@ Open the browser console on the bulk shipping page and run:
 | `altheastixShipSimulate('msgfail', 'order-item-3')` | Raises a real retryable "message not sent" pill — **without contacting eBay** |
 | `altheastixShipSimulate('reset', 'order-item-3')` | Returns card 3 to its untouched state |
 | `altheastixShipSweepPreview()` | Lists which cards the end-of-batch rescue sweep would retry, and which failed cards it would skip and why. Opens nothing |
+| `altheastixEnvelopeHistory()` | Prints the print/ship history: totals, then the 100 most recent rows as a table |
+| `altheastixEnvelopeHistory(true)` | Same, and copies the full history to the clipboard as CSV |
 | `altheastixConfigReport()` | Prints the stored panel defaults next to every card's live state, flagging which cards carry a per-order override |
 | `altheastixConfigDryRun()` | Reports which cards the **next** repaint would seed with the defaults and which it would leave alone — changes nothing |
 | `altheastixEnvelopeReport()` | Tables every order card with the envelope format it would print on. Opens no dialog |
