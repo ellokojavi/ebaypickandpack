@@ -1,5 +1,19 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.49
+- **Profiling only — no behaviour change.** v4.48's measurement says the batch
+  now costs 195ms total, of which the repaint is 7ms and the two clicks are
+  188ms, so the remaining cost is entirely eBay's React commits. This release
+  times each individual click (the toggle-all and each per-card click,
+  separately) and reports how long the page takes to settle after the
+  synchronous batch finishes, so we can tell whether one commit over 18 cards
+  is inherently ~180ms — in which case eBay's own *Select all* costs the same
+  and there is nothing left to win — or whether a single per-card click is the
+  expensive one.
+- The re-render watchdog now logs how long its pass took and how many cards it
+  re-processed, to rule it in or out as the source of any lag felt *after* the
+  selection lands.
+
 ## v4.48
 - **The real cost of a batch filter was eBay's React commits, not this script's
   repaint — so the filter now takes the cheap route.** v4.47 collapsed N panel
