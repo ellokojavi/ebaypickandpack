@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260914-v4.50-batch-select-drop-profiling
+// @version      20260914-v4.51-envelope-print-ship-history
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -68,6 +68,10 @@
     // per-card override) whenever a checkbox was ticked or an order shipped.
     const THANK_YOU_GLOBAL_KEY = 'ebay_thank_you_global';
     const SHIP_WHEN_TOMORROW_KEY = 'ebay_ship_when_tomorrow';
+    // Durable print/ship record. One row per ORDER ID (see the envelope-history
+    // section for why), stored as a JSON map so a whole batch cannot overwrite
+    // itself the way a single-slot payload would.
+    const ENVELOPE_HISTORY_KEY = 'ebay_envelope_history';
 
     // ===================================================================
     // USER CONFIGURATION (Local Preferences)
@@ -253,7 +257,7 @@
             },
             classNames: {
                 addressContainer: 'en-US', editAddressBtn: 'edit-address-btn', cancelAddressBtn: 'cancel-address-btn', copyAddressBtn: 'copy-address-btn', addressEditInput: 'address-edit-input', cancelWrapper: 'cancel-wrapper', addressFullname: 'print__address__fullname', itemContainer: 'item', shippingInfoBlock: 'shipping-info-block', buyerNoteCallout: 'buyer-note-callout', quantityMulti: 'quantity-multi', markAsShippedBtn: 'mark-as-shipped-btn', isEditingAddress: 'is-editing-address', highlightManila: 'order-highlight-manila', highlightLg: 'order-highlight-lg', highlightMultiItem: 'order-highlight-multi-item', borderLg: 'order-border-lg', borderManila: 'order-border-manila', highlightYellow: 'highlight-yellow', skuItem: 'sku-item', skuTrackingMark: 'sku-tracking-mark', skuGroupSeparator: 'sku-group-separator', skuLg: 'sku-lg', skuManila: 'sku-manila', skuMultiQty: 'sku-multi-qty', multiItemSkuOrder: 'order-multi-item', darkModeSwitch: 'dark-mode-switch', darkModeSlider: 'slider', zoomOverlay: 'zoomed-image-overlay', zoomContainer: 'zoomed-image-container', zoomImage: 'zoomed-image', zoomCloseButton: 'close-zoom-button',
-                printEnvelopeBtn: 'print-envelope-btn', markAsShippedWaiting: 'waiting-confirmation', orderShipped: 'shipped-state', shippedLabel: 'shipped-label', orderPendingShipment: 'order-pending-shipment', pendingOverlay: 'pending-overlay', pendingOverlayContent: 'pending-overlay-content', processingIcon: 'processing-icon', skuShipped: 'sku-shipped', addTrackingLink: 'add-tracking-link', trackingLinkSubmitted: 'tracking-link-submitted', reviseLink: 'revise-link', addNoteLink: 'add-note-link', noteLinkSubmitted: 'note-link-submitted',
+                printEnvelopeBtn: 'print-envelope-btn', envReprintPill: 'env-reprint-pill', markAsShippedWaiting: 'waiting-confirmation', orderShipped: 'shipped-state', shippedLabel: 'shipped-label', orderPendingShipment: 'order-pending-shipment', pendingOverlay: 'pending-overlay', pendingOverlayContent: 'pending-overlay-content', processingIcon: 'processing-icon', skuShipped: 'sku-shipped', addTrackingLink: 'add-tracking-link', trackingLinkSubmitted: 'tracking-link-submitted', reviseLink: 'revise-link', addNoteLink: 'add-note-link', noteLinkSubmitted: 'note-link-submitted',
                 orderShipFailed: 'ship-failed-state', shipFailedBanner: 'ship-failed-banner', shipQueuedBadge: 'ship-queued-badge', shipSelectedBtn: 'ship-selected-btn',
                 msgFailedPill: 'msg-failed-pill',
                 orderWatchPill: 'order-watch-pill', orderWatchPillAction: 'order-watch-pill-action',
@@ -553,6 +557,14 @@
                     background-color: ${isDarkMode ? '#4a4a4a' : '#f5f5f5'};
                     border-color: ${isDarkMode ? '#777' : '#c0c8d4'};
                     box-shadow: 0 2px 2px ${isDarkMode ? 'rgba(0,0,0,0.2)' : 'rgba(39, 44, 52, 0.12)'};
+                }
+                .${CONFIG.classNames.envReprintPill} {
+                    display: inline-block; margin-top: 6px; padding: 1px 7px; border-radius: 10px;
+                    font-size: 11px; font-weight: 700; letter-spacing: .2px; white-space: nowrap;
+                    background: ${isDarkMode ? '#4a3a1a' : '#fff3cd'};
+                    color: ${isDarkMode ? '#f0c674' : '#7a5b00'};
+                    border: 1px solid ${isDarkMode ? '#6b5320' : '#ffe08a'};
+                    cursor: help;
                 }
                 .${CONFIG.classNames.buyLabelLink} {
                     display: block; margin-top: 6px; font-size: 13px; font-weight: 600;
@@ -1598,7 +1610,7 @@
                 cn.addTrackingLink, cn.reviseLink, cn.addrWarningBadge,
                 cn.addrOkBadge, cn.messageContainer, cn.markAsShippedBtn,
                 cn.printEnvelopeBtn, cn.buyLabelLink, cn.shippedLabel,
-                cn.shipFailedBanner, cn.shipQueuedBadge, cn.msgFailedPill
+                cn.shipFailedBanner, cn.shipQueuedBadge, cn.msgFailedPill, cn.envReprintPill
             ].map(c => '.' + c).join(', ');
             orderItem.querySelectorAll(staleSelectors).forEach(el => el.remove());
             // The pending overlay is handled separately: an order that is
@@ -1858,6 +1870,22 @@
             printButton.textContent = "Print Envelope";
             tcellItem.appendChild(printButton);
 
+            // A quiet warning, not a block: reprinting is sometimes exactly
+            // what you want (a jam, a smudge), so this says what happened and
+            // gets out of the way.
+            try {
+                const prior = priorPrintForCard(orderItem);
+                if (prior) {
+                    const reprintPill = document.createElement('span');
+                    reprintPill.className = CONFIG.classNames.envReprintPill;
+                    const times = prior.printCount === 1 ? 'once' : `${prior.printCount}×`;
+                    reprintPill.textContent = `already printed ${times} · ${historyAgo(prior.lastPrintedAt)}`;
+                    reprintPill.title = `Last printed ${historyStamp(prior.lastPrintedAt)}` +
+                        (prior.shippedAt ? `\nShipped ${historyStamp(prior.shippedAt)}` : '\nNot confirmed as shipped yet');
+                    tcellItem.appendChild(reprintPill);
+                }
+            } catch (e) { console.warn('[Altheastix][hist] reprint badge skipped:', e); }
+
             // "Buy shipping label" link — opens eBay's single-label page in a
             // focused tab; the /ship/single automation pre-fills it for an eBay
             // Standard Envelope (see the buy_label branch below).
@@ -1900,10 +1928,401 @@
         // with all envelopes. A batch that mixes #10 and large orders still
         // prints as ONE job — the page size is carried per envelope by a CSS
         // named page (see envelopePrintCSS).
+        // ===================================================================
+        // ENVELOPE HISTORY
+        // ===================================================================
+        // A durable record of what was printed and what eBay confirmed as
+        // shipped, kept in GM storage so it survives reloads, tab closes and
+        // script updates. It answers two questions the page itself cannot:
+        // "did this order already go out?" and "have I printed this envelope
+        // before?".
+        //
+        // ONE ROW PER ORDER ID, not per card. eBay confirms shipment per order
+        // id, so a per-card row would have to guess which half of a combined
+        // card a confirmation belonged to — the same trap as the single-slot
+        // GM payloads that lost 11 of 12 orders in a batch. The cost is that a
+        // combined card prints ONE envelope but writes TWO rows, so every row
+        // carries `group`, the first order id on the card it was printed with:
+        // count distinct groups for envelopes, rows for orders.
+        //
+        // Timestamps are epoch ms, formatted only at render time. A stored
+        // pre-formatted date is a date you can no longer sort or filter.
+        const ENVELOPE_HISTORY_MAX = 1500;
+        let envelopeHistoryCache = null;
+
+        function envelopeHistory() {
+            if (envelopeHistoryCache) return envelopeHistoryCache;
+            try {
+                const raw = GM_getValue(ENVELOPE_HISTORY_KEY, null);
+                const parsed = !raw ? {} : (typeof raw === 'string' ? JSON.parse(raw) : raw);
+                envelopeHistoryCache = (parsed && typeof parsed === 'object') ? parsed : {};
+            } catch (e) {
+                console.warn('[Altheastix][hist] history unreadable — starting from empty:', e);
+                envelopeHistoryCache = {};
+            }
+            return envelopeHistoryCache;
+        }
+
+        function writeEnvelopeHistory(map) {
+            try {
+                const ids = Object.keys(map);
+                if (ids.length > ENVELOPE_HISTORY_MAX) {
+                    // Oldest touched go first, so the store cannot grow forever.
+                    ids.sort((a, b) => (map[a].lastTouchedAt || 0) - (map[b].lastTouchedAt || 0));
+                    ids.slice(0, ids.length - ENVELOPE_HISTORY_MAX).forEach(id => { delete map[id]; });
+                }
+                GM_setValue(ENVELOPE_HISTORY_KEY, JSON.stringify(map));
+                envelopeHistoryCache = map;
+                return true;
+            } catch (e) {
+                // Never let a failed write break a print or a shipment. The
+                // history is a record of the work, not part of doing it.
+                console.error('[Altheastix][hist] could not save history:', e);
+                return false;
+            }
+        }
+
+        // Reads what a card can tell us about itself. textContent, not
+        // innerText: innerText forces a layout pass per read and this runs over
+        // every item of every card being printed.
+        function cardHistoryFacts(card) {
+            const ids = (card.dataset.orderId || '').split(',').map(s => s.trim()).filter(Boolean);
+            const buyer = (card.querySelector('.print__address__fullname')?.textContent || '').trim();
+            const skus = [];
+            card.querySelectorAll('.item').forEach(itemEl => {
+                const details = itemEl.querySelector('[class*="item__details"]');
+                if (!details) return;
+                details.querySelectorAll('li').forEach(li => {
+                    const text = (li.textContent || '').trim();
+                    if (text.startsWith('SKU:')) skus.push(text.replace('SKU:', '').trim());
+                });
+            });
+            return { ids: ids, buyer: buyer, skus: skus };
+        }
+
+        function findCardByAnyOrderId(orderId) {
+            return Array.from(document.querySelectorAll(CONFIG.selectors.orderItem))
+                .find(card => (card.dataset.orderId || '').split(',').map(s => s.trim()).includes(orderId)) || null;
+        }
+
+        // `entries` is [{ card, format, size, canada }], one per envelope that
+        // was actually built — not per card asked for, since a card with no
+        // address block produces nothing to record.
+        function recordEnvelopesPrinted(entries) {
+            const map = envelopeHistory();
+            const now = Date.now();
+            let rows = 0, envelopes = 0;
+            entries.forEach(entry => {
+                const facts = cardHistoryFacts(entry.card);
+                if (!facts.ids.length) return;
+                envelopes++;
+                const group = facts.ids[0];
+                facts.ids.forEach(id => {
+                    const prev = map[id] || {};
+                    map[id] = Object.assign({}, prev, {
+                        orderId: id,
+                        group: group,
+                        buyer: facts.buyer || prev.buyer || '',
+                        skus: facts.skus.join(' | ') || prev.skus || '',
+                        format: entry.format || prev.format || '',
+                        size: entry.size || prev.size || '',
+                        canada: !!entry.canada,
+                        firstPrintedAt: prev.firstPrintedAt || now,
+                        lastPrintedAt: now,
+                        printCount: (prev.printCount || 0) + 1,
+                        shippedAt: prev.shippedAt || null,
+                        lastTouchedAt: now
+                    });
+                    rows++;
+                });
+            });
+            if (rows) writeEnvelopeHistory(map);
+            console.log(`[Altheastix][hist] print recorded — ${envelopes} envelope(s), ${rows} order row(s)`);
+        }
+
+        // Called when eBay CONFIRMS a shipment, never when one is merely
+        // requested — a row here means the order actually went out.
+        function recordEnvelopeShipped(orderId) {
+            if (!orderId) return;
+            const map = envelopeHistory();
+            const now = Date.now();
+            const prev = map[orderId] || {};
+            // An order can ship without ever printing an envelope here (an eBay
+            // label, or a print from before this feature existed), so the row is
+            // created rather than requiring a matching print.
+            let buyer = prev.buyer || '', skus = prev.skus || '';
+            if (!buyer || !skus) {
+                const card = findCardByAnyOrderId(orderId);
+                if (card) {
+                    const facts = cardHistoryFacts(card);
+                    buyer = buyer || facts.buyer;
+                    skus = skus || facts.skus.join(' | ');
+                }
+            }
+            map[orderId] = Object.assign({}, prev, {
+                orderId: orderId,
+                group: prev.group || orderId,
+                buyer: buyer,
+                skus: skus,
+                // First confirmation wins. A second one is eBay repeating
+                // itself, not the order shipping twice.
+                shippedAt: prev.shippedAt || now,
+                lastTouchedAt: now
+            });
+            writeEnvelopeHistory(map);
+            console.log(`[Altheastix][hist] shipped recorded — ${orderId}`);
+        }
+
+        // The print-before warning shown on a card: the busiest prior row among
+        // this card's order ids, or null if none of them was ever printed.
+        function priorPrintForCard(card) {
+            const map = envelopeHistory();
+            const ids = (card.dataset.orderId || '').split(',').map(s => s.trim()).filter(Boolean);
+            let best = null;
+            ids.forEach(id => {
+                const row = map[id];
+                if (!row || !row.printCount) return;
+                if (!best || (row.lastPrintedAt || 0) > (best.lastPrintedAt || 0)) best = row;
+            });
+            return best;
+        }
+
+        function historyAgo(ms) {
+            if (!ms) return '';
+            const days = Math.floor((Date.now() - ms) / 86400000);
+            if (days <= 0) return 'today';
+            if (days === 1) return 'yesterday';
+            if (days < 30) return `${days}d ago`;
+            const months = Math.floor(days / 30);
+            return months === 1 ? '1mo ago' : `${months}mo ago`;
+        }
+
+        function historyStamp(ms) {
+            if (!ms) return '';
+            const d = new Date(ms);
+            return `${d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' })} ${d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })}`;
+        }
+
+        function envelopeHistoryRows() {
+            return Object.values(envelopeHistory())
+                .sort((a, b) => (b.lastTouchedAt || 0) - (a.lastTouchedAt || 0));
+        }
+
+        function envelopeHistoryCSV(rows) {
+            const header = ['order_id', 'envelope_group', 'buyer', 'skus', 'format', 'size', 'canada',
+                'print_count', 'first_printed', 'last_printed', 'shipped_at', 'status'];
+            const esc = (v) => `"${String(v === null || v === undefined ? '' : v).replace(/"/g, '""')}"`;
+            const lines = [header.join(',')];
+            rows.forEach(r => {
+                const status = r.shippedAt ? 'shipped' : (r.printCount ? 'printed, not shipped' : 'recorded');
+                lines.push([r.orderId, r.group, r.buyer, r.skus, r.format, r.size, r.canada ? 'yes' : 'no',
+                    r.printCount || 0, historyStamp(r.firstPrintedAt), historyStamp(r.lastPrintedAt),
+                    historyStamp(r.shippedAt), status].map(esc).join(','));
+            });
+            return lines.join('\r\n');
+        }
+
+        function downloadEnvelopeHistoryCSV(rows) {
+            // BOM first, or Excel opens the accented buyer names as mojibake.
+            const blob = new Blob(['﻿' + envelopeHistoryCSV(rows)], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `altheastix-envelopes-${new Date().toISOString().slice(0, 10)}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+            console.log(`[Altheastix][hist] exported ${rows.length} row(s) to CSV`);
+        }
+
+        function altheastixEnvelopeHistory(copy) {
+            const rows = envelopeHistoryRows();
+            const shipped = rows.filter(r => r.shippedAt).length;
+            const openPrints = rows.filter(r => r.printCount && !r.shippedAt).length;
+            console.log(`[Altheastix][hist] ${rows.length} order row(s) — ${new Set(rows.filter(r => r.printCount).map(r => r.group)).size} envelope(s), ${shipped} shipped, ${openPrints} printed but not shipped`);
+            console.table(rows.slice(0, 100).map(r => ({
+                order: r.orderId, buyer: r.buyer, skus: r.skus, prints: r.printCount || 0,
+                printed: historyStamp(r.lastPrintedAt), shipped: historyStamp(r.shippedAt)
+            })));
+            if (copy) {
+                try { GM_setClipboard(envelopeHistoryCSV(rows)); console.log('[Altheastix][hist] CSV copied to clipboard.'); }
+                catch (e) { console.warn('[Altheastix][hist] clipboard copy failed:', e); }
+            }
+            return rows;
+        }
+
+        // --- History modal ---
+        // Deliberately a modal rather than another fixed panel: the SKU panel
+        // and the defaults panel already stack against the viewport height and
+        // a third one would fight them for space on short screens.
+        function showEnvelopeHistoryModal() {
+            document.querySelector('.altheastix-history-overlay')?.remove();
+            const isDarkMode = localStorage.getItem(CONFIG.localStorageKeys.darkMode) !== 'false';
+            const bg = isDarkMode ? '#1e1e1e' : '#fff';
+            const fg = isDarkMode ? '#e0e0e0' : '#000';
+            const inputBg = isDarkMode ? '#2c2c2c' : '#fff';
+            const inputBorder = isDarkMode ? '#555' : '#ccc';
+            const mutedFg = isDarkMode ? '#999' : '#888';
+            const accent = isDarkMode ? '#78BFFF' : '#0070d2';
+            const rowBorder = isDarkMode ? '#333' : '#eee';
+
+            const overlay = document.createElement('div');
+            overlay.className = 'altheastix-history-overlay';
+            overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);z-index:10001;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);';
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+            const modal = document.createElement('div');
+            modal.style.cssText = `background:${bg};color:${fg};border-radius:12px;padding:20px 24px;width:980px;max-width:94vw;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 8px 30px rgba(0,0,0,0.3);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;`;
+
+            const header = document.createElement('div');
+            header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;';
+            const title = document.createElement('h3');
+            title.textContent = 'Envelope history';
+            title.style.cssText = `margin:0;font-size:18px;color:${fg};`;
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = '✕';
+            closeBtn.style.cssText = `background:none;border:none;font-size:18px;cursor:pointer;color:${mutedFg};padding:4px 8px;border-radius:4px;`;
+            closeBtn.onclick = () => overlay.remove();
+            header.append(title, closeBtn);
+
+            const controls = document.createElement('div');
+            controls.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;';
+            const rangeSel = document.createElement('select');
+            [['7', 'Last 7 days'], ['30', 'Last 30 days'], ['90', 'Last 90 days'], ['0', 'Everything']]
+                .forEach(([value, label]) => {
+                    const opt = document.createElement('option');
+                    opt.value = value; opt.textContent = label;
+                    rangeSel.appendChild(opt);
+                });
+            rangeSel.value = '30';
+            rangeSel.style.cssText = `padding:6px 8px;border-radius:6px;border:1px solid ${inputBorder};background:${inputBg};color:${fg};font-size:13px;`;
+            const search = document.createElement('input');
+            search.type = 'search';
+            search.placeholder = 'Filter by order id, buyer or SKU…';
+            search.style.cssText = `flex:1;min-width:200px;padding:6px 10px;border-radius:6px;border:1px solid ${inputBorder};background:${inputBg};color:${fg};font-size:13px;`;
+            const onlyOpen = document.createElement('label');
+            onlyOpen.style.cssText = `display:flex;align-items:center;gap:6px;font-size:13px;color:${mutedFg};cursor:pointer;`;
+            const onlyOpenBox = document.createElement('input');
+            onlyOpenBox.type = 'checkbox';
+            onlyOpen.append(onlyOpenBox, document.createTextNode('Printed but not shipped'));
+            const exportBtn = document.createElement('button');
+            exportBtn.textContent = 'Export CSV';
+            exportBtn.style.cssText = `padding:6px 12px;border-radius:6px;border:1px solid ${inputBorder};background:${inputBg};color:${fg};font-size:13px;font-weight:600;cursor:pointer;`;
+            controls.append(rangeSel, search, onlyOpen, exportBtn);
+
+            const summary = document.createElement('div');
+            summary.style.cssText = `font-size:12px;color:${mutedFg};margin-bottom:8px;`;
+
+            const tableWrap = document.createElement('div');
+            tableWrap.style.cssText = 'overflow:auto;flex:1;min-height:120px;';
+            const table = document.createElement('table');
+            table.style.cssText = 'width:100%;border-collapse:collapse;font-size:12.5px;';
+            const thead = document.createElement('thead');
+            const headRow = document.createElement('tr');
+            ['Order', 'Buyer', 'SKUs', 'Env.', 'Printed', 'Shipped'].forEach(label => {
+                const th = document.createElement('th');
+                th.textContent = label;
+                th.style.cssText = `text-align:left;padding:6px 8px;border-bottom:1px solid ${rowBorder};position:sticky;top:0;background:${bg};color:${mutedFg};font-weight:600;white-space:nowrap;`;
+                headRow.appendChild(th);
+            });
+            thead.appendChild(headRow);
+            const tbody = document.createElement('tbody');
+            table.append(thead, tbody);
+            tableWrap.appendChild(table);
+
+            let visibleRows = [];
+            const render = () => {
+                const days = parseInt(rangeSel.value, 10);
+                const cutoff = days > 0 ? Date.now() - days * 86400000 : 0;
+                const needle = search.value.trim().toLowerCase();
+                visibleRows = envelopeHistoryRows().filter(r => {
+                    if (cutoff && (r.lastTouchedAt || 0) < cutoff) return false;
+                    if (onlyOpenBox.checked && (!r.printCount || r.shippedAt)) return false;
+                    if (!needle) return true;
+                    return `${r.orderId} ${r.buyer} ${r.skus}`.toLowerCase().includes(needle);
+                });
+                tbody.textContent = '';
+                if (!visibleRows.length) {
+                    const tr = document.createElement('tr');
+                    const td = document.createElement('td');
+                    td.colSpan = 6;
+                    td.textContent = 'Nothing recorded for this filter yet.';
+                    td.style.cssText = `padding:18px 8px;color:${mutedFg};text-align:center;`;
+                    tr.appendChild(td);
+                    tbody.appendChild(tr);
+                } else {
+                    visibleRows.forEach(r => {
+                        const tr = document.createElement('tr');
+                        const cells = [
+                            r.orderId,
+                            r.buyer || '—',
+                            r.skus || '—',
+                            r.printCount ? `${r.printCount}×${r.canada ? ' 🇨🇦' : ''}` : '—',
+                            r.lastPrintedAt ? `${historyStamp(r.lastPrintedAt)}` : '—',
+                            r.shippedAt ? historyStamp(r.shippedAt) : (r.printCount ? 'not yet' : '—')
+                        ];
+                        cells.forEach((value, i) => {
+                            const td = document.createElement('td');
+                            // textContent throughout: buyer names and SKUs are
+                            // page data, never markup.
+                            td.textContent = value;
+                            td.style.cssText = `padding:5px 8px;border-bottom:1px solid ${rowBorder};vertical-align:top;${i === 0 ? 'white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;' : ''}${i === 5 && !r.shippedAt && r.printCount ? `color:${isDarkMode ? '#f0a35e' : '#b35c00'};` : ''}`;
+                            tr.appendChild(td);
+                        });
+                        tbody.appendChild(tr);
+                    });
+                }
+                const envelopes = new Set(visibleRows.filter(r => r.printCount).map(r => r.group)).size;
+                const shipped = visibleRows.filter(r => r.shippedAt).length;
+                const open = visibleRows.filter(r => r.printCount && !r.shippedAt).length;
+                summary.textContent = `${visibleRows.length} order(s) · ${envelopes} envelope(s) · ${shipped} shipped · ${open} printed but not shipped`;
+            };
+
+            rangeSel.addEventListener('change', render);
+            search.addEventListener('input', render);
+            onlyOpenBox.addEventListener('change', render);
+            exportBtn.addEventListener('click', () => downloadEnvelopeHistoryCSV(visibleRows));
+
+            const footer = document.createElement('div');
+            footer.style.cssText = `margin-top:10px;font-size:11px;color:${mutedFg};`;
+            footer.textContent = 'Printed is recorded when an envelope goes to the printer; shipped only when eBay confirms it. Kept locally in this browser.';
+
+            modal.append(header, controls, summary, tableWrap, footer);
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+            render();
+            search.focus();
+
+            const onEsc = (e) => {
+                if (e.key !== 'Escape') return;
+                overlay.remove();
+                document.removeEventListener('keydown', onEsc);
+            };
+            document.addEventListener('keydown', onEsc);
+        }
+
+        try {
+            unsafeWindow.altheastixEnvelopeHistory = altheastixEnvelopeHistory;
+        } catch (e) {
+            try {
+                window.altheastixEnvelopeHistory = altheastixEnvelopeHistory;
+            } catch (e2) { console.warn('[Altheastix][hist] diagnostics not reachable from the page console.'); }
+        }
+
+        // Another tab (a shipping automation tab, or a second bulk page) can
+        // write history too, so drop the cache when it changes underneath us.
+        try {
+            GM_addValueChangeListener(ENVELOPE_HISTORY_KEY, (name, oldValue, newValue, remote) => {
+                if (remote) envelopeHistoryCache = null;
+            });
+        } catch (e) {}
+
         function printEnvelopes(orderCards) {
             const envelopeHTMLs = [];
             const usedFormats = [];
             const debugRows = [];
+            const printedEntries = [];
             orderCards.forEach(orderItem => {
                 const addressEl = orderItem.querySelector(`.${CONFIG.classNames.addressContainer}`);
                 if (!addressEl) return;
@@ -1920,9 +2339,16 @@
                     : '';
                 envelopeHTMLs.push(buildEnvelopeHTML(addressHTML, format, stampReminder));
                 usedFormats.push(format);
+                printedEntries.push({ card: orderItem, format: format.key, size: format.sizeLabel, canada: isCanadian });
                 debugRows.push({ card: orderItem.id || '(no id)', format: format.key, size: format.sizeLabel, canada: isCanadian });
             });
             if (envelopeHTMLs.length === 0) return;
+            // Recorded here, not after window.print(): the browser never tells
+            // us whether the user actually completed or cancelled the print
+            // dialog, so "sent to the printer" is the only honest event. A
+            // cancelled print shows as a print in the history, which is the
+            // safe direction for a reprint warning.
+            try { recordEnvelopesPrinted(printedEntries); } catch (e) { console.error('[Altheastix][hist] print not recorded:', e); }
             const css = envelopePrintCSS(usedFormats);
             const largeCount = usedFormats.filter(f => f.key === 'large').length;
             console.log(`[Altheastix][env] printing ${envelopeHTMLs.length} envelope(s): ${envelopeHTMLs.length - largeCount} standard, ${largeCount} large`);
@@ -4450,6 +4876,16 @@
                 contentWrapper.appendChild(customEnvLink);
                 // --- END CUSTOM ENVELOPE FEATURE (link) ---
 
+                const historyLink = document.createElement('a');
+                historyLink.href = '#';
+                historyLink.textContent = '🧾 Envelope history';
+                historyLink.title = 'What was printed and what eBay confirmed as shipped';
+                historyLink.style.cssText = `display:block;text-align:center;margin-top:4px;font-size:12px;color:${isDarkMode ? '#78BFFF' : '#3665f3'};text-decoration:none;cursor:pointer;opacity:0.75;transition:opacity 0.2s;`;
+                historyLink.onmouseenter = () => { historyLink.style.opacity = '1'; };
+                historyLink.onmouseleave = () => { historyLink.style.opacity = '0.75'; };
+                historyLink.addEventListener('click', (e) => { e.preventDefault(); showEnvelopeHistoryModal(); });
+                contentWrapper.appendChild(historyLink);
+
                 // --- Defaults panel (separate floating panel) ---
                 // Every control here is persisted in GM storage and re-read on
                 // each rebuild. PrintSKUTable() runs on every checkbox change
@@ -5014,6 +5450,9 @@
             };
             const processShipmentConfirmation = async (confirmedOrderId) => {
                 if (!confirmedOrderId) return;
+                // Before the card lookup: an order whose card has already left
+                // the page still belongs in the history.
+                try { recordEnvelopeShipped(confirmedOrderId); } catch (e) { console.error('[Altheastix][hist] shipment not recorded:', e); }
                 const orderCard = Array.from(document.querySelectorAll(CONFIG.selectors.orderItem)).find(card => card.dataset.orderId?.includes(confirmedOrderId));
                 if (orderCard) {
                     let confirmedIds = (orderCard.dataset.confirmedIds || '').split(',').filter(Boolean);
