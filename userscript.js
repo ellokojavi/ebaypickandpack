@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260914-v4.49-batch-select-click-profiling
+// @version      20260914-v4.50-batch-select-drop-profiling
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -1241,57 +1241,16 @@
         // say whether the time went into eBay's React commits or this script's
         // own repaint. Guessing wrong about which half is expensive costs a
         // release, so the numbers are printed rather than assumed.
-        let batchClickCount = 0;
-        let batchClickLog = [];
-
-        // Times every click the batch issues and labels it, so the breakdown can
-        // say WHICH click is expensive rather than only that clicking is. With
-        // the via-all route there are usually two, so the log stays tiny.
-        function timedClick(el, label) {
-            const t = performance.now();
-            el.click();
-            const ms = performance.now() - t;
-            batchClickCount++;
-            batchClickLog.push(`${label} ${Math.round(ms)}ms`);
-            return ms;
-        }
-
-        function clickOrderCheckbox(cb) {
-            return timedClick(cb, 'card');
-        }
-
-        function clickMasterCheckbox(master, label) {
-            return timedClick(master, label);
-        }
-
         function runBatchSelection(mutate) {
             if (batchSelectionInFlight) { mutate(); return; }
             batchSelectionInFlight = true;
-            batchClickCount = 0;
-            batchClickLog = [];
-            const t0 = performance.now();
-            let tClicksDone = t0;
             try {
                 mutate();
             } finally {
-                tClicksDone = performance.now();
                 batchSelectionInFlight = false;
             }
             try { skuManagerRef?.createSKUPackingList(); } catch (e) { console.error('[Tampermonkey][SELECT] panel repaint failed:', e); }
             refreshBatchSelectControls();
-            const tEnd = performance.now();
-            const clickMs = tClicksDone - t0;
-            console.debug(`[Tampermonkey][SELECT] batch done in ${Math.round(tEnd - t0)}ms — ${batchClickCount} click(s) took ${Math.round(clickMs)}ms, repaint took ${Math.round(tEnd - tClicksDone)}ms — breakdown: ${batchClickLog.join(', ') || '(none)'}`);
-            // Everything above is synchronous. Anything the user still waits for
-            // after it — React effects, eBay's own observers, ours — lands
-            // between here and the next painted frame, so measure that too
-            // rather than assuming the synchronous total is what is felt.
-            requestAnimationFrame(() => {
-                const tPaint = performance.now();
-                setTimeout(() => {
-                    console.debug(`[Tampermonkey][SELECT] settled — first frame ${Math.round(tPaint - tEnd)}ms after the batch, quiet ${Math.round(performance.now() - tEnd)}ms after`);
-                }, 0);
-            });
         }
 
         // Every real .click() on an order checkbox costs eBay a full React
@@ -1299,6 +1258,13 @@
         // repaint, is why ticking 15 cards one at a time lags. eBay's own
         // "Select all" does the whole list in a single commit, which is the
         // entire reason it feels instant by comparison.
+        //
+        // Measured on 18 real orders (v4.49 profiling, since removed): a commit
+        // costs 60-95ms REGARDLESS of how many cards it touches — one card
+        // 61ms, all eighteen 66-94ms — while this script's whole repaint is
+        // 4-7ms. So the cost is per commit, not per card, and counting clicks
+        // is the right model. Do not "optimise" this by making the repaint
+        // cheaper; that was tried in v4.47 and moved nothing.
         //
         // So take the cheaper route to the same end state instead of always
         // walking card by card:
@@ -1332,20 +1298,20 @@
             const route = viaAllCost < directCost ? 'via-all' : 'direct';
 
             if (route === 'via-all') {
-                if (masterOn) clickMasterCheckbox(master, 'toggle-all:off');
-                clickMasterCheckbox(master, 'toggle-all:on');
+                if (masterOn) master.click();
+                master.click();
             } else if (masterOn) {
                 // Reset through eBay's own toggle-all when it is on, so the pass
                 // below starts from a clean state rather than fighting a master
                 // flag that still believes everything is selected.
-                clickMasterCheckbox(master, 'toggle-all:reset');
+                master.click();
             }
 
             rows.forEach(row => {
                 const shouldCheck = target.has(row.order);
                 // A real click, not a .checked assignment, so eBay's React
                 // selection state and this script's listeners both stay in sync.
-                if (row.cb.checked !== shouldCheck) clickOrderCheckbox(row.cb);
+                if (row.cb.checked !== shouldCheck) row.cb.click();
             });
 
             if (master) master.indeterminate = false;
@@ -1353,7 +1319,7 @@
             // order on the page — an unchecked box over a fully ticked list is
             // the same lie in the other direction.
             syncSelectAllCheckbox();
-            console.debug(`[Tampermonkey][SELECT] ${filter.key} → ${target.size} order(s) checked via ${route} (direct ${directCost} vs via-all ${viaAllCost} clicks)`);
+            console.debug(`[Tampermonkey][SELECT] ${filter.key} → ${target.size} order(s) checked via ${route}`);
         }
 
         // Injects or refreshes the whole row. A filter matching nothing renders
@@ -1401,13 +1367,13 @@
             // takes two commits (all on, then all off) — still far cheaper than
             // one commit per ticked card once more than a couple are ticked.
             if (master && master.checked) {
-                clickMasterCheckbox(master, 'toggle-all:off');
+                master.click();
             } else if (master && rows.filter(row => row.cb.checked).length > 2) {
-                clickMasterCheckbox(master, 'toggle-all:on');
-                clickMasterCheckbox(master, 'toggle-all:off');
+                master.click();
+                master.click();
             }
             // Whatever toggle-all left behind, clear the direct way.
-            rows.forEach(row => { if (row.cb.checked) clickOrderCheckbox(row.cb); });
+            rows.forEach(row => { if (row.cb.checked) row.cb.click(); });
             if (master) master.indeterminate = false;
         }
 
@@ -5159,7 +5125,6 @@
             const ordersContainerToWatch = document.querySelector(CONFIG.selectors.ordersContainer) || document.body;
             let reprocessTimer = null;
             const reprocessWipedCards = () => {
-                const tWatchdog = performance.now();
                 let reprocessed = 0;
                 document.querySelectorAll(CONFIG.selectors.orderItem).forEach((card, pos) => {
                     if (card.querySelector(`.${CONFIG.classNames.shippingInfoBlock}`)) return; // still intact
@@ -5189,9 +5154,7 @@
                     skuManager.createSKUPackingList();
                     refreshAddressBanner();
                     refreshBatchSelectControls();
-                    // Timed because this pass runs 500ms AFTER whatever triggered
-                    // it, so a slow one reads as lag with no obvious cause.
-                    console.debug(`[Tampermonkey][ORDERS] Re-processed ${reprocessed} re-rendered card(s) in ${Math.round(performance.now() - tWatchdog)}ms`);
+                    console.debug(`[Tampermonkey][ORDERS] Re-processed ${reprocessed} re-rendered card(s)`);
                 }
             };
             new MutationObserver(() => {

@@ -1,5 +1,18 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.50
+- **Profiling removed now that it has done its job.** The per-click timers, the
+  click log, the batch/settle debug lines and the watchdog timing added in v4.49
+  are gone; the batch-select log line is back to the plain
+  "N order(s) checked via <route>". The route picking and the single-repaint
+  guard stay — those are the fix, not the measurement.
+- Measured cost model, recorded here so it doesn't have to be rediscovered: on
+  18 orders one React commit costs 60-95ms **regardless of how many cards it
+  touches** (one card 61ms, all eighteen 66-94ms), while the script's own panel
+  repaint is 4-7ms. Cost is per commit, not per card — which is why counting
+  clicks is the right model and why the direct route (17 commits, ~1.0s) lost to
+  via-all (2 commits, ~140ms).
+
 ## v4.49
 - **Profiling only — no behaviour change.** v4.48's measurement says the batch
   now costs 195ms total, of which the repaint is 7ms and the two clicks are
