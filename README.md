@@ -272,7 +272,8 @@ tracking above `trackingOrderAmountThreshold`.
   covered by an international stamp.
 - **Envelope history** (since v4.51) — every envelope sent to the printer and
   every shipment eBay confirms is recorded in GM storage, so the record survives
-  reloads and tab closes. Open it from **🧾 Envelope history** in the SKU panel:
+  reloads and tab closes. Open it from the **History** link in the bottom right
+  corner of the SKU panel:
   filter by date range, by order id / buyer / SKU, or by *printed but not
   shipped*, and export exactly what the filter shows to CSV. A card whose
   envelope was printed before carries an amber **already printed 2× · 3d ago**

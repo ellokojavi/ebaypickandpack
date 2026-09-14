@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260914-v4.51-envelope-print-ship-history
+// @version      20260914-v4.52-history-link-corner
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -4876,13 +4876,17 @@
                 contentWrapper.appendChild(customEnvLink);
                 // --- END CUSTOM ENVELOPE FEATURE (link) ---
 
+                // Last child of the panel, right-aligned: the bottom right
+                // corner. Somewhere you go occasionally, not an action
+                // competing with Print and Ship, so it stays muted and small
+                // rather than sitting centred among the buttons.
                 const historyLink = document.createElement('a');
                 historyLink.href = '#';
-                historyLink.textContent = '🧾 Envelope history';
+                historyLink.textContent = 'History';
                 historyLink.title = 'What was printed and what eBay confirmed as shipped';
-                historyLink.style.cssText = `display:block;text-align:center;margin-top:4px;font-size:12px;color:${isDarkMode ? '#78BFFF' : '#3665f3'};text-decoration:none;cursor:pointer;opacity:0.75;transition:opacity 0.2s;`;
-                historyLink.onmouseenter = () => { historyLink.style.opacity = '1'; };
-                historyLink.onmouseleave = () => { historyLink.style.opacity = '0.75'; };
+                historyLink.style.cssText = `display:block;text-align:right;margin-top:8px;font-size:11px;color:${isDarkMode ? '#8a8a8a' : '#999'};text-decoration:none;cursor:pointer;transition:color 0.2s;`;
+                historyLink.onmouseenter = () => { historyLink.style.color = isDarkMode ? '#78BFFF' : '#3665f3'; };
+                historyLink.onmouseleave = () => { historyLink.style.color = isDarkMode ? '#8a8a8a' : '#999'; };
                 historyLink.addEventListener('click', (e) => { e.preventDefault(); showEnvelopeHistoryModal(); });
                 contentWrapper.appendChild(historyLink);
 

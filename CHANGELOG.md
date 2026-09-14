@@ -1,5 +1,12 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.52
+- The envelope-history entry point is now a plain **History** link in the bottom
+  right corner of the SKU panel, right-aligned and muted, instead of a centred
+  "🧾 Envelope history" line under Custom Envelope. It is a place you go
+  occasionally, not an action competing with Print and Ship, so it should read
+  as a corner link and nothing more.
+
 ## v4.51
 - **Envelope history — a durable record of what was printed and what shipped.**
   Until now nothing survived a reload: once the tab closed there was no way to
