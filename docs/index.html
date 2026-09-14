@@ -2331,6 +2331,7 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
                 <button class="btn2 wide" type="button" id="printbtn">Print All 10 Envelopes</button>
                 <button class="btnblue wide" type="button" id="shipbtn" hidden>Ship 0 Selected Orders</button>
                 <span class="customenv">✉ Custom Envelope</span>
+                <span class="customenv">🧾 Envelope history</span>
               </div>
             </div>
 
@@ -2561,7 +2562,9 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
         eBay gives one print dialog per envelope. <strong>Print All Envelopes</strong> consolidates
         the batch into a single print window, one envelope per page, scaled to #10.
         <strong>Custom Envelope</strong> takes a pasted address block, parses it into editable
-        fields, and prints a one-off.
+        fields, and prints a one-off. <strong>Envelope history</strong> keeps what was printed
+        and what eBay confirmed as shipped, so a card printed yesterday says so before you
+        print it again.
       </p>
     </div>
   </div>
@@ -4409,6 +4412,8 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
       ["print", "Envelope #10 format", "", "9.5in × 4.125in with auto-scaled content and a fully configurable return address."],
       ["print", "Custom Envelope modal", "", "Paste any address block for an order not in the queue; it parses into editable fields (name, street, unit, city/state/ZIP, country) and prints."],
       ["print", "Canadian stamp reminder", "", "A faint 🇨🇦 and “Int'l Stamp” note sized to sit under the international stamp that answers it."],
+      ["print", "Envelope history", "v4.51", "Every envelope sent to the printer and every shipment eBay confirms, recorded in local storage so the record survives reloads. Filter by date, order id, buyer or SKU, or by “printed but not shipped”, and export the filtered view to CSV."],
+      ["print", "Reprint warning", "v4.51", "A card whose envelope was printed before carries an amber “already printed 2× · 3d ago” pill next to Print Envelope, with exact timestamps in the tooltip. It warns rather than blocks — a jam or a smudge is a good reason to reprint."],
       ["print", "Postage cost hidden", "v4.03", "eBay's “Show postage cost on label” dropdown is forced to No whenever the Edit labels modal opens, so the amount never prints on a label a buyer will see."],
       ["auto", "Mark as Shipped", "v4.21+", "Three honest states, dual failure detection, and a deadline on the page that fires even if the automation tab was closed or never loaded."],
       ["auto", "Status read from eBay", "v4.24–4.25", "Reads eBay's own progress stepper via two independent signals and accepts either; returns <code>unknown</code> rather than guessing when neither is legible."],
