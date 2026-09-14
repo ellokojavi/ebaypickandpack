@@ -1,5 +1,18 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.47
+- **"Select standard envelope" no longer lags about half a second before the
+  orders tick.** Applying a filter clicks each matching checkbox for real, so
+  eBay's selection state stays honest — but every one of those clicks fired the
+  per-order `change` listener, which rebuilds the whole SKU panel (re-parsing
+  every card) and re-derives both filter boxes. A 15-order filter therefore ran
+  that work 15 times over. The batch now suppresses the per-click repaints and
+  rebuilds the panel and the filter boxes exactly once, when the whole batch is
+  done. That is why eBay's own *Select all* feels instant: it sets `.checked`
+  programmatically and fires no change events at all. Selection behaviour is
+  unchanged — same orders checked, same master-checkbox sync, one repaint
+  instead of N.
+
 ## v4.46
 - **The v4.45 tracking asterisk is now actually visible on every pill.** The
   spec'd `#ffd54f` is the right colour against the default pill, but it is the
