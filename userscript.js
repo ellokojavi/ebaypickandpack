@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260914-v4.47-batch-select-single-repaint
+// @version      20260914-v4.48-batch-select-toggle-all-route
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -1237,50 +1237,96 @@
         // session — a far worse bug than the one being fixed.
         let batchSelectionInFlight = false;
 
+        // Counts every real click the batch issues, so the debug line below can
+        // say whether the time went into eBay's React commits or this script's
+        // own repaint. Guessing wrong about which half is expensive costs a
+        // release, so the numbers are printed rather than assumed.
+        let batchClickCount = 0;
+
+        function clickOrderCheckbox(cb) {
+            batchClickCount++;
+            cb.click();
+        }
+
         function runBatchSelection(mutate) {
             if (batchSelectionInFlight) { mutate(); return; }
             batchSelectionInFlight = true;
+            batchClickCount = 0;
             const t0 = performance.now();
+            let tClicksDone = t0;
             try {
                 mutate();
             } finally {
+                tClicksDone = performance.now();
                 batchSelectionInFlight = false;
             }
             try { skuManagerRef?.createSKUPackingList(); } catch (e) { console.error('[Tampermonkey][SELECT] panel repaint failed:', e); }
             refreshBatchSelectControls();
-            console.debug(`[Tampermonkey][SELECT] batch selection + single repaint in ${Math.round(performance.now() - t0)}ms`);
+            const tEnd = performance.now();
+            const clickMs = tClicksDone - t0;
+            console.debug(`[Tampermonkey][SELECT] batch done in ${Math.round(tEnd - t0)}ms — ${batchClickCount} click(s) took ${Math.round(clickMs)}ms (${batchClickCount ? (clickMs / batchClickCount).toFixed(1) : '0'}ms each), repaint took ${Math.round(tEnd - tClicksDone)}ms`);
         }
 
+        // Every real .click() on an order checkbox costs eBay a full React
+        // commit, and N of them cost N commits — that, not this script's
+        // repaint, is why ticking 15 cards one at a time lags. eBay's own
+        // "Select all" does the whole list in a single commit, which is the
+        // entire reason it feels instant by comparison.
+        //
+        // So take the cheaper route to the same end state instead of always
+        // walking card by card:
+        //   direct  — click only the cards whose state differs from the target
+        //   via-all — let toggle-all select the page in one commit, then click
+        //             off the few cards that should not be selected
+        // For "standard envelope" over 16 orders that is ~2 commits instead of
+        // ~16. Both routes use real clicks, so eBay's internal selection flag
+        // stays as honest as it was before.
+        //
+        // Each route ends with the same comparison pass, so if toggle-all does
+        // not land the way we expect the batch still converges on the right
+        // selection — it just costs what the direct route would have cost. A
+        // cheap route that can silently select the wrong orders would be much
+        // worse than a slow one.
         function applyBatchSelectFilter(filter) {
             const master = document.querySelector(CONFIG.selectors.selectAllCheckbox);
-            // Reset through eBay's own toggle-all first when it is on, so the
-            // per-order pass below starts from a clean, consistent state rather
-            // than fighting a master flag that still believes everything is on.
-            if (master && master.checked) master.click();
-            if (master) master.indeterminate = false;
+            const rows = orderCheckboxRows();
+            // Shipped cards are never targets, so both routes untick them and
+            // the old separate cleanup pass is no longer needed.
+            const target = new Set();
+            rows.forEach(row => {
+                if (!isOrderCardDone(row.order) && filter.match(row.order)) target.add(row.order);
+            });
 
-            let checked = 0;
-            batchSelectCandidates().forEach(orderEl => {
-                const cb = orderEl.querySelector(CONFIG.selectors.checkbox);
-                if (!cb) return;
-                const shouldCheck = !!filter.match(orderEl);
+            const differing = () => rows.filter(row => row.cb.checked !== target.has(row.order)).length;
+            const masterOn = !!(master && master.checked);
+            // Toggle-all costs one commit from off, two from on (off, then on).
+            const viaAllCost = master ? (masterOn ? 2 : 1) + rows.filter(row => !target.has(row.order)).length : Infinity;
+            const directCost = differing();
+            const route = viaAllCost < directCost ? 'via-all' : 'direct';
+
+            if (route === 'via-all') {
+                if (masterOn) master.click();
+                master.click();
+            } else if (masterOn) {
+                // Reset through eBay's own toggle-all when it is on, so the pass
+                // below starts from a clean state rather than fighting a master
+                // flag that still believes everything is selected.
+                master.click();
+            }
+
+            rows.forEach(row => {
+                const shouldCheck = target.has(row.order);
                 // A real click, not a .checked assignment, so eBay's React
                 // selection state and this script's listeners both stay in sync.
-                if (cb.checked !== shouldCheck) cb.click();
-                if (shouldCheck) checked++;
+                if (row.cb.checked !== shouldCheck) clickOrderCheckbox(row.cb);
             });
-            // A shipped card left checked would keep dragging its SKUs into the
-            // print selection, so clear those on the way out.
-            document.querySelectorAll(CONFIG.selectors.orderItem).forEach(orderEl => {
-                if (!isOrderCardDone(orderEl)) return;
-                const cb = orderEl.querySelector(CONFIG.selectors.checkbox);
-                if (cb && cb.checked) cb.click();
-            });
-            // And put the master back on if this filter happened to cover every
+
+            if (master) master.indeterminate = false;
+            // Put the master back on if this filter happened to cover every
             // order on the page — an unchecked box over a fully ticked list is
             // the same lie in the other direction.
             syncSelectAllCheckbox();
-            console.debug(`[Tampermonkey][SELECT] ${filter.key} → ${checked} order(s) checked`);
+            console.debug(`[Tampermonkey][SELECT] ${filter.key} → ${target.size} order(s) checked via ${route} (direct ${directCost} vs via-all ${viaAllCost} clicks)`);
         }
 
         // Injects or refreshes the whole row. A filter matching nothing renders
@@ -1322,10 +1368,19 @@
 
         function clearAllOrderSelection() {
             const master = document.querySelector(CONFIG.selectors.selectAllCheckbox);
+            const rows = orderCheckboxRows();
             // eBay's toggle-all is the cheapest way to clear everything, and using
-            // it keeps their internal flag honest.
-            if (master && master.checked) master.click();
-            orderCheckboxRows().forEach(row => { if (row.cb.checked) row.cb.click(); });
+            // it keeps their internal flag honest. From a partial selection it
+            // takes two commits (all on, then all off) — still far cheaper than
+            // one commit per ticked card once more than a couple are ticked.
+            if (master && master.checked) {
+                master.click();
+            } else if (master && rows.filter(row => row.cb.checked).length > 2) {
+                master.click();
+                master.click();
+            }
+            // Whatever toggle-all left behind, clear the direct way.
+            rows.forEach(row => { if (row.cb.checked) clickOrderCheckbox(row.cb); });
             if (master) master.indeterminate = false;
         }
 
@@ -5123,7 +5178,10 @@
         // initial delay or when the page is detected to be fully loaded.
         async function executeMainScript() {
             if (scriptHasRun) { console.warn('[Tampermonkey][BOOT] executeMainScript() called but script already ran. Ignoring.'); return; }
-            console.log('[Tampermonkey][BOOT] Executing main script…');
+            // Printed so "did my change even ship?" is answerable from the
+            // Console alone — Tampermonkey only checks for updates on its own
+            // schedule, and a stale copy looks exactly like a fix that failed.
+            console.log(`[Tampermonkey][BOOT] Executing main script… (version ${(typeof GM_info !== 'undefined' && GM_info?.script?.version) || 'unknown'})`);
             scriptHasRun = true;
             if (fallbackTimer) clearTimeout(fallbackTimer);
             if (countdownInterval) clearInterval(countdownInterval);
