@@ -1,5 +1,27 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.48
+- **The real cost of a batch filter was eBay's React commits, not this script's
+  repaint — so the filter now takes the cheap route.** v4.47 collapsed N panel
+  repaints into one and changed nothing perceptible, because each real
+  `.click()` on an order checkbox costs eBay a full React commit and 15 clicks
+  cost 15 of them. `applyBatchSelectFilter` now prices two routes to the same
+  end state and takes the cheaper one: *direct* (click only the cards that
+  differ) or *via-all* (let eBay's own toggle-all select the page in a single
+  commit, then click off the few cards that shouldn't be selected). For
+  "standard envelope" over 16 orders that is ~2 commits instead of ~16 — the
+  same one-commit trick that makes *Select all* feel instant. Both routes end
+  with the same comparison pass, so if toggle-all doesn't land as expected the
+  batch still converges on the correct selection at the old cost rather than
+  silently selecting the wrong orders. `clearAllOrderSelection` uses the same
+  trick (two commits, not one per ticked card).
+- The batch debug line now splits its timing into the click phase and the
+  repaint phase and reports per-click cost, so which half is expensive is
+  measured rather than assumed.
+- The boot log now prints the running `@version`. Tampermonkey only checks for
+  updates on its own schedule, and a stale copy looks exactly like a fix that
+  didn't work.
+
 ## v4.47
 - **"Select standard envelope" no longer lags about half a second before the
   orders tick.** Applying a filter clicks each matching checkbox for real, so
