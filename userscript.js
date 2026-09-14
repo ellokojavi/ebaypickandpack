@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260910-v4.46-sku-tracking-mark-legibility
+// @version      20260914-v4.47-batch-select-single-repaint
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -1222,6 +1222,35 @@
             console.debug(`[Tampermonkey][SELECT] select-all → ${allChecked ? 'checked' : 'partial/none'}`);
         }
 
+        // Applying a filter clicks up to a couple of dozen checkboxes in a row,
+        // and each real click fires the per-order change listener below —
+        // rebuilding the whole SKU panel (which re-parses every card) and
+        // re-deriving both filter boxes. A 15-order filter ran that work 15
+        // times and cost about half a second of visible lag. eBay's own
+        // "Select all" feels instant only because React assigns .checked
+        // programmatically and fires no change events at all.
+        //
+        // This flag gives the batch the same shape: per-click repaints are
+        // suppressed while it runs, and the panel and the filter boxes are
+        // rebuilt exactly once at the end. try/finally because a throw mid-loop
+        // leaving the flag stuck on would freeze the panel for the rest of the
+        // session — a far worse bug than the one being fixed.
+        let batchSelectionInFlight = false;
+
+        function runBatchSelection(mutate) {
+            if (batchSelectionInFlight) { mutate(); return; }
+            batchSelectionInFlight = true;
+            const t0 = performance.now();
+            try {
+                mutate();
+            } finally {
+                batchSelectionInFlight = false;
+            }
+            try { skuManagerRef?.createSKUPackingList(); } catch (e) { console.error('[Tampermonkey][SELECT] panel repaint failed:', e); }
+            refreshBatchSelectControls();
+            console.debug(`[Tampermonkey][SELECT] batch selection + single repaint in ${Math.round(performance.now() - t0)}ms`);
+        }
+
         function applyBatchSelectFilter(filter) {
             const master = document.querySelector(CONFIG.selectors.selectAllCheckbox);
             // Reset through eBay's own toggle-all first when it is on, so the
@@ -1379,9 +1408,11 @@
                         if (labelEl.getAttribute('aria-disabled') === 'true') return;
                         // Clicking an already-exact filter clears the selection,
                         // which is what a ticked checkbox should do when clicked.
-                        if (filterSelectionState(filter) === 'exact') clearAllOrderSelection();
-                        else applyBatchSelectFilter(filter);
-                        refreshBatchSelectControls();
+                        // One repaint for the whole batch, not one per order.
+                        runBatchSelection(() => {
+                            if (filterSelectionState(filter) === 'exact') clearAllOrderSelection();
+                            else applyBatchSelectFilter(filter);
+                        });
                     };
                     boxWrap.addEventListener('click', activate);
                     labelEl.addEventListener('click', activate);
@@ -4040,6 +4071,9 @@
             document.querySelectorAll(CONFIG.selectors.checkbox).forEach(cb => {
                 if (!cb.dataset.skuChangeListenerAdded) {
                     cb.addEventListener('change', () => {
+                        // A batch filter is mid-flight and will repaint once it
+                        // finishes; doing it per click is the same work N times.
+                        if (batchSelectionInFlight) return;
                         skuManager.createSKUPackingList();
                         // Ticking or unticking a single order by hand can take the
                         // selection out of (or into) a filter's exact set, and the
