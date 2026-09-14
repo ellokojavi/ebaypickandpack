@@ -1,5 +1,35 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.51
+- **Envelope history — a durable record of what was printed and what shipped.**
+  Until now nothing survived a reload: once the tab closed there was no way to
+  answer "did this one already go out?" or "did I print this envelope
+  yesterday?". Every envelope sent to the printer and every shipment eBay
+  confirms is now written to GM storage.
+  - **One row per order id, not per card.** eBay confirms shipment per order
+    id, so a per-card row would have to guess which half of a combined card a
+    confirmation belonged to. Each row carries `group` — the first order id on
+    the card it was printed with — so envelope counts don't double-count a
+    combined card: count distinct groups for envelopes, rows for orders.
+  - **Reprint warning on the card.** A card whose envelope was printed before
+    shows an amber "already printed 2× · 3d ago" pill next to Print Envelope,
+    with the exact timestamps and shipped status in its tooltip. It warns, it
+    does not block — a jam or a smudge is a legitimate reason to reprint.
+  - **History modal** from the SKU panel (🧾 Envelope history): filter by date
+    range, free text (order id, buyer, SKU) or "printed but not shipped", with
+    a running count of orders, envelopes, shipped and still-open, and an
+    **Export CSV** button that exports exactly what the filter shows.
+  - `altheastixEnvelopeHistory()` prints the same data in the console;
+    `altheastixEnvelopeHistory(true)` copies the CSV to the clipboard.
+  - Printing is recorded when the job goes to the printer, not when it
+    completes — the browser never reports whether the print dialog was
+    confirmed or cancelled, so a cancelled print counts as a print. That is the
+    safe direction for a warning. Shipping is recorded only on eBay's
+    confirmation, never on a request.
+  - Timestamps are stored as epoch ms and formatted at render time, the store
+    is pruned to the 1500 most recently touched rows, and a failed write is
+    logged but never interrupts a print or a shipment.
+
 ## v4.50
 - **Profiling removed now that it has done its job.** The per-click timers, the
   click log, the batch/settle debug lines and the watchdog timing added in v4.49
