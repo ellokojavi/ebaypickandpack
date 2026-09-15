@@ -275,7 +275,11 @@ tracking above `trackingOrderAmountThreshold`.
   reloads and tab closes. Open it from the **History** link in the bottom right
   corner of the SKU panel:
   filter by date range, by order id / buyer / SKU, or by *printed but not
-  shipped*, and export exactly what the filter shows to CSV. A card whose
+  shipped*, and export exactly what the filter shows to CSV. Rows are grouped by
+  envelope, so a combined card is one row with its order ids stacked in the first
+  cell, and the Shipped cell carries one entry per order, since eBay confirms
+  each order separately and a combined envelope can be half confirmed. The CSV
+  stays one row per order, which is the auditable unit. A card whose
   envelope was printed before carries an amber **already printed 2× · 3d ago**
   pill next to Print Envelope — a warning, not a block, since a jam or a smudge
   is a good reason to reprint. Rows are keyed by order id (eBay confirms

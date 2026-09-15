@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260915-v4.53-buyer-name-without-badge
+// @version      20260915-v4.54-history-grouped-by-envelope
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -2249,7 +2249,7 @@
             table.style.cssText = 'width:100%;border-collapse:collapse;font-size:12.5px;';
             const thead = document.createElement('thead');
             const headRow = document.createElement('tr');
-            ['Order', 'Buyer', 'SKUs', 'Env.', 'Printed', 'Shipped'].forEach(label => {
+            ['Order(s)', 'Buyer', 'SKUs', 'Prints', 'Printed', 'Shipped'].forEach(label => {
                 const th = document.createElement('th');
                 th.textContent = label;
                 th.style.cssText = `text-align:left;padding:6px 8px;border-bottom:1px solid ${rowBorder};position:sticky;top:0;background:${bg};color:${mutedFg};font-weight:600;white-space:nowrap;`;
@@ -2271,8 +2271,36 @@
                     if (!needle) return true;
                     return `${r.orderId} ${r.buyer} ${r.skus}`.toLowerCase().includes(needle);
                 });
+                // One row per ENVELOPE. A combined card is a single print job,
+                // so listing its orders as separate rows would overstate how
+                // many envelopes went out. The order ids stack inside the first
+                // cell, and the Shipped cell keeps one entry per order, lined up
+                // with them, because eBay confirms each order separately and an
+                // envelope can sit half confirmed.
+                const grouped = new Map();
+                visibleRows.forEach(r => {
+                    const key = r.group || r.orderId;
+                    if (!grouped.has(key)) grouped.set(key, []);
+                    grouped.get(key).push(r);
+                });
+                const envelopeRows = Array.from(grouped.values()).map(orders => {
+                    // Stable order inside the cell, so the ids and their shipped
+                    // entries always pair up the same way.
+                    orders.sort((a, b) => String(a.orderId).localeCompare(String(b.orderId)));
+                    const withPrint = orders.find(o => o.printCount) || orders[0];
+                    return {
+                        orders: orders,
+                        buyer: (orders.find(o => o.buyer) || {}).buyer || '',
+                        skus: (orders.find(o => o.skus) || {}).skus || '',
+                        printCount: withPrint.printCount || 0,
+                        canada: !!withPrint.canada,
+                        lastPrintedAt: Math.max(...orders.map(o => o.lastPrintedAt || 0)),
+                        lastTouchedAt: Math.max(...orders.map(o => o.lastTouchedAt || 0))
+                    };
+                }).sort((a, b) => b.lastTouchedAt - a.lastTouchedAt);
+
                 tbody.textContent = '';
-                if (!visibleRows.length) {
+                if (!envelopeRows.length) {
                     const tr = document.createElement('tr');
                     const td = document.createElement('td');
                     td.colSpan = 6;
@@ -2281,31 +2309,51 @@
                     tr.appendChild(td);
                     tbody.appendChild(tr);
                 } else {
-                    visibleRows.forEach(r => {
+                    const cellBase = `padding:5px 8px;border-bottom:1px solid ${rowBorder};vertical-align:top;`;
+                    const addCell = (tr, extraStyle) => {
+                        const td = document.createElement('td');
+                        td.style.cssText = cellBase + (extraStyle || '');
+                        tr.appendChild(td);
+                        return td;
+                    };
+                    const addLine = (td, text, color) => {
+                        const line = document.createElement('div');
+                        // textContent throughout: buyer names, SKUs and order ids
+                        // are page data, never markup.
+                        line.textContent = text;
+                        line.style.cssText = `line-height:1.55;${color ? `color:${color};` : ''}`;
+                        td.appendChild(line);
+                        return line;
+                    };
+                    const pendingColor = isDarkMode ? '#f0a35e' : '#b35c00';
+
+                    envelopeRows.forEach(env => {
                         const tr = document.createElement('tr');
-                        const cells = [
-                            r.orderId,
-                            r.buyer || '—',
-                            r.skus || '—',
-                            r.printCount ? `${r.printCount}×${r.canada ? ' 🇨🇦' : ''}` : '—',
-                            r.lastPrintedAt ? `${historyStamp(r.lastPrintedAt)}` : '—',
-                            r.shippedAt ? historyStamp(r.shippedAt) : (r.printCount ? 'not yet' : '—')
-                        ];
-                        cells.forEach((value, i) => {
-                            const td = document.createElement('td');
-                            // textContent throughout: buyer names and SKUs are
-                            // page data, never markup.
-                            td.textContent = value;
-                            td.style.cssText = `padding:5px 8px;border-bottom:1px solid ${rowBorder};vertical-align:top;${i === 0 ? 'white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;' : ''}${i === 5 && !r.shippedAt && r.printCount ? `color:${isDarkMode ? '#f0a35e' : '#b35c00'};` : ''}`;
-                            tr.appendChild(td);
+
+                        const orderTd = addCell(tr, 'white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;');
+                        env.orders.forEach(o => addLine(orderTd, o.orderId));
+
+                        addLine(addCell(tr), env.buyer || '\u2014');
+                        addLine(addCell(tr), env.skus || '\u2014');
+                        addLine(addCell(tr), env.printCount ? `${env.printCount}\u00d7${env.canada ? ' \ud83c\udde8\ud83c\udde6' : ''}` : '\u2014');
+                        addLine(addCell(tr), env.lastPrintedAt ? historyStamp(env.lastPrintedAt) : '\u2014');
+
+                        // One entry per order, never collapsed: a combined
+                        // envelope with one order still unconfirmed must read as
+                        // unfinished, not as shipped.
+                        const shippedTd = addCell(tr, 'white-space:nowrap;');
+                        env.orders.forEach(o => {
+                            if (o.shippedAt) addLine(shippedTd, historyStamp(o.shippedAt));
+                            else addLine(shippedTd, o.printCount ? 'not yet' : '\u2014', o.printCount ? pendingColor : '');
                         });
+
                         tbody.appendChild(tr);
                     });
                 }
-                const envelopes = new Set(visibleRows.filter(r => r.printCount).map(r => r.group)).size;
+                const envelopes = envelopeRows.filter(env => env.printCount).length;
                 const shipped = visibleRows.filter(r => r.shippedAt).length;
                 const open = visibleRows.filter(r => r.printCount && !r.shippedAt).length;
-                summary.textContent = `${visibleRows.length} order(s) · ${envelopes} envelope(s) · ${shipped} shipped · ${open} printed but not shipped`;
+                summary.textContent = `${envelopes} envelope(s) \u00b7 ${visibleRows.length} order(s) \u00b7 ${shipped} shipped \u00b7 ${open} printed but not shipped`;
             };
 
             rangeSel.addEventListener('change', render);
