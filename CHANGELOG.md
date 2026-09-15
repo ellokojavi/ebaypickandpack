@@ -1,5 +1,19 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.54
+- **History now shows one row per envelope, not per order.** A combined card is
+  a single print job, so listing its orders as separate rows misrepresented how
+  many envelopes went out. Rows are grouped by envelope, with every order id in
+  the group stacked in the first cell.
+- **The Shipped cell keeps one entry per order**, stacked to line up with the
+  order ids beside it, because a combined envelope carries several orders and
+  each one is confirmed by eBay separately. An order still waiting shows an
+  amber "not yet" on its own line, so a half-confirmed envelope is visible at a
+  glance instead of collapsing into a single misleading status.
+- The summary line now leads with envelopes and then orders, matching what the
+  table shows. The CSV export stays one row per order, since that is the
+  auditable unit and each order carries its own shipped timestamp.
+
 ## v4.53
 - **Buyer names no longer carry the address badge with them.** The validation
   badge is a `<span>` placed INSIDE `.print__address__fullname`, and its tooltip
