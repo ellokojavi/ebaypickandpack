@@ -1,5 +1,23 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.53
+- **Buyer names no longer carry the address badge with them.** The validation
+  badge is a `<span>` placed INSIDE `.print__address__fullname`, and its tooltip
+  text is a child node that CSS hides but `textContent` still reads, so every
+  buyer name read that way came out as "Luis Serratos✔Address looks correct".
+  The address-warning banner already worked around this in its own code; three
+  other readers did not, including the envelope history, where it was visible in
+  the Buyer column.
+  - New `readBuyerFullName()` helper reads only the element's own text nodes, so
+    the badge and its tooltip are skipped whatever they contain. It is now the
+    single way a buyer name is read, and the banner's private copy of the logic
+    is gone.
+  - Also fixes the same pollution in `{BUYER_NAME}`, which is interpolated into
+    buyer messages. `{BUYER_FIRST}` was unaffected, since it takes the first
+    whitespace-separated token, which is why this went unnoticed.
+  - History rows saved before this fix are cleaned once on load, so the Buyer
+    column shows plain names for orders already recorded.
+
 ## v4.52
 - The envelope-history entry point is now a plain **History** link in the bottom
   right corner of the SKU panel, right-aligned and muted, instead of a centred
