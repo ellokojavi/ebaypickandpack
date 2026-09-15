@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260914-v4.52-history-link-corner
+// @version      20260915-v4.53-buyer-name-without-badge
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -1523,16 +1523,7 @@
             const flagged = [];
             document.querySelectorAll(CONFIG.selectors.orderItem).forEach(orderItem => {
                 if (!orderItem.querySelector(`.${CONFIG.classNames.addrWarningBadge}`)) return;
-                // Get buyer name — strip any badge text nodes by reading only the first text node
-                const nameEl = orderItem.querySelector('.print__address__fullname');
-                let name = '';
-                if (nameEl) {
-                    name = Array.from(nameEl.childNodes)
-                        .filter(n => n.nodeType === Node.TEXT_NODE)
-                        .map(n => n.textContent)
-                        .join('')
-                        .trim();
-                }
+                const name = readBuyerFullName(orderItem);
                 if (!name) name = orderItem.id || 'Order';
                 flagged.push({ id: orderItem.id, name });
             });
@@ -1630,6 +1621,25 @@
             orderItem.classList.remove(cn.orderShipFailed);
             orderItem.querySelectorAll('.ship-when-wrap').forEach(el => el.remove());
             orderItem.querySelectorAll('.thank-you-checkbox').forEach(el => el.parentElement?.remove());
+        }
+
+        // Reads a buyer's name off a card without dragging the validation badge
+        // along. The badge is a <span> placed INSIDE .print__address__fullname
+        // and its tooltip is a child node that CSS hides but textContent still
+        // reads, so the naive read returns "Luis Serratos\u2714Address looks correct".
+        // Only the element's OWN text nodes are joined, which skips the badge
+        // whatever it happens to contain.
+        function readBuyerFullName(cardOrNameEl) {
+            if (!cardOrNameEl) return '';
+            const nameEl = cardOrNameEl.classList?.contains(CONFIG.classNames.addressFullname)
+                ? cardOrNameEl
+                : cardOrNameEl.querySelector('.print__address__fullname');
+            if (!nameEl) return '';
+            return Array.from(nameEl.childNodes)
+                .filter(node => node.nodeType === Node.TEXT_NODE)
+                .map(node => node.textContent)
+                .join('')
+                .trim();
         }
 
         function processOrderCard(orderItem, index) {
@@ -1956,11 +1966,30 @@
                 const raw = GM_getValue(ENVELOPE_HISTORY_KEY, null);
                 const parsed = !raw ? {} : (typeof raw === 'string' ? JSON.parse(raw) : raw);
                 envelopeHistoryCache = (parsed && typeof parsed === 'object') ? parsed : {};
+                cleanLegacyBuyerNames(envelopeHistoryCache);
             } catch (e) {
                 console.warn('[Altheastix][hist] history unreadable — starting from empty:', e);
                 envelopeHistoryCache = {};
             }
             return envelopeHistoryCache;
+        }
+
+        // Rows written before v4.53 hold the badge text in their buyer name.
+        // Cleaned in place on load, and saved back only when something actually
+        // changed, so an already-clean store costs one pass and no write.
+        function cleanLegacyBuyerNames(map) {
+            let dirty = false;
+            Object.values(map).forEach(row => {
+                if (!row || typeof row.buyer !== 'string') return;
+                const cleaned = row.buyer.split(/[\u2714\u26A0]/)[0].trim();
+                if (cleaned !== row.buyer) { row.buyer = cleaned; dirty = true; }
+            });
+            if (dirty) {
+                try {
+                    GM_setValue(ENVELOPE_HISTORY_KEY, JSON.stringify(map));
+                    console.log('[Altheastix][hist] cleaned badge text out of stored buyer names');
+                } catch (e) { console.warn('[Altheastix][hist] could not save cleaned names:', e); }
+            }
         }
 
         function writeEnvelopeHistory(map) {
@@ -1987,7 +2016,7 @@
         // every item of every card being printed.
         function cardHistoryFacts(card) {
             const ids = (card.dataset.orderId || '').split(',').map(s => s.trim()).filter(Boolean);
-            const buyer = (card.querySelector('.print__address__fullname')?.textContent || '').trim();
+            const buyer = readBuyerFullName(card);
             const skus = [];
             card.querySelectorAll('.item').forEach(itemEl => {
                 const details = itemEl.querySelector('[class*="item__details"]');
@@ -3955,7 +3984,7 @@
                     const formattedShipmentDate = `${isToday ? 'today, ' : ''}${shipmentDate.toLocaleDateString('en-US', options)}`;
                     // Extract buyer name for personalization
                     const fullNameEl = orderItemElement.querySelector('.print__address__fullname');
-                    const buyerName = (fullNameEl?.textContent || '').trim();
+                    const buyerName = readBuyerFullName(fullNameEl);
                     const buyerFirst = buyerName.split(/\s+/)[0] || 'there';
                     // Determine total item quantity and content type (sticker, magnet, or mixed)
                     let totalItemQty = 0;
@@ -4303,7 +4332,7 @@
                         // them so the greeting reads as if hand-written ("GEORGE" -> "George").
                         const orderItemEl = target.closest(CONFIG.selectors.orderItem);
                         const fullNameEl = orderItemEl?.querySelector('.print__address__fullname');
-                        const buyerName = (fullNameEl?.textContent || '').trim();
+                        const buyerName = readBuyerFullName(fullNameEl);
                         const buyerFirst = humanizeName(buyerName.split(/\s+/)[0] || 'there');
 
                         const modalOverlay = document.createElement('div');
@@ -4454,7 +4483,7 @@
                             if (template) {
                                 const orderItemElement = target.closest(CONFIG.selectors.orderItem);
                                 const fullNameEl = orderItemElement.querySelector('.print__address__fullname');
-                                const buyerName = (fullNameEl?.textContent || '').trim();
+                                const buyerName = readBuyerFullName(fullNameEl);
                                 const buyerFirst = humanizeName(buyerName.split(/\s+/)[0] || 'there');
                                 messageText = applyTemplate(template, { BUYER_FIRST: buyerFirst });
                             }
