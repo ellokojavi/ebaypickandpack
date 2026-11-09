@@ -1,5 +1,21 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.56
+- **The print note updates the moment you print.** It used to be drawn only when
+  eBay re-rendered the card, so after printing the card said nothing until the
+  next repaint. `renderPrintHistoryNote()` is now the single place the note is
+  built, called on every card render and straight after a print job is recorded.
+  A note that appears without a repaint fades in once, so the card visibly
+  answers the click. The animation is disabled under `prefers-reduced-motion`.
+- **Reworded "already printed" to "Sent to printer".** The browser never reports
+  whether the print dialog was confirmed or cancelled, so the timestamp only
+  marks when the job was handed off. The tooltip now says so.
+- **The note shares a row with the Print Envelope button.** As a direct child
+  of `.tcell__item`, a flex column, the pill was stretched to the full card
+  width. It is now a small dot-and-text note beside the button, inside a new
+  `.env-print-row`, which `cleanupCardInjections()` also strips on re-render.
+- v4.55 was never published to this repo. These notes describe the full change from v4.54.
+
 ## v4.54
 - **History now shows one row per envelope, not per order.** A combined card is
   a single print job, so listing its orders as separate rows misrepresented how

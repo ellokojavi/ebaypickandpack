@@ -12,7 +12,7 @@ validated addresses, and shipping automation that tells you when it failed.
 
 | | |
 |---|---|
-| **Current version** | v4.44 (`20260902-v4.44-envelope-blank-page`) |
+| **Current version** | v4.56 (`20260925-v4.56-live-print-note`) |
 | **Size** | ~6,800 lines, one file |
 | **Runs on** | 7 eBay page patterns — see [Pages supported](#pages-supported) |
 | **Built for** | [Altheastix](https://www.ebay.com/str/altheastix), a one-person sticker shop shipping ~350 items a month |

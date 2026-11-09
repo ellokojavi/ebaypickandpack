@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260915-v4.54-history-grouped-by-envelope
+// @version      20260925-v4.56-live-print-note
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -257,7 +257,7 @@
             },
             classNames: {
                 addressContainer: 'en-US', editAddressBtn: 'edit-address-btn', cancelAddressBtn: 'cancel-address-btn', copyAddressBtn: 'copy-address-btn', addressEditInput: 'address-edit-input', cancelWrapper: 'cancel-wrapper', addressFullname: 'print__address__fullname', itemContainer: 'item', shippingInfoBlock: 'shipping-info-block', buyerNoteCallout: 'buyer-note-callout', quantityMulti: 'quantity-multi', markAsShippedBtn: 'mark-as-shipped-btn', isEditingAddress: 'is-editing-address', highlightManila: 'order-highlight-manila', highlightLg: 'order-highlight-lg', highlightMultiItem: 'order-highlight-multi-item', borderLg: 'order-border-lg', borderManila: 'order-border-manila', highlightYellow: 'highlight-yellow', skuItem: 'sku-item', skuTrackingMark: 'sku-tracking-mark', skuGroupSeparator: 'sku-group-separator', skuLg: 'sku-lg', skuManila: 'sku-manila', skuMultiQty: 'sku-multi-qty', multiItemSkuOrder: 'order-multi-item', darkModeSwitch: 'dark-mode-switch', darkModeSlider: 'slider', zoomOverlay: 'zoomed-image-overlay', zoomContainer: 'zoomed-image-container', zoomImage: 'zoomed-image', zoomCloseButton: 'close-zoom-button',
-                printEnvelopeBtn: 'print-envelope-btn', envReprintPill: 'env-reprint-pill', markAsShippedWaiting: 'waiting-confirmation', orderShipped: 'shipped-state', shippedLabel: 'shipped-label', orderPendingShipment: 'order-pending-shipment', pendingOverlay: 'pending-overlay', pendingOverlayContent: 'pending-overlay-content', processingIcon: 'processing-icon', skuShipped: 'sku-shipped', addTrackingLink: 'add-tracking-link', trackingLinkSubmitted: 'tracking-link-submitted', reviseLink: 'revise-link', addNoteLink: 'add-note-link', noteLinkSubmitted: 'note-link-submitted',
+                printEnvelopeBtn: 'print-envelope-btn', envPrintRow: 'env-print-row', envReprintPill: 'env-reprint-pill', envPrintNoteFresh: 'env-print-note-fresh', markAsShippedWaiting: 'waiting-confirmation', orderShipped: 'shipped-state', shippedLabel: 'shipped-label', orderPendingShipment: 'order-pending-shipment', pendingOverlay: 'pending-overlay', pendingOverlayContent: 'pending-overlay-content', processingIcon: 'processing-icon', skuShipped: 'sku-shipped', addTrackingLink: 'add-tracking-link', trackingLinkSubmitted: 'tracking-link-submitted', reviseLink: 'revise-link', addNoteLink: 'add-note-link', noteLinkSubmitted: 'note-link-submitted',
                 orderShipFailed: 'ship-failed-state', shipFailedBanner: 'ship-failed-banner', shipQueuedBadge: 'ship-queued-badge', shipSelectedBtn: 'ship-selected-btn',
                 msgFailedPill: 'msg-failed-pill',
                 orderWatchPill: 'order-watch-pill', orderWatchPillAction: 'order-watch-pill-action',
@@ -558,13 +558,39 @@
                     border-color: ${isDarkMode ? '#777' : '#c0c8d4'};
                     box-shadow: 0 2px 2px ${isDarkMode ? 'rgba(0,0,0,0.2)' : 'rgba(39, 44, 52, 0.12)'};
                 }
+                /* Print button and its "sent to printer" note share one row.
+                   The note used to be a direct child of .tcell__item, a flex
+                   column, where align-items: stretch blew it out to the full
+                   card width. */
+                .${CONFIG.classNames.envPrintRow} {
+                    display: flex; align-items: center; gap: 12px; margin-top: 8px; min-width: 0;
+                }
+                .${CONFIG.classNames.envPrintRow} > .${CONFIG.classNames.printEnvelopeBtn} {
+                    margin-top: 0; flex-shrink: 0;
+                }
                 .${CONFIG.classNames.envReprintPill} {
-                    display: inline-block; margin-top: 6px; padding: 1px 7px; border-radius: 10px;
-                    font-size: 11px; font-weight: 700; letter-spacing: .2px; white-space: nowrap;
-                    background: ${isDarkMode ? '#4a3a1a' : '#fff3cd'};
-                    color: ${isDarkMode ? '#f0c674' : '#7a5b00'};
-                    border: 1px solid ${isDarkMode ? '#6b5320' : '#ffe08a'};
+                    display: inline-flex; align-items: center; gap: 6px; min-width: 0;
+                    font-size: 12px; font-weight: 600; line-height: 1.2;
+                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                    color: ${isDarkMode ? '#d9b36a' : '#8a6500'};
                     cursor: help;
+                }
+                .${CONFIG.classNames.envReprintPill}::before {
+                    content: ''; flex: 0 0 auto; width: 6px; height: 6px; border-radius: 50%;
+                    background: ${isDarkMode ? '#d9b36a' : '#c99a1e'};
+                }
+                /* Only when the note changes without a page repaint, so the
+                   card visibly answers the click that just printed. */
+                .${CONFIG.classNames.envReprintPill}.${CONFIG.classNames.envPrintNoteFresh} {
+                    animation: altheastix-print-note-in 900ms ease-out 1;
+                }
+                @keyframes altheastix-print-note-in {
+                    0%   { opacity: 0; transform: translateX(-4px); }
+                    35%  { opacity: 1; transform: translateX(0); }
+                    100% { opacity: 1; transform: translateX(0); }
+                }
+                @media (prefers-reduced-motion: reduce) {
+                    .${CONFIG.classNames.envReprintPill}.${CONFIG.classNames.envPrintNoteFresh} { animation: none; }
                 }
                 .${CONFIG.classNames.buyLabelLink} {
                     display: block; margin-top: 6px; font-size: 13px; font-weight: 600;
@@ -1600,7 +1626,7 @@
                 cn.shippingInfoBlock, cn.buyerNoteCallout, cn.addNoteLink,
                 cn.addTrackingLink, cn.reviseLink, cn.addrWarningBadge,
                 cn.addrOkBadge, cn.messageContainer, cn.markAsShippedBtn,
-                cn.printEnvelopeBtn, cn.buyLabelLink, cn.shippedLabel,
+                cn.envPrintRow, cn.printEnvelopeBtn, cn.buyLabelLink, cn.shippedLabel,
                 cn.shipFailedBanner, cn.shipQueuedBadge, cn.msgFailedPill, cn.envReprintPill
             ].map(c => '.' + c).join(', ');
             orderItem.querySelectorAll(staleSelectors).forEach(el => el.remove());
@@ -1878,23 +1904,12 @@
             printButton.id = `${CONFIG.ids.createTemplateButton}${index}`;
             printButton.className = CONFIG.classNames.printEnvelopeBtn;
             printButton.textContent = "Print Envelope";
-            tcellItem.appendChild(printButton);
+            const printRow = document.createElement('div');
+            printRow.className = CONFIG.classNames.envPrintRow;
+            printRow.appendChild(printButton);
+            tcellItem.appendChild(printRow);
 
-            // A quiet warning, not a block: reprinting is sometimes exactly
-            // what you want (a jam, a smudge), so this says what happened and
-            // gets out of the way.
-            try {
-                const prior = priorPrintForCard(orderItem);
-                if (prior) {
-                    const reprintPill = document.createElement('span');
-                    reprintPill.className = CONFIG.classNames.envReprintPill;
-                    const times = prior.printCount === 1 ? 'once' : `${prior.printCount}×`;
-                    reprintPill.textContent = `already printed ${times} · ${historyAgo(prior.lastPrintedAt)}`;
-                    reprintPill.title = `Last printed ${historyStamp(prior.lastPrintedAt)}` +
-                        (prior.shippedAt ? `\nShipped ${historyStamp(prior.shippedAt)}` : '\nNot confirmed as shipped yet');
-                    tcellItem.appendChild(reprintPill);
-                }
-            } catch (e) { console.warn('[Altheastix][hist] reprint badge skipped:', e); }
+            renderPrintHistoryNote(orderItem);
 
             // "Buy shipping label" link — opens eBay's single-label page in a
             // focused tab; the /ship/single automation pre-fills it for an eBay
@@ -2066,6 +2081,10 @@
                 });
             });
             if (rows) writeEnvelopeHistory(map);
+            // Repaint each card's note from the history we just wrote. A failed
+            // write leaves the note showing the older count, which is correct:
+            // the note reports what was recorded, not what was attempted.
+            entries.forEach(entry => renderPrintHistoryNote(entry.card, { animate: true }));
             console.log(`[Altheastix][hist] print recorded — ${envelopes} envelope(s), ${rows} order row(s)`);
         }
 
@@ -2114,6 +2133,42 @@
                 if (!best || (row.lastPrintedAt || 0) > (best.lastPrintedAt || 0)) best = row;
             });
             return best;
+        }
+
+        // Draws (or redraws) the "Sent to printer" note on ONE card from
+        // whatever the history currently says, and is the only place that note
+        // is built. Called on every card render AND straight after a print, so
+        // the card answers the click instead of waiting for eBay's next
+        // repaint. Safe to call on a card that was never printed: it removes a
+        // stale note and stops.
+        //
+        // A quiet warning, not a block: reprinting is sometimes exactly what
+        // you want (a jam, a smudge), so this says what happened and gets out
+        // of the way. Worded "sent to printer", not "printed": the browser
+        // never reports whether the print dialog was confirmed, so
+        // lastPrintedAt is only when the job was handed off.
+        function renderPrintHistoryNote(card, options) {
+            try {
+                if (!card) return;
+                const row = card.querySelector(`.${CONFIG.classNames.envPrintRow}`);
+                if (!row) return;
+                row.querySelectorAll(`.${CONFIG.classNames.envReprintPill}`).forEach(el => el.remove());
+                const prior = priorPrintForCard(card);
+                if (!prior) return;
+                const note = document.createElement('span');
+                note.className = CONFIG.classNames.envReprintPill;
+                if (options && options.animate) note.classList.add(CONFIG.classNames.envPrintNoteFresh);
+                const ago = historyAgo(prior.lastPrintedAt);
+                // "last 3d ago" reads fine; "last today" does not.
+                const when = /ago$/.test(ago) ? `last ${ago}` : ago;
+                note.textContent = prior.printCount === 1
+                    ? `Sent to printer ${ago}`
+                    : `Sent to printer ${prior.printCount}× · ${when}`;
+                note.title = `Last sent to printer ${historyStamp(prior.lastPrintedAt)}` +
+                    `\nThe browser can't tell whether the print dialog was confirmed or cancelled.` +
+                    (prior.shippedAt ? `\nShipped ${historyStamp(prior.shippedAt)}` : '\nNot confirmed as shipped yet');
+                row.appendChild(note);
+            } catch (e) { console.warn('[Altheastix][hist] print note skipped:', e); }
         }
 
         function historyAgo(ms) {
