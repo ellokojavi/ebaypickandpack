@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261109-v4.59-mini-logout
+// @version      20261109-v4.60-thanked-pill
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -268,6 +268,7 @@
                 printEnvelopeBtn: 'print-envelope-btn', envPrintRow: 'env-print-row', envReprintPill: 'env-reprint-pill', envPrintNoteFresh: 'env-print-note-fresh', markAsShippedWaiting: 'waiting-confirmation', orderShipped: 'shipped-state', shippedLabel: 'shipped-label', orderPendingShipment: 'order-pending-shipment', pendingOverlay: 'pending-overlay', pendingOverlayContent: 'pending-overlay-content', processingIcon: 'processing-icon', skuShipped: 'sku-shipped', addTrackingLink: 'add-tracking-link', trackingLinkSubmitted: 'tracking-link-submitted', reviseLink: 'revise-link', addNoteLink: 'add-note-link', noteLinkSubmitted: 'note-link-submitted',
                 orderShipFailed: 'ship-failed-state', shipFailedBanner: 'ship-failed-banner', shipQueuedBadge: 'ship-queued-badge', shipSelectedBtn: 'ship-selected-btn',
                 msgFailedPill: 'msg-failed-pill',
+                msgSentPill: 'msg-sent-pill',
                 orderWatchPill: 'order-watch-pill', orderWatchPillAction: 'order-watch-pill-action',
                 orderWatchStatus: 'order-watch-status', orderWatchStatusLabel: 'order-watch-status-label', orderWatchStatusAction: 'order-watch-status-action', orderWatchStatusWarn: 'order-watch-status-warn',
                 messageContainer: 'message-container', cannedMessageSelect: 'canned-message-select', sendCannedMessageBtn: 'send-canned-message-btn', buyLabelLink: 'buy-label-link',
@@ -936,6 +937,16 @@
                    An order can ship perfectly and still leave the buyer with
                    nothing, if eBay's composer never opened. The card says so
                    rather than showing an unqualified green tick. */
+                /* v4.60: the positive counterpart. A sent thank-you used to
+                   leave no trace on the card at all. */
+                .${CONFIG.classNames.msgSentPill} {
+                    display: inline-flex; align-items: center; gap: 6px;
+                    margin-top: 6px; font-size: 12px; font-weight: 600;
+                    color: ${isDarkMode ? '#7ee2a8' : '#15803d'};
+                }
+                .${CONFIG.classNames.msgSentPill} a {
+                    font-weight: 400; color: inherit; opacity: 0.75; text-decoration: underline;
+                }
                 .${CONFIG.classNames.msgFailedPill} {
                     display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
                     width: 100%; margin-top: 8px; padding: 7px 10px; border-radius: 6px;
@@ -1635,7 +1646,7 @@
                 cn.addTrackingLink, cn.reviseLink, cn.addrWarningBadge,
                 cn.addrOkBadge, cn.messageContainer, cn.markAsShippedBtn,
                 cn.envPrintRow, cn.printEnvelopeBtn, cn.buyLabelLink, cn.shippedLabel,
-                cn.shipFailedBanner, cn.shipQueuedBadge, cn.msgFailedPill, cn.envReprintPill
+                cn.shipFailedBanner, cn.shipQueuedBadge, cn.msgFailedPill, cn.msgSentPill, cn.envReprintPill
             ].map(c => '.' + c).join(', ');
             orderItem.querySelectorAll(staleSelectors).forEach(el => el.remove());
             // The pending overlay is handled separately: an order that is
@@ -3427,6 +3438,39 @@
         // otherwise-good card, not the red ship-failure banner. Retry just
         // reopens the message tab: the text is still sitting in GM storage,
         // because a message is only consumed once it reaches the composer.
+        // v4.60. Shows that the thank-you went out, and by which route, so a
+        // sent message no longer looks the same as one that was never tried.
+        // Stashed on the card like the failure pill, so an eBay re-render
+        // can rebuild it.
+        function markCardMessageSent(orderCard, via, at) {
+            if (!orderCard) return;
+            orderCard.dataset.msgOutcome = 'sent';
+            orderCard.dataset.msgSentVia = via || 'tab';
+            orderCard.dataset.msgSentAt = String(at || Date.now());
+            orderCard.querySelectorAll(`.${CONFIG.classNames.msgFailedPill}, .${CONFIG.classNames.msgSentPill}`).forEach(el => el.remove());
+            const firstOrderId = (orderCard.dataset.orderId || '').split(',')[0];
+            const when = new Date(Number(orderCard.dataset.msgSentAt)).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+            const pill = document.createElement('div');
+            pill.className = CONFIG.classNames.msgSentPill;
+            pill.title = orderCard.dataset.msgSentVia === 'api'
+                ? `Thank-you sent through the eBay API at ${when}. eBay accepted it; it is in Messages → Sent.`
+                : `Thank-you sent from the message tab at ${when}.`;
+            pill.append(`✉ Thanked ${when}${orderCard.dataset.msgSentVia === 'api' ? ' · API' : ''}`);
+            if (firstOrderId) {
+                const view = document.createElement('a');
+                view.textContent = 'view';
+                view.href = `https://www.ebay.com/mesh/ord/details?orderid=${firstOrderId}`;
+                view.target = '_blank';
+                view.rel = 'noopener';
+                view.title = 'Open the order on eBay to read the conversation';
+                pill.appendChild(view);
+            }
+            const anchor = orderCard.querySelector(`.${CONFIG.classNames.shippedLabel}`)
+                || orderCard.querySelector(`.${CONFIG.classNames.markAsShippedBtn}`);
+            if (anchor) anchor.insertAdjacentElement('afterend', pill);
+            else (orderCard.querySelector(CONFIG.selectors.tcellItem) || orderCard).appendChild(pill);
+        }
+
         function markCardMessageFailed(orderCard, payload) {
             if (!orderCard) return;
             const p = payload || {};
@@ -4226,7 +4270,7 @@
                         SHIPDBG('message:api', { card: orderItemElement.id, outcome: apiMsg.outcome, why: apiMsg.why || '' });
                     }
                     if (apiMsg && apiMsg.outcome === 'sent') {
-                        await reportMessageResult(firstOrderId, 'sent', '', { action: 'auto_message' });
+                        await reportMessageResult(firstOrderId, 'sent', '', { action: 'auto_message', via: 'api' });
                     } else if (apiMsg && apiMsg.outcome === 'unknown') {
                         // Not retryable on purpose: a retry would open the tab and
                         // could thank the buyer a second time.
@@ -5798,6 +5842,7 @@
                     delete card.dataset.msgFailedAction;
                     delete card.dataset.msgFailedRetryable;
                     card.querySelectorAll(`.${CONFIG.classNames.msgFailedPill}`).forEach(el => el.remove());
+                    if ((payload.status || 'sent') === 'sent') markCardMessageSent(card, payload.via, payload.timestamp);
                     SHIPDBG('message:' + (payload.status || 'sent'), { card: card.id, orderId: payload.orderId });
                 }
             };
@@ -5846,6 +5891,10 @@
                     // nothing else would ever put it back — the card would go
                     // back to an unqualified green tick with the buyer still
                     // un-messaged. Rebuild it from the stash.
+                    if (card.dataset.msgOutcome === 'sent' &&
+                        !card.querySelector(`.${CONFIG.classNames.msgSentPill}`)) {
+                        markCardMessageSent(card, card.dataset.msgSentVia, Number(card.dataset.msgSentAt) || undefined);
+                    }
                     if (card.dataset.msgOutcome === 'failed' &&
                         !card.querySelector(`.${CONFIG.classNames.msgFailedPill}`)) {
                         markCardMessageFailed(card, {
@@ -6790,6 +6839,7 @@
                 // rather than resolving to the auto thank-you path.
                 action: o.action || '',
                 retryable: !!o.retryable,
+                via: o.via || 'tab',
                 timestamp: Date.now()
             });
         } catch (e) { console.error('[Buyer-Msg] Could not report result:', e); }

@@ -1,5 +1,15 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.60
+- **A sent thank-you now shows on the card**: a green "✉ Thanked 3:03 PM · API" line under
+  ✓ Shipped, with a **view** link to the order. Until now a sent message left no trace at all,
+  so it looked the same as one that was never tried, and the only way to check was eBay's
+  Messages window. It appears for both routes (API or message tab, the tooltip says which), and
+  it is rebuilt when eBay re-renders the card.
+- Behind it, the Mini now confirms a send it is unsure of by reading the account's **Sent**
+  folder. The first live test showed the Message API's conversation list never lists a
+  thank-you the seller started, so checking there would have read every unclear send as unsent.
+
 ## v4.59
 - **A "log out" link beside the Mini API switch** whenever this browser is logged in, so the
   login flow can be tested again. It ends the session on the Mini as well, not just in the
