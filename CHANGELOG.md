@@ -34,7 +34,7 @@
 - **Buyer names no longer carry the address badge with them.** The validation
   badge is a `<span>` placed INSIDE `.print__address__fullname`, and its tooltip
   text is a child node that CSS hides but `textContent` still reads, so every
-  buyer name read that way came out as "Luis Serratos✔Address looks correct".
+  buyer name read that way came out as "Jane Doe✔Address looks correct".
   The address-warning banner already worked around this in its own code; three
   other readers did not, including the envelope history, where it was visible in
   the Buyer column.

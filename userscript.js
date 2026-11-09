@@ -1652,7 +1652,7 @@
         // Reads a buyer's name off a card without dragging the validation badge
         // along. The badge is a <span> placed INSIDE .print__address__fullname
         // and its tooltip is a child node that CSS hides but textContent still
-        // reads, so the naive read returns "Luis Serratos\u2714Address looks correct".
+        // reads, so the naive read returns "Jane Doe\u2714Address looks correct".
         // Only the element's OWN text nodes are joined, which skips the badge
         // whatever it happens to contain.
         function readBuyerFullName(cardOrNameEl) {
