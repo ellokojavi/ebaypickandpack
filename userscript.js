@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261109-v4.60-thanked-pill
+// @version      20261109-v4.61-always-note
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -4127,13 +4127,13 @@
                 // deferred to tomorrow. A same-day order used to get none at
                 // all, which left no record on eBay of when it actually went
                 // out — the one case where the note matters most.
-                // v4.57: an API shipment records its own ship date on eBay, so
-                // the same-day "Shipped on" note would only cost a tab. The
-                // "Will be shipped on" note for tomorrow's orders still goes.
-                const noteShipsTomorrow = !!(shipTomorrowCheckbox && shipTomorrowCheckbox.checked);
-                if (orderItemElement.dataset.shipNoteSent !== '1' && (noteShipsTomorrow || !apiShippedAll)) {
+                // Every order gets its dated note, API or not (v4.61: v4.57
+                // skipped "Shipped on" after an API shipment; Javier wants it
+                // kept). It still goes through a background tab: the note
+                // has no API path yet.
+                if (orderItemElement.dataset.shipNoteSent !== '1') {
                     orderItemElement.dataset.shipNoteSent = '1';
-                    const shipsTomorrow = noteShipsTomorrow;
+                    const shipsTomorrow = !!(shipTomorrowCheckbox && shipTomorrowCheckbox.checked);
                     const noteDate = shipsTomorrow ? computeNextShipDateSkippingSunday(1) : new Date();
                     const options = { weekday: 'long', month: 'short', day: 'numeric' };
                     const formattedDate = noteDate.toLocaleDateString('en-US', options);

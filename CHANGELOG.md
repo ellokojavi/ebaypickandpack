@@ -1,5 +1,12 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.61
+- **Every shipped order gets its dated note again**, whichever route shipped it. v4.57 skipped the
+  same-day "Shipped on" note after an API shipment, on the grounds that eBay records the ship
+  date itself; Javier wants the note kept. "Shipped on" (today) and "Will be shipped on"
+  (tomorrow) both go through a background tab, as before v4.57. Orders are still marked shipped
+  at the moment of the click; only the note and the buyer message say which day it leaves.
+
 ## v4.60
 - **A sent thank-you now shows on the card**: a green "✉ Thanked 3:03 PM · API" line under
   ✓ Shipped, with a **view** link to the order. Until now a sent message left no trace at all,
@@ -42,6 +49,7 @@
     review. The API can only send.
 - **The same-day "Shipped on" order note is skipped when the API shipped the order**, since eBay
   records the ship date itself. "Will be shipped on" notes for tomorrow's orders still go.
+  *(Reverted in v4.61.)*
 - New **Ship & message via Mini API** switch in *Defaults for all orders*, with a one-time
   **log in** link (the Mini's report password). It reads as off until this browser has logged
   in. `USER_CONFIG.miniApi.enabled: false` turns the API path off entirely.
