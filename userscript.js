@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20260925-v4.56-live-print-note
+// @version      20261109-v4.57-api-ship-message
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -22,6 +22,7 @@
 // @grant        GM_xmlhttpRequest
 // @connect      ebay.com
 // @connect      www.ebay.com
+// @connect      100.85.107.8
 // @grant        window.close
 // @require      https://raw.githubusercontent.com/ellokojavi/ebaypickandpack/main/altheastix-ebay-config.js
 // @updateURL    https://raw.githubusercontent.com/ellokojavi/ebaypickandpack/main/userscript.js
@@ -94,6 +95,13 @@
         // Set enableOrderWatch to false to switch the whole thing off.
         enableOrderWatch: true,
         orderWatchIntervalMinutes: 5,
+        // --- Mini API (v4.57) ---
+        // Mark as shipped and the thank-you message go through the eBay API
+        // via the always-on Mac Mini first, and fall back to the tab
+        // automation when the Mini cannot do it. The Mini is reachable only
+        // on the owner's Tailscale network and needs a login (Defaults panel).
+        // Set enabled to false to always use the tabs.
+        miniApi: { enabled: true, base: 'http://100.85.107.8:8787' },
         orderColors: [
             // Expanded 40-color palette — hues spread across the spectrum and interleaved
             // so that consecutive assignments are always visually distinct
@@ -4049,6 +4057,24 @@
                 const thankYouCheckbox = orderItemElement.querySelector('.thank-you-checkbox');
                 const firstOrderId = orderIdString.split(',')[0];
 
+                // Mini API first (v4.57). Each order id on a combined card is
+                // marked separately; whatever the API did not ship goes through
+                // the tabs below, exactly as before.
+                const apiShippedIds = [];
+                let apiShipWhy = '';
+                if (ppApiEnabled()) {
+                    target.textContent = 'Shipping via API…';
+                    target.disabled = true;
+                    for (const oid of orderIdString.split(',')) {
+                        const res = await ppShip(oid);
+                        SHIPDBG('order:api-ship', { card: orderItemElement.id, ok: res.ok, status: res.status || '', why: res.why || '' });
+                        if (res.ok) apiShippedIds.push(oid);
+                        else apiShipWhy = res.why;
+                    }
+                    if (apiShipWhy) console.warn('[Ship] Mini API did not ship every order, falling back to tabs:', apiShipWhy);
+                }
+                const apiShippedAll = apiShippedIds.length === orderIdString.split(',').length;
+
                 // The `…Sent` guards make this safe to call twice on one card.
                 // Only the SHIP step can fail and be retried; the note and the
                 // message are one-shot side effects, and re-running them would
@@ -4057,9 +4083,13 @@
                 // deferred to tomorrow. A same-day order used to get none at
                 // all, which left no record on eBay of when it actually went
                 // out — the one case where the note matters most.
-                if (orderItemElement.dataset.shipNoteSent !== '1') {
+                // v4.57: an API shipment records its own ship date on eBay, so
+                // the same-day "Shipped on" note would only cost a tab. The
+                // "Will be shipped on" note for tomorrow's orders still goes.
+                const noteShipsTomorrow = !!(shipTomorrowCheckbox && shipTomorrowCheckbox.checked);
+                if (orderItemElement.dataset.shipNoteSent !== '1' && (noteShipsTomorrow || !apiShippedAll)) {
                     orderItemElement.dataset.shipNoteSent = '1';
-                    const shipsTomorrow = !!(shipTomorrowCheckbox && shipTomorrowCheckbox.checked);
+                    const shipsTomorrow = noteShipsTomorrow;
                     const noteDate = shipsTomorrow ? computeNextShipDateSkippingSunday(1) : new Date();
                     const options = { weekday: 'long', month: 'short', day: 'numeric' };
                     const formattedDate = noteDate.toLocaleDateString('en-US', options);
@@ -4186,20 +4216,49 @@
                         .replace(/\bon\s+today\b(?=[^\w]|$)/gi, 'today')
                         // Collapse any leftover blank lines from an empty {TRACKING_NOTE}
                         .replace(/\n{3,}/g, '\n\n');
-                    try {
-                        await queueBuyerMessage(MESSAGE_SEND_KEY, firstOrderId, finalMessageText);
-                    } catch (err) {
-                        // The flag is set before the write so a retry can never
-                        // double-send. If the write itself failed then nothing
-                        // was queued, so let a retry attempt it again.
-                        delete orderItemElement.dataset.shipMsgSent;
-                        throw err;
+                    // Mini API first, but only when auto-send is on: with it off
+                    // the tab leaves a draft for review, which the API cannot do.
+                    let apiMsg = null;
+                    let autoSendOn = true;
+                    try { autoSendOn = !!GM_getValue(AUTO_SEND_MESSAGES_KEY, true); } catch (e) {}
+                    if (ppApiEnabled() && autoSendOn) {
+                        apiMsg = await ppMessage(firstOrderId, finalMessageText);
+                        SHIPDBG('message:api', { card: orderItemElement.id, outcome: apiMsg.outcome, why: apiMsg.why || '' });
                     }
-                    // Open the message tab in the foreground so paste/auto-send runs with focus
-                    openAutomationTab(`https://www.ebay.com/mesh/ord/details?orderid=${firstOrderId}&tm_action=auto_message`, { active: true });
+                    if (apiMsg && apiMsg.outcome === 'sent') {
+                        await reportMessageResult(firstOrderId, 'sent', '', { action: 'auto_message' });
+                    } else if (apiMsg && apiMsg.outcome === 'unknown') {
+                        // Not retryable on purpose: a retry would open the tab and
+                        // could thank the buyer a second time.
+                        await reportMessageResult(firstOrderId, 'failed',
+                            `Sent through the Mini, but it could not confirm eBay delivered it (${apiMsg.why}). Check the buyer conversation on eBay before sending again.`,
+                            { action: 'auto_message', retryable: false });
+                    } else {
+                        if (apiMsg) console.warn('[Buyer-Msg] Mini API did not send, falling back to the tab:', apiMsg.why);
+                        try {
+                            await queueBuyerMessage(MESSAGE_SEND_KEY, firstOrderId, finalMessageText);
+                        } catch (err) {
+                            // The flag is set before the write so a retry can never
+                            // double-send. If the write itself failed then nothing
+                            // was queued, so let a retry attempt it again.
+                            delete orderItemElement.dataset.shipMsgSent;
+                            throw err;
+                        }
+                        // Open the message tab in the foreground so paste/auto-send runs with focus
+                        openAutomationTab(`https://www.ebay.com/mesh/ord/details?orderid=${firstOrderId}&tm_action=auto_message`, { active: true });
+                    }
                 }
 
-                const orderIds = orderIdString.split(',');
+                if (apiShippedAll) {
+                    // Resolved through the same handler a tab confirmation uses,
+                    // so history, the SKU panel and the batch queue all see it.
+                    for (const oid of apiShippedIds) {
+                        if (ppConfirmShipment) await ppConfirmShipment(oid);
+                        else await GM_setValue(CONFIRMED_SHIP_KEY, { orderId: oid, timestamp: Date.now() });
+                    }
+                    return true;
+                }
+                const orderIds = orderIdString.split(',').filter(id => !apiShippedIds.includes(id));
                 const overlay = document.createElement('div');
                 overlay.className = CONFIG.classNames.pendingOverlay;
                 overlay.innerHTML = `<div class="${CONFIG.classNames.pendingOverlayContent}"><div class="${CONFIG.classNames.processingIcon}"></div><span id="overlay-text"></span><span class="pending-sub" id="overlay-sub"></span></div>`;
@@ -4239,6 +4298,11 @@
                     // has already started, so by report time it looks newer.
                     openAutomationTab(`https://www.ebay.com/mesh/ord/details?orderid=${orderIds[i]}&tm_action=ship&tm_attempt=${orderItemElement.dataset.shipAttemptAt || ''}`, { active: false });
                     if (i < orderIds.length - 1) await new Promise(resolve => setTimeout(resolve, CONFIG.timing.sequentialTabDelay));
+                }
+                // Partly shipped through the API: confirm those now, the tabs
+                // confirm the rest as usual.
+                for (const oid of apiShippedIds) {
+                    if (ppConfirmShipment) await ppConfirmShipment(oid);
                 }
                 textElement.textContent = 'Marked as shipped — confirming…';
                 const subElement = overlay.querySelector('#overlay-sub');
@@ -5134,6 +5198,58 @@
                     CFGDBG('autoSend:set', on);
                 });
 
+                // Row: Mini API (v4.57). ON means ship and thank-you go through
+                // the eBay API on the Mini, with tabs only as the fallback. It
+                // reads as OFF until this browser has logged in to the Mini.
+                if (ppConfigured()) {
+                    let apiPref = true;
+                    try { apiPref = !!GM_getValue(PP_USE_API_KEY, true); } catch (e) {}
+                    const apiRow = buildToggleRow(
+                        'mini-api-toggle',
+                        'Ship & message via Mini API',
+                        'ON: mark shipped and send the thank-you through the eBay API on the Mac Mini, falling back to tabs if it cannot. Needs this browser on Tailscale and a one-time login.',
+                        apiPref && ppApiEnabled()
+                    );
+                    cfgBody.appendChild(apiRow.row);
+                    const apiStatus = document.createElement('div');
+                    apiStatus.style.cssText = `font-size: 11px; margin: 2px 0 0 46px; color: ${isDarkMode ? '#999' : '#777'};`;
+                    const paintApiStatus = () => {
+                        apiStatus.textContent = '';
+                        if (ppApiEnabled()) { apiStatus.textContent = 'logged in'; return; }
+                        let hasToken = false;
+                        try { hasToken = !!GM_getValue(PP_TOKEN_KEY, ''); } catch (e) {}
+                        if (hasToken) { apiStatus.textContent = 'off, using tabs'; return; }
+                        apiStatus.append('not logged in, using tabs · ');
+                        const link = document.createElement('a');
+                        link.href = '#';
+                        link.textContent = 'log in';
+                        link.addEventListener('click', async (e) => {
+                            e.preventDefault();
+                            if (await ppLogin()) {
+                                try { GM_setValue(PP_USE_API_KEY, true); } catch (err) {}
+                                apiRow.input.checked = true;
+                            }
+                            paintApiStatus();
+                        });
+                        apiStatus.appendChild(link);
+                    };
+                    paintApiStatus();
+                    cfgBody.appendChild(apiStatus);
+                    apiRow.input.addEventListener('change', async (e) => {
+                        const on = !!e.target.checked;
+                        let hasToken = false;
+                        try { hasToken = !!GM_getValue(PP_TOKEN_KEY, ''); } catch (err) {}
+                        if (on && !hasToken && !(await ppLogin())) {
+                            e.target.checked = false;
+                            paintApiStatus();
+                            return;
+                        }
+                        try { GM_setValue(PP_USE_API_KEY, on); } catch (err) {}
+                        CFGDBG('miniApi:set', on);
+                        paintApiStatus();
+                    });
+                }
+
                 // Row: ship date (global) — segmented Today/Tomorrow.
                 const rowShip = document.createElement('div');
                 rowShip.style.cssText = 'display:flex; align-items:center; gap:8px; margin-top: 14px;';
@@ -5600,6 +5716,7 @@
                     skuManager.createSKUPackingList();
                 }
             };
+            ppConfirmShipment = processShipmentConfirmation;
             GM_addValueChangeListener(CONFIRMED_SHIP_KEY, async (name, oldValue, newValue) => {
                  if (newValue?.orderId) {
                     await processShipmentConfirmation(newValue.orderId);
@@ -6377,6 +6494,102 @@
     // error. The auto_message branch hid the bug for two days: it awaits
     // GM_getValue() first, and that yield is enough for these to initialize.
     // Function declarations hoist, so the order stops mattering.
+    // ===================================================================
+    // MINI API (v4.57)
+    // ===================================================================
+    // Mark-as-shipped and the thank-you message go through the eBay API on
+    // the Mac Mini, with the tab automation as the fallback. The Mini holds
+    // every eBay credential. This script holds only a session token for the
+    // Mini, in Tampermonkey storage, which page scripts cannot read.
+    //
+    // The fallback rules differ on purpose, because the fallback repeats the
+    // action:
+    //   ship     anything short of a clear yes falls back to the tab. Marking
+    //            shipped twice is harmless: the tab reads eBay's stepper.
+    //   message  only a definite "nothing went out" falls back. When the Mini
+    //            cannot tell whether eBay sent it, the card says so and no tab
+    //            opens, because a second thank-you is the failure to avoid.
+    const PP_TOKEN_KEY = 'ebay_pp_mini_token';
+    const PP_USE_API_KEY = 'ebay_pp_use_api';
+    // Set by the confirmation handler once it exists, so an API shipment
+    // resolves the card through exactly the same path as a tab confirmation.
+    let ppConfirmShipment = null;
+
+    function ppConfigured() {
+        return !!(USER_CONFIG.miniApi && USER_CONFIG.miniApi.enabled !== false && USER_CONFIG.miniApi.base);
+    }
+    function ppApiEnabled() {
+        if (!ppConfigured()) return false;
+        let on = true, token = '';
+        try { on = !!GM_getValue(PP_USE_API_KEY, true); token = GM_getValue(PP_TOKEN_KEY, '') || ''; } catch (e) { return false; }
+        return on && !!token;
+    }
+    function ppRequest(path, body, timeoutMs) {
+        return new Promise(resolve => {
+            let token = '';
+            try { token = GM_getValue(PP_TOKEN_KEY, '') || ''; } catch (e) {}
+            const headers = { 'Content-Type': 'application/json', 'X-Altheastix-PP': '1' };
+            if (token) headers.Authorization = 'Bearer ' + token;
+            try {
+                GM_xmlhttpRequest({
+                    method: 'POST',
+                    url: USER_CONFIG.miniApi.base + path,
+                    headers: headers,
+                    data: JSON.stringify(body || {}),
+                    timeout: timeoutMs || 90000,
+                    anonymous: true,
+                    onload: r => {
+                        let data = null;
+                        try { data = JSON.parse(r.responseText); } catch (e) {}
+                        if (r.status === 401 && path !== '/pp/login') {
+                            try { GM_setValue(PP_TOKEN_KEY, ''); } catch (e) {}
+                        }
+                        resolve({ transport: 'ok', http: r.status, data: data });
+                    },
+                    onerror: () => resolve({ transport: 'error' }),
+                    ontimeout: () => resolve({ transport: 'timeout' })
+                });
+            } catch (e) {
+                resolve({ transport: 'error' });
+            }
+        });
+    }
+    function ppDescribe(r) {
+        if (r.transport === 'error') return 'the Mini could not be reached';
+        if (r.transport === 'timeout') return 'the Mini did not answer in time';
+        return (r.data && r.data.detail) || `the Mini answered ${r.http}`;
+    }
+    async function ppLogin() {
+        const pw = window.prompt('Password for the Mini (the same one that unlocks the web report figures):');
+        if (!pw) return false;
+        const r = await ppRequest('/pp/login', { password: pw }, 20000);
+        if (r.transport === 'ok' && r.http === 200 && r.data && r.data.token) {
+            GM_setValue(PP_TOKEN_KEY, r.data.token);
+            return true;
+        }
+        window.alert('Could not log in to the Mini: ' + ppDescribe(r));
+        return false;
+    }
+    async function ppShip(orderId) {
+        const r = await ppRequest('/pp/ship', { order_id: orderId }, 90000);
+        const st = r.data && r.data.status;
+        if (r.transport === 'ok' && r.http === 200 && (st === 'shipped' || st === 'already_shipped')) {
+            return { ok: true, status: st };
+        }
+        return { ok: false, why: ppDescribe(r) };
+    }
+    async function ppMessage(orderId, text) {
+        const r = await ppRequest('/pp/message', { order_id: orderId, text: text }, 90000);
+        const st = r.data && r.data.status;
+        // The request may have been processed: never resend through a tab.
+        if (r.transport === 'timeout') return { outcome: 'unknown', why: ppDescribe(r) };
+        // Refused at the door (unreachable, not logged in, bad request): nothing was sent.
+        if (r.transport === 'error' || [400, 401, 403, 404].includes(r.http)) return { outcome: 'fallback', why: ppDescribe(r) };
+        if (r.http === 200 && (st === 'sent' || st === 'already_sent')) return { outcome: 'sent', status: st };
+        if (r.http === 200 && st === 'failed') return { outcome: 'fallback', why: ppDescribe(r) };
+        return { outcome: 'unknown', why: ppDescribe(r) };
+    }
+
     function msgSleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
     function MSG_LOG(...args) { console.log('[Buyer-Msg]', ...args); }
 

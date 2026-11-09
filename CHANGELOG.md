@@ -1,5 +1,30 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.57
+- **Mark as shipped and the thank-you message now go through the eBay API first.** The script
+  asks a small service on the shop's always-on Mac Mini to do both. The Mini holds the eBay
+  credentials; the script holds only a login token for the Mini, kept in Tampermonkey storage,
+  which page scripts cannot read. With the API path a shipment no longer opens a tab, and the
+  thank-you no longer takes the browser's focus.
+- **The tab automation is unchanged and is now the fallback.** The two fall back differently,
+  because the fallback repeats the action:
+  - **Ship** falls back to the tab whenever the API does not give a clear yes. Marking an order
+    shipped twice is harmless, since the tab reads eBay's progress stepper first.
+  - **Message** falls back only when nothing was sent: the Mini is unreachable, not logged in,
+    or eBay refused the request. If the Mini sent it but cannot confirm eBay delivered it, the
+    card shows a non-retryable "check the buyer conversation" pill and **no tab opens**, because
+    a second thank-you to the same buyer is worse than a missing one. The Mini also refuses a
+    second API thank-you for an order it has already thanked.
+  - With **auto-send off**, the message still goes through the tab, which leaves a draft to
+    review. The API can only send.
+- **The same-day "Shipped on" order note is skipped when the API shipped the order**, since eBay
+  records the ship date itself. "Will be shipped on" notes for tomorrow's orders still go.
+- New **Ship & message via Mini API** switch in *Defaults for all orders*, with a one-time
+  **log in** link (the Mini's report password). It reads as off until this browser has logged
+  in. `USER_CONFIG.miniApi.enabled: false` turns the API path off entirely.
+- Needs the browser to be on the owner's Tailscale network; `@connect 100.85.107.8` is new.
+  Off the tailnet, every request fails at the door and the tabs take over.
+
 ## v4.56
 - **The print note updates the moment you print.** It used to be drawn only when
   eBay re-rendered the card, so after printing the card said nothing until the
