@@ -1,5 +1,11 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.59
+- **A "log out" link beside the Mini API switch** whenever this browser is logged in, so the
+  login flow can be tested again. It ends the session on the Mini as well, not just in the
+  browser, and clears the local token even if the Mini cannot be reached. After logging out the
+  switch reads off, the status line offers "log in" again, and shipping uses the tabs.
+
 ## v4.58
 - **The Mini login no longer shows the password as you type it.** v4.57 asked through
   `window.prompt`, which cannot mask input. It is now a small dialog with a real password field

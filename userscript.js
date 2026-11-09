@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261109-v4.58-masked-mini-login
+// @version      20261109-v4.59-mini-logout
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -5215,10 +5215,24 @@
                     apiStatus.style.cssText = `font-size: 11px; margin: 2px 0 0 46px; color: ${isDarkMode ? '#999' : '#777'};`;
                     const paintApiStatus = () => {
                         apiStatus.textContent = '';
-                        if (ppApiEnabled()) { apiStatus.textContent = 'logged in'; return; }
                         let hasToken = false;
                         try { hasToken = !!GM_getValue(PP_TOKEN_KEY, ''); } catch (e) {}
-                        if (hasToken) { apiStatus.textContent = 'off, using tabs'; return; }
+                        if (hasToken) {
+                            apiStatus.append(ppApiEnabled() ? 'logged in · ' : 'logged in, off, using tabs · ');
+                            const out = document.createElement('a');
+                            out.href = '#';
+                            out.textContent = 'log out';
+                            out.addEventListener('click', async (e) => {
+                                e.preventDefault();
+                                out.textContent = 'logging out…';
+                                await ppLogout();
+                                apiRow.input.checked = false;
+                                CFGDBG('miniApi:logout', true);
+                                paintApiStatus();
+                            });
+                            apiStatus.appendChild(out);
+                            return;
+                        }
                         apiStatus.append('not logged in, using tabs · ');
                         const link = document.createElement('a');
                         link.href = '#';
@@ -6627,6 +6641,13 @@
                 input.focus();
             });
         });
+    }
+    // Ends the session on the Mini too, so a stolen copy of the token stops
+    // working. The local token is cleared whatever the Mini answers: an
+    // unreachable Mini must not leave this browser looking logged in.
+    async function ppLogout() {
+        await ppRequest('/pp/logout', {}, 10000);
+        try { GM_setValue(PP_TOKEN_KEY, ''); } catch (e) {}
     }
     async function ppShip(orderId) {
         const r = await ppRequest('/pp/ship', { order_id: orderId }, 90000);
