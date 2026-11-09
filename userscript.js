@@ -77,7 +77,7 @@
     // USER CONFIGURATION (Local Preferences)
     // ===================================================================
     const USER_CONFIG = {
-        returnAddress: "Altheastix ⚡<br>100 Sample St.<br>Seattle, WA 98100<br>USA",
+        returnAddress: "Altheastix ⚡<br>3015 E Howell St.<br>Seattle, WA 98122<br>USA",
         trackingOrderAmountThreshold: 25,
         useAlternativeTracking: true,
         scriptLoadDelay: 15 * 1000,
