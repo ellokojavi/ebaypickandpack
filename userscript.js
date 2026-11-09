@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261109-v4.57-api-ship-message
+// @version      20261109-v4.58-masked-mini-login
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -6559,16 +6559,74 @@
         if (r.transport === 'timeout') return 'the Mini did not answer in time';
         return (r.data && r.data.detail) || `the Mini answered ${r.http}`;
     }
-    async function ppLogin() {
-        const pw = window.prompt('Password for the Mini (the same one that unlocks the web report figures):');
-        if (!pw) return false;
-        const r = await ppRequest('/pp/login', { password: pw }, 20000);
-        if (r.transport === 'ok' && r.http === 200 && r.data && r.data.token) {
-            GM_setValue(PP_TOKEN_KEY, r.data.token);
-            return true;
-        }
-        window.alert('Could not log in to the Mini: ' + ppDescribe(r));
-        return false;
+    // A real dialog rather than window.prompt, which cannot mask what is
+    // typed (v4.58). The password goes straight to the Mini and is never
+    // stored here; only the session token the Mini returns is kept.
+    function ppLogin() {
+        return new Promise(resolve => {
+            // Same preference the page itself reads (CONFIG.localStorageKeys.darkMode).
+            const dark = (() => {
+                try {
+                    const v = localStorage.getItem('darkModeEnabled');
+                    return v === null ? USER_CONFIG.enableDarkModeByDefault !== false : v === 'true';
+                } catch (e) { return false; }
+            })();
+            const fg = dark ? '#eee' : '#222', bg = dark ? '#2b2b2b' : '#fff', muted = dark ? '#aaa' : '#666';
+            const backdrop = document.createElement('div');
+            backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2147483646;display:flex;align-items:center;justify-content:center;';
+            const box = document.createElement('form');
+            box.style.cssText = `background:${bg};color:${fg};border-radius:10px;padding:20px 22px;width:320px;max-width:calc(100vw - 32px);box-shadow:0 10px 30px rgba(0,0,0,.3);font:13px/1.4 system-ui,sans-serif;text-align:left;`;
+            const title = document.createElement('div');
+            title.textContent = 'Log in to the Mini';
+            title.style.cssText = 'font-weight:600;font-size:15px;margin-bottom:4px;';
+            const help = document.createElement('div');
+            help.textContent = 'The same password that unlocks the web report figures.';
+            help.style.cssText = `color:${muted};margin-bottom:12px;`;
+            const input = document.createElement('input');
+            input.type = 'password';
+            input.autocomplete = 'current-password';
+            input.placeholder = 'Password';
+            input.style.cssText = `width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid ${dark ? '#555' : '#ccc'};border-radius:6px;background:${dark ? '#1e1e1e' : '#fff'};color:${fg};font-size:14px;`;
+            const err = document.createElement('div');
+            err.style.cssText = 'color:#d93025;min-height:18px;margin-top:6px;font-size:12px;';
+            const actions = document.createElement('div');
+            actions.style.cssText = 'display:flex;justify-content:flex-end;gap:8px;margin-top:6px;';
+            const cancel = document.createElement('button');
+            cancel.type = 'button';
+            cancel.textContent = 'Cancel';
+            cancel.style.cssText = `padding:6px 12px;border-radius:6px;border:1px solid ${dark ? '#555' : '#ccc'};background:transparent;color:${fg};cursor:pointer;`;
+            const ok = document.createElement('button');
+            ok.type = 'submit';
+            ok.textContent = 'Log in';
+            ok.style.cssText = 'padding:6px 14px;border-radius:6px;border:0;background:#3665f3;color:#fff;cursor:pointer;font-weight:600;';
+            actions.append(cancel, ok);
+            box.append(title, help, input, err, actions);
+            backdrop.appendChild(box);
+            document.body.appendChild(backdrop);
+            input.focus();
+
+            const close = (result) => { backdrop.remove(); document.removeEventListener('keydown', onKey, true); resolve(result); };
+            const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(false); } };
+            document.addEventListener('keydown', onKey, true);
+            cancel.addEventListener('click', () => close(false));
+            backdrop.addEventListener('mousedown', (e) => { if (e.target === backdrop) close(false); });
+            box.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const pw = input.value;
+                if (!pw) { err.textContent = 'Enter the password.'; return; }
+                ok.disabled = true; ok.textContent = 'Checking…'; err.textContent = '';
+                const r = await ppRequest('/pp/login', { password: pw }, 20000);
+                input.value = '';
+                if (r.transport === 'ok' && r.http === 200 && r.data && r.data.token) {
+                    GM_setValue(PP_TOKEN_KEY, r.data.token);
+                    close(true);
+                    return;
+                }
+                err.textContent = 'Could not log in: ' + ppDescribe(r);
+                ok.disabled = false; ok.textContent = 'Log in';
+                input.focus();
+            });
+        });
     }
     async function ppShip(orderId) {
         const r = await ppRequest('/pp/ship', { order_id: orderId }, 90000);

@@ -1,5 +1,12 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.58
+- **The Mini login no longer shows the password as you type it.** v4.57 asked through
+  `window.prompt`, which cannot mask input. It is now a small dialog with a real password field
+  (dots), Enter to submit and Esc to cancel. A wrong password shows inline and the dialog stays
+  open, instead of a separate alert. The password goes straight to the Mini and is never stored
+  in the script; only the session token the Mini returns is kept.
+
 ## v4.57
 - **Mark as shipped and the thank-you message now go through the eBay API first.** The script
   asks a small service on the shop's always-on Mac Mini to do both. The Mini holds the eBay

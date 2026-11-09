@@ -12,7 +12,7 @@ validated addresses, and shipping automation that tells you when it failed.
 
 | | |
 |---|---|
-| **Current version** | v4.57 (`20261109-v4.57-api-ship-message`) |
+| **Current version** | v4.58 (`20261109-v4.58-masked-mini-login`) |
 | **Size** | ~6,800 lines, one file |
 | **Runs on** | 7 eBay page patterns — see [Pages supported](#pages-supported) |
 | **Built for** | [Altheastix](https://www.ebay.com/str/altheastix), a one-person sticker shop shipping ~350 items a month |
