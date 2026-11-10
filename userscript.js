@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261109-v4.65-usps-errors
+// @version      20261109-v4.66-grid-addresses
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -7779,7 +7779,10 @@
         // Rule 3: street line (line index 1) should start with a digit OR be a PO Box
         const streetLine = lines[1].trim();
         const isPOBox = /^p\.?o\.?\s*box\b/i.test(streetLine);
-        if (!isPOBox && !/^\d/.test(streetLine)) {
+        // Wisconsin and northern Illinois use grid numbers that start with a
+        // direction letter: "W140S7748 Main St", "N52 W16632 Oak Ln" (v4.66).
+        const isGridNumber = /^[NSEW]\d+\s?[NSEW]?\d*\b/i.test(streetLine);
+        if (!isPOBox && !isGridNumber && !/^\d/.test(streetLine)) {
             warnings.push('Street line doesn\'t start with a house/building number');
         }
 

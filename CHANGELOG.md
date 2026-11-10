@@ -1,5 +1,12 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.66
+- Wisconsin and northern Illinois **grid addresses** (`W140S7748 Main St`, `N52 W16632 Oak Ln`)
+  are no longer flagged as "doesn't start with a house/building number".
+- Older orders, where eBay has stopped sharing the street line, now say *USPS check skipped:
+  eBay no longer shares this order's street line* instead of "Google answered 400", and no
+  longer spend a check.
+
 ## v4.65
 - A failed USPS check is no longer re-requested every time eBay re-renders the card, which spent
   one of the Mini's 150 daily checks each time. A page reload asks again. The tooltip now shows
