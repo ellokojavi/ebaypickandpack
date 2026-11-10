@@ -1,5 +1,14 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.68
+- **Use USPS** button next to Edit/Copy when USPS offers an address that differs from the card.
+  It replaces the card's address with USPS's version, puts the unit on its own line, and
+  re-checks it. **Undo USPS** restores the buyer's version and the original answer.
+- The Mini no longer offers a "USPS version" that is the same as the card's address (ZIP+4 and
+  capitals aside), which made a warning look like it was asking for no change.
+- A unit USPS has no record of, in a building it does know, is no longer a ⚠ when Google says to
+  accept the address. Small buildings often have no unit list at USPS and still get mail.
+
 ## v4.67
 - **Fix and Edit → Save now re-check the corrected address against USPS.** The tooltip shows
   "USPS: re-checking the corrected address…" and then the new answer, and a ⚠ that only came

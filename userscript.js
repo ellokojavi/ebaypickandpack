@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261109-v4.67-recheck-after-fix
+// @version      20261110-v4.68-use-usps-version
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -274,7 +274,7 @@
                 messageContainer: 'message-container', cannedMessageSelect: 'canned-message-select', sendCannedMessageBtn: 'send-canned-message-btn', buyLabelLink: 'buy-label-link',
                 batchSelectBtn: 'batch-select-btn', selectBatchBtnDisabled: 'select-batch-btn-disabled',
                 addrWarningBadge: 'addr-warning-badge', addrWarningTooltip: 'addr-warning-tooltip',
-                addrOkBadge: 'addr-ok-badge', addrOkTooltip: 'addr-ok-tooltip', fixAddressBtn: 'fix-address-btn'
+                addrOkBadge: 'addr-ok-badge', addrOkTooltip: 'addr-ok-tooltip', fixAddressBtn: 'fix-address-btn', useUspsBtn: 'use-usps-btn'
             },
             localStorageKeys: {
                 darkMode: 'darkModeEnabled'
@@ -1755,7 +1755,29 @@
                 + notes.map(n => `• ${prefix}${addrEsc(n)}`).join('<br>')
                 + (sugg.length ? `<br>USPS version:<br>${sugg.map(addrEsc).join('<br>')}` : '');
             tip.appendChild(line);
+            syncUseUspsButton(card, sugg);
             refreshAddressBanner();
+        }
+        // Shows "Use USPS" next to Edit/Copy when USPS offers an address that
+        // differs from the card's (v4.68). While a USPS version is applied the
+        // button reads "Undo USPS" and stays, whatever the re-check says.
+        function syncUseUspsButton(card, sugg) {
+            const cn = CONFIG.classNames;
+            const actions = card.querySelector(CONFIG.selectors.addressActions);
+            if (!actions) return;
+            let btn = actions.querySelector(`.${cn.useUspsBtn}`);
+            const applied = !!card.querySelector(`.${cn.addressContainer}`)?.dataset.preUspsHtml;
+            if (!sugg.length && !applied) { btn?.previousSibling?.nodeType === 3 && btn.previousSibling.remove(); btn?.remove(); return; }
+            if (!btn) {
+                btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = `fake-link ${cn.useUspsBtn}`;
+                btn.title = 'Replace the address with the USPS version shown under the badge';
+                const anchor = actions.querySelector(`.${cn.fixAddressBtn}`) || actions.querySelector(`.${cn.copyAddressBtn}`);
+                if (!anchor) return;
+                anchor.after(document.createTextNode('\u00a0\u00a0'), btn);
+            }
+            btn.textContent = applied ? 'Undo USPS' : 'Use USPS';
         }
 
         function readBuyerFullName(cardOrNameEl) {
@@ -4897,6 +4919,36 @@
                         recheckCardAddress(orderItemElement);
                         addressElement.dataset.preFixHtml = before;
                         target.textContent = 'Undo fix';
+                    }
+                    refreshAddressBanner();
+                }
+                if (target.classList.contains(CONFIG.classNames.useUspsBtn)) {
+                    event.preventDefault(); event.stopPropagation();
+                    if (!addressElement || orderItemElement.classList.contains(CONFIG.classNames.isEditingAddress)) return;
+                    const ds = orderItemElement.dataset;
+                    if (addressElement.dataset.preUspsHtml) {
+                        addressElement.innerHTML = addressElement.dataset.preUspsHtml;
+                        const prev = JSON.parse(addressElement.dataset.preUspsState || '{}');
+                        delete addressElement.dataset.preUspsHtml;
+                        delete addressElement.dataset.preUspsState;
+                        ds.uspsStatus = prev.status || '';
+                        ds.uspsNotes = prev.notes || '[]';
+                        ds.uspsSuggestion = prev.suggestion || '[]';
+                        syncUseUspsButton(orderItemElement, JSON.parse(ds.uspsSuggestion));
+                    } else {
+                        const sugg = JSON.parse(ds.uspsSuggestion || '[]');
+                        if (!sugg.length) return;
+                        const name = readBuyerFullName(orderItemElement);
+                        if (!name) return;
+                        const before = addressElement.innerHTML;
+                        const state = JSON.stringify({ status: ds.uspsStatus, notes: ds.uspsNotes, suggestion: ds.uspsSuggestion });
+                        // USPS writes the unit on the street line; split it onto its own line.
+                        const fix = normalizeAddressUnits([name, ...sugg, 'United States']);
+                        writeAddressLines(addressElement, fix.lines, validateAddress(fix.lines), ['USPS version applied']);
+                        addressElement.dataset.preUspsHtml = before;
+                        addressElement.dataset.preUspsState = state;
+                        syncUseUspsButton(orderItemElement, []);
+                        recheckCardAddress(orderItemElement);
                     }
                     refreshAddressBanner();
                 }

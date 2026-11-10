@@ -243,7 +243,9 @@ address is linted against structural rules before it can be printed:
 - **USPS deliverability** (v4.64, needs the Mini): each US address is checked
   against USPS's delivery list. The tooltip says whether it is deliverable,
   missing an apartment number, or has the wrong ZIP, with USPS's own version
-  of the address when something is off. Read-only; nothing is changed for you.
+  of the address when something is off. When that version differs from the card,
+  **Use USPS** (v4.68) puts it on the card, unit on its own line, and re-checks it;
+  **Undo USPS** puts the buyer's version back. Nothing changes until you press it.
 - **US addresses** get an explicit "United States" country line appended (eBay
   omits it for domestic orders) so printed addresses are complete; international
   orders keep eBay's own country line.
