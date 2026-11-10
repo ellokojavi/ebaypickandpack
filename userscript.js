@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261109-v4.62-api-note
+// @version      20261109-v4.63-address-fix
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -274,7 +274,7 @@
                 messageContainer: 'message-container', cannedMessageSelect: 'canned-message-select', sendCannedMessageBtn: 'send-canned-message-btn', buyLabelLink: 'buy-label-link',
                 batchSelectBtn: 'batch-select-btn', selectBatchBtnDisabled: 'select-batch-btn-disabled',
                 addrWarningBadge: 'addr-warning-badge', addrWarningTooltip: 'addr-warning-tooltip',
-                addrOkBadge: 'addr-ok-badge', addrOkTooltip: 'addr-ok-tooltip'
+                addrOkBadge: 'addr-ok-badge', addrOkTooltip: 'addr-ok-tooltip', fixAddressBtn: 'fix-address-btn'
             },
             localStorageKeys: {
                 darkMode: 'darkModeEnabled'
@@ -1568,8 +1568,7 @@
             const flagged = [];
             document.querySelectorAll(CONFIG.selectors.orderItem).forEach(orderItem => {
                 if (!orderItem.querySelector(`.${CONFIG.classNames.addrWarningBadge}`)) return;
-                const name = readBuyerFullName(orderItem);
-                if (!name) name = orderItem.id || 'Order';
+                const name = readBuyerFullName(orderItem) || orderItem.id || 'Order';
                 flagged.push({ id: orderItem.id, name });
             });
 
@@ -1674,6 +1673,22 @@
         // reads, so the naive read returns "Jane Doe\u2714Address looks correct".
         // Only the element's OWN text nodes are joined, which skips the badge
         // whatever it happens to contain.
+        // Rebuilds a card's address block from plain lines (v4.63 Fix). The name
+        // stays in eBay's span so readBuyerFullName still finds it, and the badge
+        // is re-derived from the fixed lines rather than carried over.
+        function writeAddressLines(addrEl, lines, warnings, fixedChanges) {
+            const cn = CONFIG.classNames;
+            const badge = warnings.length
+                ? `<span class="${cn.addrWarningBadge}">⚠<span class="${cn.addrWarningTooltip}">${warnings.map(w => `• ${addrEsc(w)}`).join('<br>')}</span></span>`
+                : `<span class="${cn.addrOkBadge}">✔<span class="${cn.addrOkTooltip}">Address fixed:<br>${fixedChanges.map(c => `• ${addrEsc(c)}`).join('<br>')}</span></span>`;
+            const last = lines.length - 1;
+            const isCountry = /^(united states|canada)$/i.test(lines[last] || '');
+            addrEl.innerHTML = `<span class="${cn.addressFullname}">${addrEsc(lines[0])}${badge}<br></span>`
+                + lines.slice(1).map((l, i) => (isCountry && i + 1 === last)
+                    ? `<span class="print__address__country">${addrEsc(l)}<br></span>`
+                    : `${addrEsc(l)}<br>`).join('');
+        }
+
         function readBuyerFullName(cardOrNameEl) {
             if (!cardOrNameEl) return '';
             const nameEl = cardOrNameEl.classList?.contains(CONFIG.classNames.addressFullname)
@@ -1715,6 +1730,11 @@
                 if (addrEl) {
                     const addrLines = addrEl.innerText.split('\n').map(l => l.trim()).filter(l => l);
                     const addrWarnings = validateAddress(addrLines);
+                    const unitFix = normalizeAddressUnits(addrLines);
+                    if (unitFix.changes.length) {
+                        orderItem.dataset.addrFixable = '1';
+                        addrWarnings.push(...unitFix.changes.map(c => `Fixable: ${c}`));
+                    }
                     const fullnameEl = orderItem.querySelector(`.${CONFIG.classNames.addressFullname}`);
                     const badgeInsert = el => {
                         if (!fullnameEl) { addrEl.prepend(el); return; }
@@ -1722,7 +1742,7 @@
                         br ? fullnameEl.insertBefore(el, br) : fullnameEl.appendChild(el);
                     };
                     if (addrWarnings.length > 0) {
-                        const tooltipItems = addrWarnings.map(w => `• ${w}`).join('<br>');
+                        const tooltipItems = addrWarnings.map(w => `• ${addrEsc(w)}`).join('<br>');
                         const badge = document.createElement('span');
                         badge.className = CONFIG.classNames.addrWarningBadge;
                         badge.innerHTML = `⚠<span class="${CONFIG.classNames.addrWarningTooltip}">${tooltipItems}</span>`;
@@ -1862,7 +1882,8 @@
 
             const addressActions = orderItem.querySelector(CONFIG.selectors.addressActions);
             if (addressActions) {
-                addressActions.innerHTML = `<button type="button" class="fake-link ${CONFIG.classNames.editAddressBtn}" id="${CONFIG.ids.editAddressButton}${index}">Edit</button>&nbsp;&nbsp;<button type="button" class="fake-link ${CONFIG.classNames.copyAddressBtn}" id="${CONFIG.ids.copyAddressButton}${index}">Copy</button>`;
+                addressActions.innerHTML = `<button type="button" class="fake-link ${CONFIG.classNames.editAddressBtn}" id="${CONFIG.ids.editAddressButton}${index}">Edit</button>&nbsp;&nbsp;<button type="button" class="fake-link ${CONFIG.classNames.copyAddressBtn}" id="${CONFIG.ids.copyAddressButton}${index}">Copy</button>`
+                    + (orderItem.dataset.addrFixable === '1' ? `&nbsp;&nbsp;<button type="button" class="fake-link ${CONFIG.classNames.fixAddressBtn}" title="Apply the fixes listed under ⚠">Fix</button>` : '');
                 const shipButton = document.createElement('button');
                 shipButton.type = 'button';
                 shipButton.className = CONFIG.classNames.markAsShippedBtn;
@@ -4751,7 +4772,11 @@
                             // original layout where the badge sat next to the fullname.
                             lines[0] = `${lines[0]} ${savedBadge}`;
                         }
-                        addressElement.innerHTML = lines.join('<br>');
+                        // Keep the first line in eBay's name span: the thank-you reads the
+                        // buyer's first name from it, and a plain line made it "Hello there".
+                        addressElement.innerHTML = lines.length
+                            ? `<span class="${CONFIG.classNames.addressFullname}">${lines[0]}<br></span>` + lines.slice(1).join('<br>')
+                            : '';
                         delete addressElement.dataset.savedBadgeHtml;
                         orderItemElement.classList.remove(CONFIG.classNames.isEditingAddress);
                         editBtn.textContent = 'Edit';
@@ -4777,6 +4802,26 @@
                         copyBtn.style.display = 'none';
                         editBtn.insertAdjacentHTML('afterend', `<span class="${CONFIG.classNames.cancelWrapper}">&nbsp;&nbsp;<button type="button" class="fake-link ${CONFIG.classNames.cancelAddressBtn}">Cancel</button></span>`);
                     }
+                }
+                if (target.classList.contains(CONFIG.classNames.fixAddressBtn)) {
+                    event.preventDefault(); event.stopPropagation();
+                    if (!addressElement || orderItemElement.classList.contains(CONFIG.classNames.isEditingAddress)) return;
+                    if (addressElement.dataset.preFixHtml) {
+                        addressElement.innerHTML = addressElement.dataset.preFixHtml;
+                        delete addressElement.dataset.preFixHtml;
+                        target.textContent = 'Fix';
+                    } else {
+                        const before = addressElement.innerHTML;
+                        const badgeEls = Array.from(addressElement.querySelectorAll(`.${CONFIG.classNames.addrWarningBadge}, .${CONFIG.classNames.addrOkBadge}`));
+                        badgeEls.forEach(b => b.remove());
+                        const lines = addressElement.innerText.split('\n').map(l => l.trim()).filter(l => l);
+                        const fix = normalizeAddressUnits(lines);
+                        if (!fix.changes.length) { addressElement.innerHTML = before; return; }
+                        writeAddressLines(addressElement, fix.lines, validateAddress(fix.lines), fix.changes);
+                        addressElement.dataset.preFixHtml = before;
+                        target.textContent = 'Undo fix';
+                    }
+                    refreshAddressBanner();
                 }
                 if (target.classList.contains(CONFIG.classNames.cancelAddressBtn)) {
                     event.preventDefault();
@@ -7741,6 +7786,99 @@
         return warnings;
     }
     // --- END ADDRESS INTEGRITY VALIDATION ---
+
+    // --- UNIT-LINE NORMALISER (v4.63) ---
+    // The three corrections Javier makes by hand, as a proposal he applies with
+    // one click (the card's "Fix" link), never silently:
+    //   1. a designator glued to its number:      "Apt98"            -> "Apt 98"
+    //   2. the unit on the street line:            "12 Main St Apt 98" -> "12 Main St" / "Apt 98"
+    //   3. the same unit or line typed twice:      "Apt 98" twice      -> once
+    // Everything else is kept exactly as the buyer typed it (case, dots, "#"),
+    // so a correct address is never "fixed" into a different one. US and Canada
+    // only, and only lines between the name and the City/State/ZIP line.
+    const ADDR_UNIT_RE = /(^|[\s,])(apartment|apt|unit|suite|ste|building|bldg|floor|fl|room|rm|lot|space|spc|trlr)(\.?)(\s*)(#?)(\s*)(\d[\w-]*|[A-Za-z]\d*)(?![\w])/gi;
+    const ADDR_HASH_RE = /(^|[\s,])#\s*(\d[\w-]*)(?![\w])/g;
+    const ADDR_CSZ_RE = [
+        /^(.+?)(?:,)?\s+([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/i,
+        /^(.+?)\s+([A-Z]{2})\s+([A-Z]\d[A-Z]\s?\d[A-Z]\d)$/i
+    ];
+    const ADDR_UNIT_CANON = { apartment: 'apt', suite: 'ste', building: 'bldg', floor: 'fl', room: 'rm', space: 'spc' };
+    function addrEsc(s) {
+        return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    }
+    function normalizeAddressUnits(lines) {
+        const changes = [];
+        if (!Array.isArray(lines) || lines.length < 3) return { lines: lines || [], changes };
+        const csz = lines.findIndex((l, i) => i > 0 && ADDR_CSZ_RE.some(re => re.test(l.trim())));
+        if (csz < 2) return { lines, changes };
+
+        const streets = [];   // { text, raw }
+        const units = [];     // { text, key, value }
+        const keyOf = (des, value) => `${ADDR_UNIT_CANON[des.toLowerCase()] || des.toLowerCase()}|${value.toUpperCase()}`;
+        const sameLine = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const addUnit = (text, key, value) => {
+            const dup = units.find(u => u.key === key || ((u.key.startsWith('#|') || key.startsWith('#|')) && u.value.toUpperCase() === value.toUpperCase()));
+            if (dup) {
+                // "#98" and "Apt 98" together: keep the one that says what it is.
+                if (dup.key.startsWith('#|') && !key.startsWith('#|')) {
+                    changes.push(`Removed duplicate "${dup.text}"`);
+                    Object.assign(dup, { text, key, value });
+                } else {
+                    changes.push(`Removed duplicate "${text}"`);
+                }
+                return;
+            }
+            units.push({ text, key, value });
+        };
+
+        for (const raw of lines.slice(1, csz)) {
+            const line = raw.replace(/\s+/g, ' ').trim();
+            const found = [];
+            let rest = line.replace(ADDR_UNIT_RE, (m, lead, des, dot, sp1, hash, sp2, value) => {
+                // Keep what the buyer typed; only add the missing space after the designator.
+                const glued = !sp1 && (hash || /^\d/.test(value));
+                const text = `${des}${dot}${glued || sp1 ? ' ' : ''}${hash}${hash && sp2 ? ' ' : ''}${value}`;
+                if (glued) changes.push(`"${des}${dot}${hash}${value}" → "${text}"`);
+                found.push({ text, key: keyOf(des, value), value });
+                return lead;
+            });
+            rest = rest.replace(ADDR_HASH_RE, (m, lead, value) => {
+                found.push({ text: m.trim().replace(/^,\s*/, ''), key: `#|${value.toUpperCase()}`, value });
+                return lead;
+            });
+            rest = rest.replace(/[\s,]+$/, '').replace(/^[\s,]+/, '').replace(/\s{2,}/g, ' ');
+
+            if (rest && found.length) found.forEach(u => changes.push(`Moved "${u.text}" to its own line`));
+            if (rest) {
+                // A bare number repeating a unit or a street number, or a whole line typed twice.
+                const bare = /^\d+$/.test(rest);
+                if (bare && (units.some(u => u.value === rest) || found.some(u => u.value === rest))) {
+                    changes.push(`Removed "${rest}", which repeats the unit number`);
+                } else if (bare && streets.some(st => st.text.split(' ')[0] === rest && st.text !== rest)) {
+                    changes.push(`Removed "${rest}", which repeats the street number`);
+                } else if (streets.some(st => sameLine(st.text) === sameLine(rest))) {
+                    changes.push(`Removed duplicate line "${rest}"`);
+                } else {
+                    streets.push({ text: rest });
+                }
+            }
+            found.forEach(u => addUnit(u.text, u.key, u.value));
+        }
+        // A bare number seen BEFORE its street line ("416577" then "416577 Flying Bridge").
+        for (let i = streets.length - 1; i >= 0; i--) {
+            const t = streets[i].text;
+            if (/^\d+$/.test(t) && streets.some(st => st !== streets[i] && st.text.split(' ')[0] === t)) {
+                changes.push(`Removed "${t}", which repeats the street number`);
+                streets.splice(i, 1);
+            }
+        }
+        if (!changes.length) return { lines, changes };
+        return {
+            lines: [lines[0], ...streets.map(s => s.text), ...units.map(u => u.text), ...lines.slice(csz)],
+            changes
+        };
+    }
+    // --- END UNIT-LINE NORMALISER ---
 
     // --- CUSTOM ENVELOPE FEATURE ---
     // Parses a free-form address block into structured fields.

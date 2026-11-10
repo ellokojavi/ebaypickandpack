@@ -1,5 +1,21 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.63
+- **Address check now catches the three things Javier fixes by hand**, and offers a one-click
+  **Fix** next to Edit / Copy:
+  - a unit glued to its number: `Apt98` → `Apt 98`;
+  - the unit on the street line: `12 Main St Apt 98` → `12 Main St` / `Apt 98` on its own line;
+  - the same unit or line typed twice (`Apt 98` twice, `#98` plus `Apt 98`, a bare `98`, or a
+    street line repeated) → kept once.
+  The ⚠ tooltip lists each proposed change as "Fixable: …". Nothing changes until you press Fix,
+  and **Undo fix** restores the original. Everything else stays as the buyer typed it: case,
+  dots and `#`. Only US and Canadian addresses are checked, and only the lines between the name
+  and the City/State/ZIP line. The fix changes the card and the printed envelope, not the
+  address on eBay.
+- Saving a hand-edited address now keeps the buyer's name where the thank-you reads it. Before
+  this, an edited card's message opened with "Hello there".
+- Fixed a crash in the address banner when a flagged card had no buyer name.
+
 ## v4.62
 - **The dated order note now goes through the eBay API too**, so a shipment opens no tabs at all
   when the Mini is reachable. Each order on a combined card gets its own note (the tab path only

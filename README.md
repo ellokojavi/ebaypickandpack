@@ -12,7 +12,7 @@ validated addresses, and shipping automation that tells you when it failed.
 
 | | |
 |---|---|
-| **Current version** | v4.62 (`20261109-v4.62-api-note`) |
+| **Current version** | v4.63 (`20261109-v4.63-address-fix`) |
 | **Size** | ~6,800 lines, one file |
 | **Runs on** | 7 eBay page patterns — see [Pages supported](#pages-supported) |
 | **Built for** | [Altheastix](https://www.ebay.com/str/altheastix), a one-person sticker shop shipping ~350 items a month |
@@ -236,6 +236,10 @@ address is linted against structural rules before it can be printed:
   skipped — too many valid formats to lint reliably.
 - One rule exists for an eBay quirk: a line after the name containing only
   digits means eBay split the street number from the street name, duplicating it.
+- **One-click Fix for unit lines** (v4.63): `Apt98` → `Apt 98`, a unit on the
+  street line moved to its own line, and a unit or line typed twice kept once.
+  The proposed changes show in the ⚠ tooltip; **Fix** applies them to the card
+  and the envelope, and **Undo fix** puts the original back.
 - **US addresses** get an explicit "United States" country line appended (eBay
   omits it for domestic orders) so printed addresses are complete; international
   orders keep eBay's own country line.
