@@ -1,5 +1,10 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.65
+- A failed USPS check is no longer re-requested every time eBay re-renders the card, which spent
+  one of the Mini's 150 daily checks each time. A page reload asks again. The tooltip now shows
+  Google's own reason after "Google answered 400".
+
 ## v4.64
 - **Each US address is now checked against USPS's delivery list**, through Google's Address
   Validation API on the Mini (needs the Mini login, like Ship via API). The ✔ / ⚠ tooltip gains a

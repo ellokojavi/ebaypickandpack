@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261109-v4.64-usps-check
+// @version      20261109-v4.65-usps-errors
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -6826,7 +6826,10 @@
         if (ppAddressCache.has(orderId)) return ppAddressCache.get(orderId);
         const r = await ppRequest('/pp/address', { order_id: orderId }, 30000);
         const res = (r.transport === 'ok' && r.http === 200 && r.data) ? r.data : null;
-        if (res && (res.status === 'ok' || res.status === 'warn')) ppAddressCache.set(orderId, res);
+        // Remember every answer for this page load, errors included: eBay
+        // re-renders cards often, and re-asking after an error spent a check
+        // from the Mini's daily allowance each time. A reload asks again.
+        if (res) ppAddressCache.set(orderId, res);
         return res;
     }
 

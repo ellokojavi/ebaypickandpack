@@ -12,7 +12,7 @@ validated addresses, and shipping automation that tells you when it failed.
 
 | | |
 |---|---|
-| **Current version** | v4.64 (`20261109-v4.64-usps-check`) |
+| **Current version** | v4.65 (`20261109-v4.65-usps-errors`) |
 | **Size** | ~6,800 lines, one file |
 | **Runs on** | 7 eBay page patterns — see [Pages supported](#pages-supported) |
 | **Built for** | [Altheastix](https://www.ebay.com/str/altheastix), a one-person sticker shop shipping ~350 items a month |
