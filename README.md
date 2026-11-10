@@ -12,7 +12,7 @@ validated addresses, and shipping automation that tells you when it failed.
 
 | | |
 |---|---|
-| **Current version** | v4.61 (`20261109-v4.61-always-note`) |
+| **Current version** | v4.62 (`20261109-v4.62-api-note`) |
 | **Size** | ~6,800 lines, one file |
 | **Runs on** | 7 eBay page patterns — see [Pages supported](#pages-supported) |
 | **Built for** | [Altheastix](https://www.ebay.com/str/altheastix), a one-person sticker shop shipping ~350 items a month |
@@ -298,10 +298,10 @@ tracking above `trackingOrderAmountThreshold`.
 
 ### Shipping automation
 
-- **eBay API first, tabs as the fallback** (since v4.57) — *Mark as Shipped* and the thank-you
-  message go through the eBay API via a small service on the shop's Mac Mini, reachable only on
+- **eBay API first, tabs as the fallback** (since v4.57) — *Mark as Shipped*, the thank-you
+  message and (since v4.62) the dated order note go through the eBay API via a small service on the shop's Mac Mini, reachable only on
   its private Tailscale network. The script never holds an eBay credential. A shipment the API
-  cannot confirm falls back to the tab; a message falls back **only** when nothing was sent, and
+  or note cannot confirm falls back to the tab; a message falls back **only** when nothing was sent, and
   an unconfirmed send is flagged on the card instead of being sent again. Switch it in
   *Defaults for all orders*. Without the Mini, everything below works exactly as before.
 - **Mark as Shipped** with optional auto-notes and thank-you messages. The

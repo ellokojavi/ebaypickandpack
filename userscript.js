@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261109-v4.61-always-note
+// @version      20261109-v4.62-api-note
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -4129,8 +4129,10 @@
                 // out — the one case where the note matters most.
                 // Every order gets its dated note, API or not (v4.61: v4.57
                 // skipped "Shipped on" after an API shipment; Javier wants it
-                // kept). It still goes through a background tab: the note
-                // has no API path yet.
+                // kept). Since v4.62 it is written through the Mini API, one
+                // note per order id on the card; any order the API could not
+                // note falls back to the background tab. A note replaces the
+                // previous one, so the fallback can never leave two.
                 if (orderItemElement.dataset.shipNoteSent !== '1') {
                     orderItemElement.dataset.shipNoteSent = '1';
                     const shipsTomorrow = !!(shipTomorrowCheckbox && shipTomorrowCheckbox.checked);
@@ -4141,12 +4143,23 @@
                         ? `Will be shipped on ${formattedDate}`
                         : `Shipped on ${formattedDate}`;
 
-                    await queueOrderNote(firstOrderId, noteText);
-                    openAutomationTab(`https://www.ebay.com/mesh/ord/details?orderid=${firstOrderId}&tm_action=add_note`, { active: false });
-
-                    const noteLink = orderItemElement.querySelector(`.${CONFIG.classNames.addNoteLink}[data-order-id="${firstOrderId}"]`);
-                    if (noteLink) {
-                        noteLink.textContent = 'note ✅';
+                    const tabNoteIds = [];
+                    for (const oid of orderIdString.split(',')) {
+                        const res = ppApiEnabled() ? await ppNote(oid, noteText) : { ok: false, why: 'API off' };
+                        SHIPDBG('order:api-note', { card: orderItemElement.id, ok: res.ok, why: res.why || '' });
+                        if (!res.ok) tabNoteIds.push(oid);
+                        const noteLink = orderItemElement.querySelector(`.${CONFIG.classNames.addNoteLink}[data-order-id="${oid}"]`);
+                        if (noteLink && res.ok) { noteLink.textContent = 'note ✅'; noteLink.title = `${noteText} · via API`; }
+                    }
+                    // The tab path has only ever noted the card's first order;
+                    // keep that when the API is off, and note every order the
+                    // API failed on when it is on.
+                    const tabTargets = ppApiEnabled() ? tabNoteIds : [firstOrderId];
+                    for (const oid of tabTargets) {
+                        await queueOrderNote(oid, noteText);
+                        openAutomationTab(`https://www.ebay.com/mesh/ord/details?orderid=${oid}&tm_action=add_note`, { active: false });
+                        const noteLink = orderItemElement.querySelector(`.${CONFIG.classNames.addNoteLink}[data-order-id="${oid}"]`);
+                        if (noteLink) noteLink.textContent = 'note ✅';
                     }
                 }
 
@@ -6716,6 +6729,13 @@
         if (r.http === 200 && (st === 'sent' || st === 'already_sent')) return { outcome: 'sent', status: st };
         if (r.http === 200 && st === 'failed') return { outcome: 'fallback', why: ppDescribe(r) };
         return { outcome: 'unknown', why: ppDescribe(r) };
+    }
+
+    async function ppNote(orderId, text) {
+        const r = await ppRequest('/pp/note', { order_id: orderId, text: text }, 60000);
+        // A note replaces itself, so anything short of a clear yes goes to the tab.
+        if (r.transport === 'ok' && r.http === 200 && r.data && r.data.status === 'noted') return { ok: true };
+        return { ok: false, why: ppDescribe(r) };
     }
 
     function msgSleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }

@@ -1,5 +1,12 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.62
+- **The dated order note now goes through the eBay API too**, so a shipment opens no tabs at all
+  when the Mini is reachable. Each order on a combined card gets its own note (the tab path only
+  ever noted the first). Any order the API cannot note falls back to the background tab; a note
+  replaces the previous one, so the fallback never leaves two. The +note link shows **note ✅**
+  either way, with "via API" in its tooltip when the API wrote it.
+
 ## v4.61
 - **Every shipped order gets its dated note again**, whichever route shipped it. v4.57 skipped the
   same-day "Shipped on" note after an API shipment, on the grounds that eBay records the ship
