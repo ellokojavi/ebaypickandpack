@@ -1,5 +1,13 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.67
+- **Fix and Edit → Save now re-check the corrected address against USPS.** The tooltip shows
+  "USPS: re-checking the corrected address…" and then the new answer, and a ⚠ that only came
+  from the old address clears. Only the street through City/State/ZIP is sent, never the
+  buyer's name. **Undo fix** restores the original answer.
+- Saving an edited address re-derives the ✔ / ⚠ badge from the edited lines instead of keeping
+  the old one, and the edited text is escaped before it is shown.
+
 ## v4.66
 - Wisconsin and northern Illinois **grid addresses** (`W140S7748 Main St`, `N52 W16632 Oak Ln`)
   are no longer flagged as "doesn't start with a house/building number".

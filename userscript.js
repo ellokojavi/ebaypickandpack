@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261109-v4.66-grid-addresses
+// @version      20261109-v4.67-recheck-after-fix
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -1680,7 +1680,9 @@
             const cn = CONFIG.classNames;
             const badge = warnings.length
                 ? `<span class="${cn.addrWarningBadge}">⚠<span class="${cn.addrWarningTooltip}">${warnings.map(w => `• ${addrEsc(w)}`).join('<br>')}</span></span>`
-                : `<span class="${cn.addrOkBadge}">✔<span class="${cn.addrOkTooltip}">Address fixed:<br>${fixedChanges.map(c => `• ${addrEsc(c)}`).join('<br>')}</span></span>`;
+                : `<span class="${cn.addrOkBadge}">✔<span class="${cn.addrOkTooltip}">${fixedChanges.length
+                    ? `Address fixed:<br>${fixedChanges.map(c => `• ${addrEsc(c)}`).join('<br>')}`
+                    : 'Address looks correct'}</span></span>`;
             const last = lines.length - 1;
             const isCountry = /^(united states|canada)$/i.test(lines[last] || '');
             addrEl.innerHTML = `<span class="${cn.addressFullname}">${addrEsc(lines[0])}${badge}<br></span>`
@@ -1695,6 +1697,33 @@
         async function applyUspsCheck(card, orderId) {
             const res = await ppAddress(orderId);
             if (!res || !card.isConnected) return;
+            card.dataset.uspsStatus = res.status || 'error';
+            card.dataset.uspsNotes = JSON.stringify(res.notes || []);
+            card.dataset.uspsSuggestion = JSON.stringify(res.suggestion || []);
+            paintUsps(card);
+        }
+        // Re-checks the address exactly as the card now shows it, after Fix or
+        // Edit (v4.67). Sends street to City/State/ZIP only: not the buyer's
+        // name, not the country line. US addresses only.
+        async function recheckCardAddress(card) {
+            const cn = CONFIG.classNames;
+            const addrEl = card.querySelector(`.${cn.addressContainer}`);
+            const oid = (card.dataset.orderId || '').split(',')[0];
+            if (!addrEl || !oid || !ppApiEnabled()) return;
+            const badges = addrEl.querySelectorAll(`.${cn.addrWarningBadge}, .${cn.addrOkBadge}`);
+            badges.forEach(b => b.style.display = 'none');
+            const lines = addrEl.innerText.split('\n').map(l => l.trim()).filter(l => l);
+            badges.forEach(b => b.style.display = '');
+            if (!/^united states$/i.test(lines[lines.length - 1] || '')) return;
+            const body = lines.slice(1, -1);
+            if (body.length < 2) return;
+            card.dataset.uspsStatus = 'checking';
+            card.dataset.uspsNotes = JSON.stringify(['re-checking the corrected address…']);
+            card.dataset.uspsSuggestion = '[]';
+            paintUsps(card);
+            const r = await ppRequest('/pp/address', { order_id: oid, lines: body }, 30000);
+            const res = (r.transport === 'ok' && r.http === 200 && r.data) ? r.data : { status: 'error', notes: [ppDescribe(r)] };
+            if (!card.isConnected) return;
             card.dataset.uspsStatus = res.status || 'error';
             card.dataset.uspsNotes = JSON.stringify(res.notes || []);
             card.dataset.uspsSuggestion = JSON.stringify(res.suggestion || []);
@@ -1719,7 +1748,7 @@
             tip.querySelectorAll('.usps-line').forEach(e => e.remove());
             const notes = JSON.parse(card.dataset.uspsNotes || '[]');
             const sugg = JSON.parse(card.dataset.uspsSuggestion || '[]');
-            const prefix = (status === 'ok' || status === 'warn') ? '' : 'USPS check skipped: ';
+            const prefix = (status === 'ok' || status === 'warn') ? '' : status === 'checking' ? 'USPS: ' : 'USPS check skipped: ';
             const line = document.createElement('span');
             line.className = 'usps-line';
             line.innerHTML = (tip.textContent.trim() ? '<br>' : '')
@@ -4807,18 +4836,16 @@
                         // by re-injecting it into the rebuilt first line, so editing the address never
                         // mutates or strips the status icon.
                         const inputs = Array.from(addressElement.querySelectorAll(`.${CONFIG.classNames.addressEditInput}`));
-                        const savedBadge = addressElement.dataset.savedBadgeHtml || '';
                         const lines = inputs.map(input => input.value.trim()).filter(line => line);
-                        if (lines.length > 0 && savedBadge) {
-                            // Re-attach badge to the end of the first line (name line), matching the
-                            // original layout where the badge sat next to the fullname.
-                            lines[0] = `${lines[0]} ${savedBadge}`;
+                        // Rebuilt like a Fix (v4.67): the name stays in eBay's span (the
+                        // thank-you reads it), the badge is re-derived from the edited
+                        // lines, and the edited address is re-checked against USPS.
+                        if (lines.length) {
+                            writeAddressLines(addressElement, lines, validateAddress(lines), []);
+                            recheckCardAddress(orderItemElement);
+                        } else {
+                            addressElement.innerHTML = '';
                         }
-                        // Keep the first line in eBay's name span: the thank-you reads the
-                        // buyer's first name from it, and a plain line made it "Hello there".
-                        addressElement.innerHTML = lines.length
-                            ? `<span class="${CONFIG.classNames.addressFullname}">${lines[0]}<br></span>` + lines.slice(1).join('<br>')
-                            : '';
                         delete addressElement.dataset.savedBadgeHtml;
                         orderItemElement.classList.remove(CONFIG.classNames.isEditingAddress);
                         editBtn.textContent = 'Edit';
@@ -4851,6 +4878,13 @@
                     if (addressElement.dataset.preFixHtml) {
                         addressElement.innerHTML = addressElement.dataset.preFixHtml;
                         delete addressElement.dataset.preFixHtml;
+                        // The restored HTML carries the original USPS line; match the data to it.
+                        const orig = ppAddressCache.get((orderItemElement.dataset.orderId || '').split(',')[0]);
+                        if (orig) {
+                            orderItemElement.dataset.uspsStatus = orig.status;
+                            orderItemElement.dataset.uspsNotes = JSON.stringify(orig.notes || []);
+                            orderItemElement.dataset.uspsSuggestion = JSON.stringify(orig.suggestion || []);
+                        }
                         target.textContent = 'Fix';
                     } else {
                         const before = addressElement.innerHTML;
@@ -4860,7 +4894,7 @@
                         const fix = normalizeAddressUnits(lines);
                         if (!fix.changes.length) { addressElement.innerHTML = before; return; }
                         writeAddressLines(addressElement, fix.lines, validateAddress(fix.lines), fix.changes);
-                        paintUsps(orderItemElement);
+                        recheckCardAddress(orderItemElement);
                         addressElement.dataset.preFixHtml = before;
                         target.textContent = 'Undo fix';
                     }
