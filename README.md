@@ -12,7 +12,7 @@ validated addresses, and shipping automation that tells you when it failed.
 
 | | |
 |---|---|
-| **Current version** | v4.63 (`20261109-v4.63-address-fix`) |
+| **Current version** | v4.64 (`20261109-v4.64-usps-check`) |
 | **Size** | ~6,800 lines, one file |
 | **Runs on** | 7 eBay page patterns — see [Pages supported](#pages-supported) |
 | **Built for** | [Altheastix](https://www.ebay.com/str/altheastix), a one-person sticker shop shipping ~350 items a month |
@@ -240,6 +240,10 @@ address is linted against structural rules before it can be printed:
   street line moved to its own line, and a unit or line typed twice kept once.
   The proposed changes show in the ⚠ tooltip; **Fix** applies them to the card
   and the envelope, and **Undo fix** puts the original back.
+- **USPS deliverability** (v4.64, needs the Mini): each US address is checked
+  against USPS's delivery list. The tooltip says whether it is deliverable,
+  missing an apartment number, or has the wrong ZIP, with USPS's own version
+  of the address when something is off. Read-only; nothing is changed for you.
 - **US addresses** get an explicit "United States" country line appended (eBay
   omits it for domestic orders) so printed addresses are complete; international
   orders keep eBay's own country line.

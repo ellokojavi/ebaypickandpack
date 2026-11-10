@@ -1,5 +1,15 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.64
+- **Each US address is now checked against USPS's delivery list**, through Google's Address
+  Validation API on the Mini (needs the Mini login, like Ship via API). The ✔ / ⚠ tooltip gains a
+  line: *USPS: deliverable*, *needs an apartment/unit number*, *apartment/unit not found*, *not
+  deliverable*, *ZIP should be …* or *marked vacant*. On a warning it also shows USPS's own
+  version of the address. A USPS warning turns ✔ into ⚠ and puts the order in the banner. Nothing
+  is changed automatically. Each order is checked once (cached on the Mini), and the Mini stops at
+  150 checks a day / 4,000 a month, inside Google's 5,000 free. Canada and other countries are
+  skipped.
+
 ## v4.63
 - **Address check now catches the three things Javier fixes by hand**, and offers a one-click
   **Fix** next to Edit / Copy:

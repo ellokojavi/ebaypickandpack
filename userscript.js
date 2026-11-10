@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261109-v4.63-address-fix
+// @version      20261109-v4.64-usps-check
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -1689,6 +1689,46 @@
                     : `${addrEsc(l)}<br>`).join('');
         }
 
+        // Adds the USPS answer to the card's address badge. A USPS warning turns
+        // a ✔ into ⚠ (and so into the banner); a pass only adds a line to the
+        // tooltip. Skipped or failed checks say why, and change nothing else.
+        async function applyUspsCheck(card, orderId) {
+            const res = await ppAddress(orderId);
+            if (!res || !card.isConnected) return;
+            card.dataset.uspsStatus = res.status || 'error';
+            card.dataset.uspsNotes = JSON.stringify(res.notes || []);
+            card.dataset.uspsSuggestion = JSON.stringify(res.suggestion || []);
+            paintUsps(card);
+        }
+        function paintUsps(card) {
+            const cn = CONFIG.classNames;
+            const status = card.dataset.uspsStatus;
+            const addrEl = card.querySelector(`.${cn.addressContainer}`);
+            if (!status || !addrEl) return;
+            let badge = addrEl.querySelector(`.${cn.addrWarningBadge}, .${cn.addrOkBadge}`);
+            if (!badge) return;
+            if (status === 'warn' && badge.classList.contains(cn.addrOkBadge)) {
+                const warn = document.createElement('span');
+                warn.className = cn.addrWarningBadge;
+                warn.innerHTML = `⚠<span class="${cn.addrWarningTooltip}"></span>`;
+                badge.replaceWith(warn);
+                badge = warn;
+            }
+            const tip = badge.querySelector(`.${cn.addrWarningTooltip}, .${cn.addrOkTooltip}`);
+            if (!tip) return;
+            tip.querySelectorAll('.usps-line').forEach(e => e.remove());
+            const notes = JSON.parse(card.dataset.uspsNotes || '[]');
+            const sugg = JSON.parse(card.dataset.uspsSuggestion || '[]');
+            const prefix = (status === 'ok' || status === 'warn') ? '' : 'USPS check skipped: ';
+            const line = document.createElement('span');
+            line.className = 'usps-line';
+            line.innerHTML = (tip.textContent.trim() ? '<br>' : '')
+                + notes.map(n => `• ${prefix}${addrEsc(n)}`).join('<br>')
+                + (sugg.length ? `<br>USPS version:<br>${sugg.map(addrEsc).join('<br>')}` : '');
+            tip.appendChild(line);
+            refreshAddressBanner();
+        }
+
         function readBuyerFullName(cardOrNameEl) {
             if (!cardOrNameEl) return '';
             const nameEl = cardOrNameEl.classList?.contains(CONFIG.classNames.addressFullname)
@@ -1755,6 +1795,8 @@
                     }
                 }
             }
+
+            if (allOrderIds && ppApiEnabled()) applyUspsCheck(orderItem, allOrderIds.split(',')[0]);
 
             // --- Append "United States" for domestic orders ---
             // eBay only renders a .print__address__country span for international
@@ -4818,6 +4860,7 @@
                         const fix = normalizeAddressUnits(lines);
                         if (!fix.changes.length) { addressElement.innerHTML = before; return; }
                         writeAddressLines(addressElement, fix.lines, validateAddress(fix.lines), fix.changes);
+                        paintUsps(orderItemElement);
                         addressElement.dataset.preFixHtml = before;
                         target.textContent = 'Undo fix';
                     }
@@ -6774,6 +6817,17 @@
         if (r.http === 200 && (st === 'sent' || st === 'already_sent')) return { outcome: 'sent', status: st };
         if (r.http === 200 && st === 'failed') return { outcome: 'fallback', why: ppDescribe(r) };
         return { outcome: 'unknown', why: ppDescribe(r) };
+    }
+
+    // USPS deliverability, via Google Address Validation on the Mini (v4.64).
+    // Read-only and cached per order on both ends, so a re-render costs nothing.
+    const ppAddressCache = new Map();
+    async function ppAddress(orderId) {
+        if (ppAddressCache.has(orderId)) return ppAddressCache.get(orderId);
+        const r = await ppRequest('/pp/address', { order_id: orderId }, 30000);
+        const res = (r.transport === 'ok' && r.http === 200 && r.data) ? r.data : null;
+        if (res && (res.status === 'ok' || res.status === 'warn')) ppAddressCache.set(orderId, res);
+        return res;
     }
 
     async function ppNote(orderId, text) {
