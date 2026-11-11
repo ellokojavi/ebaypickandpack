@@ -956,6 +956,8 @@ h1.title .lied { white-space: normal; }
 .valout ul { margin: 0; padding-left: 1.1em; }
 .valout li { margin-bottom: .35em; color: var(--ink-2); line-height: 1.5; }
 .valout .skip { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.valout .fixbtn { margin-top: .6rem; padding: .35rem .9rem; border: 1px solid var(--accent); border-radius: 6px; background: transparent; color: var(--accent); font: inherit; cursor: pointer; }
+.valout .fixbtn:hover { background: var(--accent); color: var(--ground); }
 .samples { display: flex; flex-wrap: wrap; gap: 6px; margin-top: .7rem; }
 .samples button {
   font-family: var(--mono); font-size: 10.5px;
@@ -1278,6 +1280,8 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
     <li><a href="#s-knows">How it knows</a></li>
     <li><a href="#s-dashboard">The tab as dashboard</a></li>
     <li><a href="#s-diagnostics">Diagnostics</a></li>
+    <li class="toc-group">Off the page</li>
+    <li><a href="#s-api">Through the eBay API</a></li>
     <li class="toc-group">Reference</li>
     <li><a href="#s-howiwork">How I work</a></li>
     <li><a href="#s-timeline">Timeline</a></li>
@@ -1519,7 +1523,7 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 
     <p class="lede">
       eBay tells me what sold, not which warehouse box the sticker is in, what envelope it needs,
-      or what I've already packed and marked as shipped. A 6,700-line Tampermonkey userscript
+      or what I've already packed and marked as shipped. An 8,100-line Tampermonkey userscript
       fixes that, and cut my daily order processing from 45 minutes to about 12.
     </p>
 
@@ -1528,7 +1532,7 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
       <span><b>10–15</b> orders a day</span>
       <span><b>~70%</b> less work</span>
       <span><b>45 → 12</b> min a day</span>
-      <span><b>1</b> userscript, <b>6,700+</b> lines</span>
+      <span><b>1</b> userscript, <b>8,100+</b> lines</span>
     </div>
 
     <nav class="quick" aria-label="Five-minute tour">
@@ -1906,6 +1910,7 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
       <div class="rule-row three"><b>Talking to buyers</b><span>Every shipped order gets a customised &ldquo;your order is on its way&rdquo; message; stock-outs get a kind, pre-canned ask to wait.</span><span class="tools">ChatGPT + Gemini + VS Code</span></div>
       <div class="rule-row three"><b>Talking to buyers v2</b><span>Sends verified against eBay, a retry that can never message twice, and the code moved into a GitHub repo that now handles versioning.</span><span class="tools">Claude Code + GitHub</span></div>
       <div class="rule-row three"><b>Destinations and envelopes</b><span>Canada visually separated from the US, and several envelope formats instead of one, each a versioned commit.</span><span class="tools">Claude Code + GitHub</span></div>
+      <div class="rule-row three"><b>Off the page</b><span>Shipping, thank-yous and order notes go through the eBay API from the shop's always-on Mac Mini, and every US address is checked against USPS. The tab automation became the fallback.</span><span class="tools">Claude Code + eBay API + Google Address Validation</span></div>
     </div>
   </div>
 </section>
@@ -2578,7 +2583,7 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
 <section class="pad-y" id="s-addresses" data-collapse>
   <div class="wrap">
     <div class="col" style="margin-bottom:2rem;">
-      <div class="eyebrow"><span class="v">v3.34–3.43</span> the address as data to be linted</div>
+      <div class="eyebrow"><span class="v">v3.34–4.68</span> the address as data to be linted</div>
       <h2 style="font-size:clamp(1.55rem,3.6vw,2.1rem);margin-bottom:1rem;">
         A stamped envelope is an expensive place to discover a bad address.
       </h2>
@@ -2594,11 +2599,37 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
       </p>
       <p>
         One rule exists for an eBay quirk: a line after the name containing only digits means eBay
-        split the street number from the street name, duplicating it.
+        split the street number from the street name, duplicating it. Another exists for
+        Wisconsin and northern Illinois, whose grid addresses (<span class="mono">W140S7748</span>)
+        start with a letter and are still a house number.
       </p>
+      <h3 style="font-size:1.15rem;margin:2rem 0 .8rem;">Fixing what buyers type</h3>
+      <p>
+        Three corrections I used to make by hand on almost every batch are now one click: a unit
+        glued to its number (<span class="mono">Apt98</span>), a unit on the street line instead of
+        its own, and the same unit typed twice. The ⚠ tooltip lists each change as
+        &ldquo;Fixable&rdquo;, and nothing changes until <b>Fix</b> is pressed. <b>Undo fix</b>
+        puts the buyer's version back. It changes the card and the envelope, never the address on
+        eBay.
+      </p>
+      <h3 style="font-size:1.15rem;margin:2rem 0 .8rem;">Does the address actually exist?</h3>
+      <p>
+        A well-formed address can still be undeliverable. Each US order is now checked against
+        USPS's own delivery list, through Google's Address Validation API on the Mac Mini (USPS's
+        own API went paid in August 2026). The tooltip says <i>deliverable</i>, <i>needs an
+        apartment number</i>, <i>not deliverable</i>, <i>ZIP should be &hellip;</i> or <i>marked
+        vacant</i>, and a USPS warning turns ✔ into ⚠.
+      </p>
+      <ul style="padding-left:1.15em;margin:1rem 0;">
+        <li style="margin-bottom:.4em;"><strong>Fix and Edit re-check.</strong> A corrected address is checked again straight away, so the badge describes what will be printed.</li>
+        <li style="margin-bottom:.4em;"><strong>Use USPS.</strong> When USPS's version really differs from the card, one click puts it on the card, unit on its own line. Its echo of the buyer's own address is never offered as a correction.</li>
+        <li style="margin-bottom:.4em;"><strong>Not every unknown unit is a problem.</strong> Small buildings often have no unit list at USPS and still get mail, so a unit USPS has never heard of, in a building it knows, stays ✔ when Google says to accept it.</li>
+        <li><strong>Cheap by construction.</strong> Only the street to the ZIP is sent, never the buyer's name. Each address is checked once and cached, and the Mini stops at 150 checks a day, inside Google's free 5,000 a month.</li>
+      </ul>
       <p class="note" style="margin-top:1.3rem;">
-        The real <span class="mono">validateAddress()</span> function, ported verbatim. Edit it, or
-        load a broken sample.
+        The real <span class="mono">validateAddress()</span> and
+        <span class="mono">normalizeAddressUnits()</span>, ported verbatim. Edit the address, load
+        a broken sample, or press Fix. The USPS check needs the Mini, so it is not in this demo.
       </p>
     </div>
 
@@ -2615,6 +2646,9 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
             <div class="samples">
               <button type="button" data-sample="good">valid US</button>
               <button type="button" data-sample="split">split street number</button>
+              <button type="button" data-sample="glued">unit glued + twice</button>
+              <button type="button" data-sample="hash"># and Apt</button>
+              <button type="button" data-sample="grid">WI grid address</button>
               <button type="button" data-sample="state">bad state code</button>
               <button type="button" data-sample="nozip">no city/state/ZIP</button>
               <button type="button" data-sample="pobox">PO Box</button>
@@ -2691,7 +2725,7 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
 <section class="pad-y" id="s-messages" data-collapse>
   <div class="wrap">
     <div class="col" style="margin-bottom:2rem;">
-      <div class="eyebrow"><span class="v">v4.15–4.23</span> what the buyer is told</div>
+      <div class="eyebrow"><span class="v">v4.15–4.60</span> what the buyer is told</div>
       <h2 style="font-size:clamp(1.55rem,3.6vw,2.1rem);margin-bottom:1rem;">
         A thank-you note that reads like a person wrote it, sent exactly once.
       </h2>
@@ -2789,6 +2823,14 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
         The draft is read and deleted separately, with the delete happening only once the text is
         in the box, so a failed attempt leaves the draft intact and Retry sends the same message
         rather than an empty one.
+      </p>
+      <p>
+        Since v4.57 the thank-you goes through the eBay API, with no tab and no stolen focus, and
+        this tab path is the fallback. The same rule decides when it may fall back: only when
+        nothing went out. A sent thank-you now leaves a green
+        <span class="mono">✉ Thanked 3:03 PM · API</span> line on the card, so a message that went
+        out no longer looks the same as one that was never tried.
+        <a href="#s-api">How the API path works &rarr;</a>
       </p>
     </div>
   </div>
@@ -3126,6 +3168,65 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
 
 <hr class="rule">
 
+<!-- ============================================================
+     THROUGH THE EBAY API
+     ============================================================ -->
+<section class="pad-y" id="s-api">
+  <div class="wrap">
+    <div class="col" style="margin-bottom:2rem;">
+      <div class="eyebrow"><span class="v">v4.57–4.62</span> off the page</div>
+      <h2 style="font-size:clamp(1.55rem,3.6vw,2.1rem);margin-bottom:1rem;">
+        When eBay opened its API, the tabs became the fallback.
+      </h2>
+      <p>
+        For years eBay would not give this shop a developer account, so every action above was a
+        browser tab the script drove by hand. In November 2026 eBay approved one. Marking shipped,
+        the thank-you and the dated order note now go through the eBay API, and a normal shipment
+        opens no tabs at all.
+      </p>
+      <p>
+        <strong>The browser never holds an eBay credential.</strong> A small service on the shop's
+        always-on Mac Mini holds them and makes the calls. The script logs in to the Mini once,
+        through a masked password dialog, and keeps only a session token in Tampermonkey storage,
+        which page scripts cannot read. The Mini answers only on the shop's private network, and
+        only to the script's header plus that token. Off the network, every request fails at the
+        door and the tabs take over.
+      </p>
+    </div>
+
+    <div class="rules">
+      <div class="rule-row three head"><span>Action</span><span>When eBay's answer is unclear</span><span class="tools">Why</span></div>
+      <div class="rule-row three"><b>Mark shipped</b><span>Falls back to the tab on anything short of a clear yes.</span><span class="tools">Marking an order shipped twice is harmless: the tab reads eBay's progress stepper first.</span></div>
+      <div class="rule-row three"><b>Thank-you</b><span>Falls back only when nothing went out. If eBay took it but the answer is unclear, the card says &ldquo;check the buyer conversation&rdquo; and <b>no tab opens</b>.</span><span class="tools">A buyer thanked twice is worse than one not thanked. The Mini also refuses a second thank-you for the same order.</span></div>
+      <div class="rule-row three"><b>Order note</b><span>Any failure falls back to the tab. Each order on a combined card gets its own note.</span><span class="tools">A note replaces the previous one, so a retry can never leave two.</span></div>
+    </div>
+
+    <div class="col" style="margin-top:2rem;">
+      <h3 style="font-size:1.15rem;margin-bottom:.8rem;">Confirming a send where it actually lands</h3>
+      <p>
+        The first live thank-you was accepted by eBay and never appeared in the Message API's
+        conversation list. Checking there would have read every unclear send as unsent and
+        invited a second message. The Mini now confirms an unclear send from the account's
+        <b>Sent</b> folder instead, which is where it actually is.
+      </p>
+      <h3 style="font-size:1.15rem;margin:2rem 0 .8rem;">Three ways to turn it off</h3>
+      <ul style="padding-left:1.15em;margin:1rem 0;">
+        <li style="margin-bottom:.4em;">A switch in <i>Defaults for all orders</i> turns the API path off for this browser.</li>
+        <li style="margin-bottom:.4em;">A log-out link ends the session on the Mini too, not just in the browser.</li>
+        <li>One file on the Mini stops every API action at once and sends everything back to the tabs.</li>
+      </ul>
+      <p>
+        Every action is written to a ledger on the Mini with the order id, the outcome and a hash
+        of the text, never the text itself. What the script sends to buyers, and when, stays my
+        decision, version by version. Speed was the reason for the API, but the fallback rules
+        were what made it safe to switch on.
+      </p>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
 
 <hr class="rule">
 
@@ -3156,8 +3257,8 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
         the design decisions, the scope and the order of work my own.
       </p>
       <p>
-        And I shipped small: 112 versions to a single user, me, each one the smallest change that
-        removed the day's most tedious step. That is how a print button became a 6,700-line
+        And I shipped small: 125 versions to a single user, me, each one the smallest change that
+        removed the day's most tedious step. That is how a print button became an 8,100-line
         pick-and-pack system without ever being planned as one.
       </p>
     </div>
@@ -3176,7 +3277,7 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
       </h2>
       <p>
         Layout first, then the data on the page, then the automation, then making the automation
-        honest.
+        honest, then moving it off the page.
       </p>
     </div>
 
@@ -3194,6 +3295,10 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
       <div class="rule-row"><b>4.29&ndash;4.36</b><span>Batch filters with counts and derived checkboxes; end-of-batch message rescue sweep.</span></div>
       <div class="rule-row"><b>4.37&ndash;4.38</b><span>Panel defaults persist and stop overwriting per-order choices.</span></div>
       <div class="rule-row"><b>4.39&ndash;4.45</b><span>Envelope geometry from one source of truth, the blank-second-page fix, and the tracked-label marker on SKU pills.</span></div>
+      <div class="rule-row"><b>4.46&ndash;4.50</b><span>Batch filters take the cheapest route to the same selection, measured: one eBay React commit costs 60&ndash;95ms however many cards it touches.</span></div>
+      <div class="rule-row"><b>4.51&ndash;4.56</b><span>Envelope history and the reprint warning; buyer names read without the badge's tooltip text.</span></div>
+      <div class="rule-row"><b>4.57&ndash;4.62</b><span>Ship, thank-you and order note through the eBay API via the Mac Mini; the tabs become the fallback; the Thanked line.</span></div>
+      <div class="rule-row"><b>4.63&ndash;4.68</b><span>One-click address fixes, the USPS deliverability check, re-checks after Fix, and Use USPS.</span></div>
     </div>
   </div>
 </section>
@@ -3220,6 +3325,7 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
       <button role="tab" aria-selected="false" data-ref="print">Printing</button>
       <button role="tab" aria-selected="false" data-ref="auto">Automation</button>
       <button role="tab" aria-selected="false" data-ref="msg">Messages</button>
+      <button role="tab" aria-selected="false" data-ref="api">eBay API</button>
       <button role="tab" aria-selected="false" data-ref="cfg">Config</button>
     </div>
 
@@ -3304,9 +3410,9 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
       <div>
         <h5>By the numbers</h5>
         <ul class="tnum">
-          <li>6,700+ lines, one userscript</li>
-          <li>112 versions</li>
-          <li>228 commits</li>
+          <li>8,100+ lines, one userscript</li>
+          <li>125 versions</li>
+          <li>293 commits</li>
           <li>7 eBay pages matched</li>
           <li>13 console diagnostics</li>
           <li>59 US + 13 CA region codes</li>
@@ -4062,7 +4168,10 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
 
     var streetLine = lines[1].trim();
     var isPOBox = /^p\.?o\.?\s*box\b/i.test(streetLine);
-    if (!isPOBox && !/^\d/.test(streetLine)) warnings.push("Street line doesn't start with a house/building number");
+    // Wisconsin and northern Illinois use grid numbers that start with a
+    // direction letter: "W140S7748 Main St", "N52 W16632 Oak Ln" (v4.66).
+    var isGridNumber = /^[NSEW]\d+\s?[NSEW]?\d*\b/i.test(streetLine);
+    if (!isPOBox && !isGridNumber && !/^\d/.test(streetLine)) warnings.push("Street line doesn't start with a house/building number");
 
     var bareNumberLine = lines.slice(1).find(function (l) { return /^\d+$/.test(l.trim()); });
     if (bareNumberLine) warnings.push('"' + bareNumberLine.trim() + '" is a number on its own line, so the street number may be duplicated');
@@ -4097,6 +4206,90 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
     return warnings;
   }
 
+  /* ==========================================================
+     UNIT FIX: ported verbatim from userscript.js (v4.63)
+     ========================================================== */
+    const ADDR_UNIT_RE = /(^|[\s,])(apartment|apt|unit|suite|ste|building|bldg|floor|fl|room|rm|lot|space|spc|trlr)(\.?)(\s*)(#?)(\s*)(\d[\w-]*|[A-Za-z]\d*)(?![\w])/gi;
+    const ADDR_HASH_RE = /(^|[\s,])#\s*(\d[\w-]*)(?![\w])/g;
+    const ADDR_CSZ_RE = [
+        /^(.+?)(?:,)?\s+([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/i,
+        /^(.+?)\s+([A-Z]{2})\s+([A-Z]\d[A-Z]\s?\d[A-Z]\d)$/i
+    ];
+    const ADDR_UNIT_CANON = { apartment: 'apt', suite: 'ste', building: 'bldg', floor: 'fl', room: 'rm', space: 'spc' };
+    function normalizeAddressUnits(lines) {
+        const changes = [];
+        if (!Array.isArray(lines) || lines.length < 3) return { lines: lines || [], changes };
+        const csz = lines.findIndex((l, i) => i > 0 && ADDR_CSZ_RE.some(re => re.test(l.trim())));
+        if (csz < 2) return { lines, changes };
+
+        const streets = [];   // { text, raw }
+        const units = [];     // { text, key, value }
+        const keyOf = (des, value) => `${ADDR_UNIT_CANON[des.toLowerCase()] || des.toLowerCase()}|${value.toUpperCase()}`;
+        const sameLine = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const addUnit = (text, key, value) => {
+            const dup = units.find(u => u.key === key || ((u.key.startsWith('#|') || key.startsWith('#|')) && u.value.toUpperCase() === value.toUpperCase()));
+            if (dup) {
+                // "#98" and "Apt 98" together: keep the one that says what it is.
+                if (dup.key.startsWith('#|') && !key.startsWith('#|')) {
+                    changes.push(`Removed duplicate "${dup.text}"`);
+                    Object.assign(dup, { text, key, value });
+                } else {
+                    changes.push(`Removed duplicate "${text}"`);
+                }
+                return;
+            }
+            units.push({ text, key, value });
+        };
+
+        for (const raw of lines.slice(1, csz)) {
+            const line = raw.replace(/\s+/g, ' ').trim();
+            const found = [];
+            let rest = line.replace(ADDR_UNIT_RE, (m, lead, des, dot, sp1, hash, sp2, value) => {
+                // Keep what the buyer typed; only add the missing space after the designator.
+                const glued = !sp1 && (hash || /^\d/.test(value));
+                const text = `${des}${dot}${glued || sp1 ? ' ' : ''}${hash}${hash && sp2 ? ' ' : ''}${value}`;
+                if (glued) changes.push(`"${des}${dot}${hash}${value}" → "${text}"`);
+                found.push({ text, key: keyOf(des, value), value });
+                return lead;
+            });
+            rest = rest.replace(ADDR_HASH_RE, (m, lead, value) => {
+                found.push({ text: m.trim().replace(/^,\s*/, ''), key: `#|${value.toUpperCase()}`, value });
+                return lead;
+            });
+            rest = rest.replace(/[\s,]+$/, '').replace(/^[\s,]+/, '').replace(/\s{2,}/g, ' ');
+
+            if (rest && found.length) found.forEach(u => changes.push(`Moved "${u.text}" to its own line`));
+            if (rest) {
+                // A bare number repeating a unit or a street number, or a whole line typed twice.
+                const bare = /^\d+$/.test(rest);
+                if (bare && (units.some(u => u.value === rest) || found.some(u => u.value === rest))) {
+                    changes.push(`Removed "${rest}", which repeats the unit number`);
+                } else if (bare && streets.some(st => st.text.split(' ')[0] === rest && st.text !== rest)) {
+                    changes.push(`Removed "${rest}", which repeats the street number`);
+                } else if (streets.some(st => sameLine(st.text) === sameLine(rest))) {
+                    changes.push(`Removed duplicate line "${rest}"`);
+                } else {
+                    streets.push({ text: rest });
+                }
+            }
+            found.forEach(u => addUnit(u.text, u.key, u.value));
+        }
+        // A bare number seen BEFORE its street line ("416577" then "416577 Flying Bridge").
+        for (let i = streets.length - 1; i >= 0; i--) {
+            const t = streets[i].text;
+            if (/^\d+$/.test(t) && streets.some(st => st !== streets[i] && st.text.split(' ')[0] === t)) {
+                changes.push(`Removed "${t}", which repeats the street number`);
+                streets.splice(i, 1);
+            }
+        }
+        if (!changes.length) return { lines, changes };
+        return {
+            lines: [lines[0], ...streets.map(s => s.text), ...units.map(u => u.text), ...lines.slice(csz)],
+            changes
+        };
+    }
+
+
   (function () {
     var ta = $("#addrin"), out = $("#addrout");
     if (!ta) return;
@@ -4109,7 +4302,10 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
       pobox:  "Sample Buyer A\nPO Box 4471\nAnn Arbor MI 48104",
       canada: "Sample Buyer H\n700 Example St\nToronto ON M5V 2T6\nCanada",
       cabad:  "Sample Buyer H\n700 Example St\nToronto ZZ M5V 2T6\nCanada",
-      intl:   "Sofia Marchetti\nVia Roma 14\n50123 Firenze\nItaly"
+      intl:   "Sofia Marchetti\nVia Roma 14\n50123 Firenze\nItaly",
+      glued:  "Sample Buyer E\n12 Example St Apt98\nApt 98\nSeattle WA 98101\nUnited States",
+      hash:   "Sample Buyer G\n500 Example Ave #4B\nApt 4B\nPortland OR 97205\nUnited States",
+      grid:   "Sample Buyer J\nW140S7748 Example Dr\nMuskego WI 53150\nUnited States"
     };
 
     function run() {
@@ -4118,6 +4314,8 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
       var skipped = !lines.some(function (l) { return /^canada$/i.test(l); }) &&
                     lines.some(function (l) { return isIntl.test(l); });
       var w = validateAddress(lines);
+      var fix = normalizeAddressUnits(lines);
+      w = w.concat(fix.changes.map(function (c) { return "Fixable: " + c; }));
 
       if (skipped) {
         out.innerHTML =
@@ -4133,7 +4331,10 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
       }
       out.innerHTML =
         '<div class="verdict fail"><span>⚠</span> ' + w.length + " issue" + (w.length > 1 ? "s" : "") + " found</div>" +
-        "<ul>" + w.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>";
+        "<ul>" + w.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" +
+        (fix.changes.length ? '<button type="button" class="fixbtn" id="addrfix">Fix</button>' : "");
+      var fb = $("#addrfix");
+      if (fb) fb.addEventListener("click", function () { ta.value = fix.lines.join("\n"); run(); });
     }
 
     ta.addEventListener("input", run);
@@ -4432,8 +4633,15 @@ section[data-collapse] .more-body > *:first-child { margin-top: 0; }
       ["cfg", "USER_CONFIG", "", "Return address, tracking threshold, load delay, dark-mode default, automation tab timeout, watch interval, the 40-colour palette and the header links."],
       ["cfg", "External config", "", "Thank-you drafts, delivery notes, quotes and quote keywords are pulled at runtime from a file in the repo, so messaging changes ship without touching the script. Falls back to built-in defaults if it can't load."],
       ["cfg", "Defaults that persist", "v4.37", "Thank-you, auto-send and ship date are stored and re-read on every rebuild; repaints seed only cards the script has never seen, so hand-set overrides survive."],
-      ["cfg", "Self-updating", "", "<code>@updateURL</code> and <code>@downloadURL</code> point at the repo, so Tampermonkey offers each new version. A launchd watcher commits and pushes local saves automatically."]
-    ];
+      ["cfg", "Self-updating", "", "<code>@updateURL</code> and <code>@downloadURL</code> point at the repo, so Tampermonkey offers each new version. A launchd watcher commits and pushes local saves automatically."],
+      ["api", "Ship via API", "v4.57", "Marks the order shipped through eBay's Fulfillment API from the Mac Mini. Anything short of a clear yes falls back to the tab, which reads eBay's stepper before it clicks."],
+      ["api", "Thank-you via API", "v4.57", "Sent through eBay's Message API with no tab and no stolen focus. Falls back only when nothing went out; an unclear send is confirmed from the Sent folder, never retried blind."],
+      ["api", "Order note via API", "v4.62", "The dated &ldquo;Shipped on&rdquo; / &ldquo;Will be shipped on&rdquo; note, written to every order on a combined card, the same note Seller Hub shows."],
+      ["api", "Mini login", "v4.57–4.59", "A masked password dialog; only a session token is kept, in Tampermonkey storage. Log out ends the session on the Mini as well as in the browser."],
+      ["msg", "Thanked line", "v4.60", "A green &ldquo;✉ Thanked 3:03 PM · API&rdquo; under ✓ Shipped, with a link to the order, for both the API and the tab route. Rebuilt when eBay re-renders the card."],
+      ["ui", "One-click address fix", "v4.63", "Splits <code>Apt98</code>, moves a unit onto its own line, drops a unit typed twice. Shown as &ldquo;Fixable&rdquo; under ⚠; nothing changes until Fix, and Undo restores it."],
+      ["ui", "USPS deliverability", "v4.64–4.68", "Each US address checked against USPS through Google's Address Validation API on the Mini, re-checked after Fix or Edit, with Use USPS when USPS's version differs. Never sends the buyer's name; 150 checks a day at most."],
+      ["print", "Print note", "v4.56", "&ldquo;Sent to printer&rdquo; appears beside Print Envelope the moment a job is handed off, not at the next repaint. The browser can't say whether the dialog was confirmed, and the tooltip says so."],    ];
 
     function render(cat) {
       grid.innerHTML = F.filter(function (f) { return cat === "all" || f[0] === cat; })
