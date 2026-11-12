@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v4.74-steady-dots
+// @version      20261111-v4.75-dev-channel
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -23,6 +23,8 @@
 // @connect      ebay.com
 // @connect      www.ebay.com
 // @connect      100.85.107.8
+// @connect      api.github.com
+// @connect      raw.githubusercontent.com
 // @grant        window.close
 // @require      https://raw.githubusercontent.com/ellokojavi/ebaypickandpack/main/altheastix-ebay-config.js
 // @updateURL    https://raw.githubusercontent.com/ellokojavi/ebaypickandpack/main/userscript.js
@@ -33,6 +35,61 @@
 
 (function() {
     'use strict';
+
+    // ===================================================================
+    // DEV CHANNEL (v4.75) -- test the newest push without reinstalling.
+    // A tab that holds sessionStorage 'pp-dev-channel' runs the latest commit
+    // on main instead of this installed copy: the commit is looked up through
+    // the GitHub API (raw.githubusercontent caches main for minutes), fetched
+    // at that exact commit, and run here with the same GM_* grants. Only that
+    // one tab is affected; every other tab, and tabs this script opens, run
+    // the installed copy. A dev badge (bottom left) names the commit and
+    // version. If anything fails the flag is dropped and the tab reloads on
+    // the installed copy, so a broken push cannot leave a dead page.
+    // Turn on:  sessionStorage.setItem('pp-dev-channel','1'); location.reload()
+    // Turn off: sessionStorage.removeItem('pp-dev-channel'); location.reload()
+    // ===================================================================
+    if (typeof PP_DEV_COPY === 'undefined') {
+        let ppDevFlag = null;
+        try { ppDevFlag = sessionStorage.getItem('pp-dev-channel'); } catch (e) {}
+        if (ppDevFlag) {
+            const PP_DEV_COPY = true; // the copy run below sees this through eval's scope, and runs normally
+            const devFail = (why) => {
+                console.error('[DEV channel] ' + why + ' -- falling back to the installed copy');
+                try { sessionStorage.removeItem('pp-dev-channel'); sessionStorage.setItem('pp-dev-last-error', why); } catch (e) {}
+                location.reload();
+            };
+            const get = (url, headers) => new Promise((ok, bad) => GM_xmlhttpRequest({
+                method: 'GET', url: url, headers: headers || {}, timeout: 20000, anonymous: true,
+                onload: r => r.status === 200 ? ok(r.responseText) : bad(new Error(url + ' answered ' + r.status)),
+                onerror: () => bad(new Error(url + ' unreachable')), ontimeout: () => bad(new Error(url + ' timed out'))
+            }));
+            (async () => {
+                let code, sha;
+                try {
+                    sha = (await get('https://api.github.com/repos/ellokojavi/ebaypickandpack/commits/main',
+                        { Accept: 'application/vnd.github.sha' })).trim();
+                    if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error('unexpected commit id');
+                    code = await get(`https://raw.githubusercontent.com/ellokojavi/ebaypickandpack/${sha}/userscript.js`);
+                } catch (e) { return devFail('fetch failed: ' + e.message); }
+                const version = (code.match(/@version\s+(\S+)/) || [])[1] || '?';
+                try { sessionStorage.setItem('pp-dev-loaded', JSON.stringify({ sha: sha, version: version, at: Date.now() })); } catch (e) {}
+                console.log('[DEV channel] running ' + version + ' at ' + sha.slice(0, 7));
+                const badge = () => {
+                    if (!document.body || document.getElementById('pp-dev-badge')) return;
+                    const b = document.createElement('div');
+                    b.id = 'pp-dev-badge';
+                    b.textContent = `DEV ${sha.slice(0, 7)} · ${version}`;
+                    b.title = 'This tab runs the newest commit, not the installed script. Turn off: sessionStorage.removeItem("pp-dev-channel") and reload.';
+                    b.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:2147483647;padding:3px 8px;border-radius:6px;font:11px/1.4 ui-monospace,monospace;background:#6a1b9a;color:#fff;opacity:.85;pointer-events:auto;';
+                    document.body.appendChild(b);
+                };
+                if (document.body) badge(); else document.addEventListener('DOMContentLoaded', badge);
+                try { eval(code); } catch (e) { devFail('the new copy threw: ' + (e && e.message)); }
+            })();
+            return;
+        }
+    }
 
     // Earnings state (v4.69/v4.70). Declared first on purpose: main() sets the
     // repaint hook early, and in v4.69 a declaration further down reset it to

@@ -1,5 +1,17 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.75
+- **Dev channel, for testing a push without reinstalling.** A tab that holds
+  `sessionStorage['pp-dev-channel']` runs the newest commit on `main` instead of the installed
+  copy: the commit is looked up through the GitHub API (raw links are cached for minutes) and
+  fetched at that exact commit. A purple badge, bottom left, names the commit and version. Only
+  that tab is affected; every other tab, and every tab the script opens, runs the installed copy.
+  If the fetch or the new copy fails, the flag is dropped and the tab reloads on the installed copy.
+  - On: `sessionStorage.setItem('pp-dev-channel','1'); location.reload()`
+  - Off: `sessionStorage.removeItem('pp-dev-channel'); location.reload()`
+- New `@connect` entries for `api.github.com` and `raw.githubusercontent.com`. Tampermonkey may
+  ask once to allow them.
+
 ## v4.74
 - **The loading dots no longer shake the line.** They used to grow in width four times a second,
   so a line near the edge kept wrapping and unwrapping. They now keep a fixed width and are revealed
