@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v4.89-focus-only
+// @version      20261111-v4.90-compact-multi-item
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -606,6 +606,21 @@
                 ${CONFIG.selectors.itemDetailsContainer} li:first-child { font-size: 1.5em !important; font-weight: bold; color: ${isDarkMode ? '#ffffff' : '#111'}; }
                 ${CONFIG.selectors.itemDetailsContainer} li:nth-child(2) { font-size: 1em !important; font-weight: normal; color: ${isDarkMode ? '#e0e0e0' : 'black'}; }
                 .${CONFIG.classNames.quantityMulti} { font-size: 1.5em !important; font-weight: bold; color: ${isDarkMode ? '#FFA500' : '#B45309'} !important; }
+                /* Compact rows for orders with 3+ items (v4.90, Javier). One line per item: small
+                   thumbnail (still click-to-zoom), SKU, quantity, the rest small, title cut to one
+                   line. An 11-item card went from 1,793px to about 750px. eBay's inner wrappers
+                   have scrambled class names, so they are targeted by position, not by name. */
+                ${CONFIG.selectors.orderItem}.pp-compact .item { padding: 3px 0 !important; margin: 0 !important; border-bottom: 1px solid rgba(128,128,128,.18); }
+                ${CONFIG.selectors.orderItem}.pp-compact .item:last-of-type { border-bottom: 0; }
+                ${CONFIG.selectors.orderItem}.pp-compact .item > div, ${CONFIG.selectors.orderItem}.pp-compact .item > div > div { padding: 0 !important; margin: 0 !important; display: flex; align-items: center; gap: 12px; width: 100%; }
+                ${CONFIG.selectors.orderItem}.pp-compact .item__image { width: 42px !important; height: 42px !important; }
+                ${CONFIG.selectors.orderItem}.pp-compact ${CONFIG.selectors.itemDescription} { display: flex !important; align-items: center; gap: 14px; max-width: none !important; min-width: 0 !important; font-size: 13px !important; padding: 0 !important; }
+                ${CONFIG.selectors.orderItem}.pp-compact ${CONFIG.selectors.itemDescription} h2 { order: 2; flex: 1 1 auto; min-width: 0; margin: 0 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px !important; font-weight: normal; }
+                ${CONFIG.selectors.orderItem}.pp-compact ${CONFIG.selectors.itemDetailsContainer} { order: 1; flex-direction: row !important; align-items: baseline; gap: 10px; min-width: 0 !important; flex-shrink: 0; margin: 0; padding: 0; }
+                ${CONFIG.selectors.orderItem}.pp-compact ${CONFIG.selectors.itemDetailsContainer} li { white-space: nowrap; font-size: 12px !important; }
+                ${CONFIG.selectors.orderItem}.pp-compact ${CONFIG.selectors.itemDetailsContainer} li:empty { display: none; }
+                ${CONFIG.selectors.orderItem}.pp-compact ${CONFIG.selectors.itemDetailsContainer} li:first-child { font-size: 17px !important; min-width: 120px; }
+                ${CONFIG.selectors.orderItem}.pp-compact ${CONFIG.selectors.itemDetailsContainer} li.${CONFIG.classNames.quantityMulti} { font-size: 15px !important; }
                 .${CONFIG.classNames.reviseLink} {
                     display: inline-block;
                     margin-left: 3px;
@@ -2405,6 +2420,8 @@
                     else if (text.toLowerCase().includes('lg')) hasLg = true;
                 }
             });
+            // Orders with 3+ items get one compact row per item (v4.90).
+            orderItem.classList.toggle('pp-compact', orderItem.querySelectorAll('.item').length >= 3);
             if (hasManila) orderItem.classList.add(CONFIG.classNames.highlightManila, CONFIG.classNames.borderManila);
             else if (hasLg) orderItem.classList.add(CONFIG.classNames.highlightLg, CONFIG.classNames.borderLg);
             else if (skuCount > 1) orderItem.classList.add(CONFIG.classNames.highlightMultiItem);

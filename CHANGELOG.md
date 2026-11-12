@@ -1,5 +1,14 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.90
+- **Compact rows for orders with 3 or more items.** Each item becomes one line:
+  - a small thumbnail, still click-to-zoom;
+  - the SKU in bold, then the quantity (a quantity above 1 stays highlighted);
+  - the other details small, and the title cut to one line.
+- An 11-item order card went from 1,793px to about 750px, so it now fits on one screen with its
+  Ship button. Orders with 1 or 2 items look the same as before.
+- Rollback point if needed: v4.89, commit 191db06.
+
 ## v4.89
 - **Checks for a new version only when you come back to the tab.** The 5-minute timer is gone: a
   new version only ever comes from a coding session, never while picking and packing, so checking
