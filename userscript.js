@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v4.92-compact-price-only
+// @version      20261111-v4.93-shipping-only-when-it-matters
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -2391,13 +2391,15 @@
                 const totalHTML = totalItemsPrice > USER_CONFIG.trackingOrderAmountThreshold
                     ? `<strong style="color: #000; background: #ffd54f; padding: 2px 6px; border-radius: 4px; font-weight: 700;" class="pp-total">Total: $${totalItemsPrice.toFixed(2)}</strong>`
                     : `<strong class="pp-total">Total: $${totalItemsPrice.toFixed(2)}</strong>`;
-                let shippingText = 'Free Shipping';
+                // Shipping is shown only when it matters (v4.93, Javier): when the buyer paid for it,
+                // or the order goes to Canada. "Free Shipping" on every card was noise.
+                let shippingText = '';
                 if (transactionCell.querySelector(CONFIG.selectors.buyerPaidService)?.innerText.trim() && !transactionCell.querySelector(CONFIG.selectors.buyerPaidService)?.innerText.trim().includes("$0.00")) {
                     const shippingCostMatch = transactionCell.querySelector(CONFIG.selectors.buyerPaidService)?.innerText.trim().match(/\$\d+\.\d{2}/);
                     if (shippingCostMatch) shippingText = `Shipping: <span style="font-weight: bold; color: red;">${shippingCostMatch[0]}</span>`;
                 }
-                if (orderItem.dataset.isCanadian === 'true') shippingText += ' 🇨🇦';
-                infoBlock.innerHTML = `<p>${orderIdContainer.innerHTML} │ ${totalHTML} │ ${shippingText}</p>`;
+                if (orderItem.dataset.isCanadian === 'true') shippingText = shippingText ? `${shippingText} 🇨🇦` : '🇨🇦 Canada';
+                infoBlock.innerHTML = `<p>${orderIdContainer.innerHTML} │ ${totalHTML}${shippingText ? ` │ ${shippingText}` : ''}</p>`;
                 tcellItem.insertBefore(infoBlock, tcellItem.firstChild);
                 transactionCell.style.display = 'none';
 

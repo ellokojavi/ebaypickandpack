@@ -1,5 +1,10 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.93
+- "│ Free Shipping" is gone from the order header. Shipping now shows only when it matters:
+  - **Shipping: $X** in red when the buyer paid for it;
+  - **🇨🇦 Canada** for a Canadian order with free shipping, or **Shipping: $X 🇨🇦** when paid.
+
 ## v4.92
 - Compact rows show the price alone, `$4.99` instead of `Sold for: $4.99`, which leaves more room
   for the title. Cards with 1 or 2 items are unchanged.
