@@ -1,5 +1,8 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.88
+- No functional change: a version bump to test reload-on-focus.
+
 ## v4.87
 - **Reload on focus, no buttons.** With *Always run the latest version* on, coming back to the bulk
   shipping tab checks for a new version at once. The Mini answers in about 0.3s. If there is one,
