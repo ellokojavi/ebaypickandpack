@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v4.70-profit-and-placement
+// @version      20261111-v4.71-packing-and-mini-offline
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -40,6 +40,12 @@
     const ppEarningsCache = new Map();
     const ppEarningsQueue = new Set();
     let ppEarningsTimer = null, ppEarningsError = '', ppEarningsOnUpdate = null, ppEconomics = null;
+    // Is the Mini answering? (v4.71) Set by every ppRequest: any HTTP answer
+    // means up, a connection error or timeout means down. While down, ship,
+    // message and note go straight to the tab fallback instead of waiting on
+    // a timeout per order, and a probe re-checks with backoff (30s -> 5 min).
+    // hooks: named repaint callbacks, replaced (not stacked) on each rebuild.
+    const ppMini = { down: false, since: 0, why: '', probeTimer: null, probeDelay: 30000, nextProbeAt: 0, hooks: {} };
 
     // ===================================================================
     // GLOBAL CONSTANTS & STORAGE KEYS
@@ -469,6 +475,8 @@
                 #pp-earn-total .pp-row { display: flex; justify-content: space-between; gap: 8px; }
                 #pp-earn-total strong { color: ${isDarkMode ? '#7ee2a8' : '#137333'}; }
                 #pp-earn-total .pp-earn-sub { font-size: 11px; color: ${isDarkMode ? '#8a8a8a' : '#777'}; }
+                #pp-earn-total .pp-earn-offline { color: ${isDarkMode ? '#d99e3c' : '#9a6a08'}; margin-top: 4px; }
+                #pp-earn-total .pp-earn-offline a { color: inherit; text-decoration: underline; cursor: pointer; }
                 .${CONFIG.classNames.shippingInfoBlock} ${CONFIG.selectors.uniqueOrderIdLink} { font-weight: bold; color: ${isDarkMode ? '#99ccff' : '#003087'}; }
                 .${CONFIG.classNames.buyerNoteCallout} { display: flex; align-items: flex-start; gap: 8px; margin: -2px 0 10px; padding: 8px 12px; border-radius: 8px; border-left: 3px solid ${isDarkMode ? '#c97d20' : '#f59e0b'}; background: ${isDarkMode ? 'rgba(255,179,71,0.08)' : '#fffbeb'}; font-size: 13px; line-height: 1.45; color: ${isDarkMode ? '#FFD580' : '#78350f'}; }
                 .${CONFIG.classNames.buyerNoteCallout} .buyer-note-icon { flex: 0 0 auto; font-size: 14px; line-height: 1.4; }
@@ -1741,18 +1749,23 @@
         // envelope, even when it carries combined orders. Tracked wins over
         // large, large over standard. Overridable in USER_CONFIG.postageEstimate.
         function postageFor(card) {
-            const cfg = Object.assign({ standard: 0.10, large: 0.25, tracked: 0.78 },
+            // Same figures as data/shipping-costs.json on the Mini, which sends
+            // them with the earnings; these defaults only cover a cold start.
+            const cfg = Object.assign({ standard: 0.10, large: 0.25, tracked: 0.78, packing: 0.15 },
+                (ppEconomics && ppEconomics.shipping) || {},
                 (typeof USER_CONFIG !== 'undefined' && USER_CONFIG.postageEstimate) || {});
-            if (card.dataset.shipsWithLabel === 'true') return { amount: cfg.tracked, kind: 'eBay tracked label (over $' + USER_CONFIG.trackingOrderAmountThreshold + ')' };
+            const out = (postage, kind) => ({ postage, packing: cfg.packing, amount: postage + cfg.packing, kind });
+            if (card.dataset.shipsWithLabel === 'true') return out(cfg.tracked, 'eBay tracked label (over $' + USER_CONFIG.trackingOrderAmountThreshold + ')');
             if (card.classList.contains(CONFIG.classNames.highlightManila) || card.classList.contains(CONFIG.classNames.highlightLg)) {
-                return { amount: cfg.large, kind: 'large envelope' };
+                return out(cfg.large, 'large envelope');
             }
-            return { amount: cfg.standard, kind: 'standard envelope' };
+            return out(cfg.standard, 'standard envelope');
         }
         function paintEarnings(card) {
             const total = card.querySelector(`.${CONFIG.classNames.shippingInfoBlock} .pp-total`);
             const ids = (card.dataset.orderId || '').split(',').filter(Boolean);
             if (!total || !ids.length) return;
+            if (!ppApiEnabled()) { card.querySelector('.pp-earn-wrap')?.remove(); return; }
             let wrap = card.querySelector(`.${CONFIG.classNames.shippingInfoBlock} .pp-earn-wrap`);
             if (!wrap) {
                 wrap = document.createElement('span');
@@ -1770,6 +1783,11 @@
             profSpan.textContent = '';
             const e = earningsFor(ids);
             span.classList.toggle('pp-earn-wait', e.state !== 'ok');
+            if (e.state === 'wait' && ppMini.down) {
+                span.textContent = 'Earn —';
+                span.title = ppMiniDownText() + '\nShipping and messages use tabs meanwhile. The figures fill in when it answers.';
+                return;
+            }
             if (e.state === 'wait') { span.textContent = 'Earn …'; span.title = 'Asking the Mini'; return; }
             if (e.state === 'unknown') { span.textContent = 'Earn ?'; span.title = 'Earnings unknown: ' + e.why; return; }
             const m = v => '$' + v.toFixed(2);
@@ -1781,7 +1799,8 @@
             profSpan.title = [
                 `Earnings ${m(e.earnings)}`,
                 `− ${m(e.stickerCost)} for ${e.stickers} sticker${e.stickers === 1 ? '' : 's'} at $${Number(ec.sticker_cost || 0).toFixed(4)} average cost`,
-                `− ${m(post.amount)} postage, ${post.kind}`,
+                `− ${m(post.postage)} postage, ${post.kind}`,
+                `− ${m(post.packing)} envelope and printing`,
                 `≈ Profit ${m(profit)}`,
                 '',
                 'Shop averages: sticker cost is measured over the trailing 12 months of print orders (' + (ec.sticker_cost_basis || '?') + ').',
@@ -1827,8 +1846,25 @@
             };
             row(`Earnings to ship (${n} order${n === 1 ? '' : 's'})`, total);
             row('Est. profit', profitSum);
+            if (ppMini.down) {
+                const off = document.createElement('div');
+                off.className = 'pp-earn-sub pp-earn-offline';
+                off.textContent = `⚠ Mini not responding${waiting ? ` · ${waiting} order${waiting === 1 ? '' : 's'} not loaded` : ''} · `;
+                const retry = document.createElement('a');
+                retry.href = '#';
+                retry.textContent = 'Retry now';
+                retry.addEventListener('click', async (ev) => {
+                    ev.preventDefault();
+                    retry.textContent = 'Checking…';
+                    if (!(await ppRetryMini())) renderEarningsTotal();
+                });
+                off.append(retry);
+                off.title = ppMiniDownText() + '\nShip, message and notes go through tabs until it answers.';
+                el.append(off);
+                waiting = 0;
+            }
             const note = [waiting ? `${waiting} loading` : '', unknown ? `${unknown} unknown` : '',
-                ppEarningsError ? '⚠ last request failed' : ''].filter(Boolean).join(' · ');
+                !ppMini.down && ppEarningsError ? '⚠ last request failed' : ''].filter(Boolean).join(' · ');
             if (note) {
                 const sub = document.createElement('div');
                 sub.className = 'pp-earn-sub';
@@ -1836,7 +1872,7 @@
                 el.append(sub);
             }
             el.title = `Buyers paid $${sales.toFixed(2)} for these ${n} orders (before tax); eBay keeps fees and General ad fees.\n` +
-                'Not included: Priority ad clicks.\nProfit = earnings − average sticker cost − postage per envelope ($0.10 standard, $0.25 large, $0.78 tracked). Hover a card for its breakdown.' +
+                'Not included: Priority ad clicks.\nProfit = earnings − average sticker cost − postage per envelope ($0.10 standard, $0.25 large, $0.78 tracked) − $0.15 envelope and printing. Hover a card for its breakdown.' +
                 (ppEarningsError ? `\n\nLast request failed: ${ppEarningsError}` : '');
         }
         ppEarningsOnUpdate = () => {
@@ -5597,8 +5633,24 @@
                         apiStatus.textContent = '';
                         let hasToken = false;
                         try { hasToken = !!GM_getValue(PP_TOKEN_KEY, ''); } catch (e) {}
+                        if (hasToken && ppApiEnabled() && ppMini.down) {
+                            const warn = document.createElement('span');
+                            warn.textContent = '⚠ Mini not responding, using tabs · ';
+                            warn.title = ppMiniDownText();
+                            warn.style.color = isDarkMode ? '#d99e3c' : '#9a6a08';
+                            const retry = document.createElement('a');
+                            retry.href = '#';
+                            retry.textContent = 'retry';
+                            retry.addEventListener('click', async (e) => {
+                                e.preventDefault();
+                                retry.textContent = 'checking…';
+                                await ppRetryMini();
+                                paintApiStatus();
+                            });
+                            apiStatus.append(warn, retry, ' · ');
+                        }
                         if (hasToken) {
-                            apiStatus.append(ppApiEnabled() ? 'logged in · ' : 'logged in, off, using tabs · ');
+                            if (!(ppApiEnabled() && ppMini.down)) apiStatus.append(ppApiEnabled() ? 'logged in · ' : 'logged in, off, using tabs · ');
                             const out = document.createElement('a');
                             out.href = '#';
                             out.textContent = 'log out';
@@ -5628,6 +5680,7 @@
                         apiStatus.appendChild(link);
                     };
                     paintApiStatus();
+                    ppMini.hooks.status = () => { if (apiStatus.isConnected) paintApiStatus(); };
                     cfgBody.appendChild(apiStatus);
                     apiRow.input.addEventListener('change', async (e) => {
                         const on = !!e.target.checked;
@@ -6938,6 +6991,7 @@
                     timeout: timeoutMs || 90000,
                     anonymous: true,
                     onload: r => {
+                        ppNoteMini(true);
                         let data = null;
                         try { data = JSON.parse(r.responseText); } catch (e) {}
                         if (r.status === 401 && path !== '/pp/login') {
@@ -6945,13 +6999,50 @@
                         }
                         resolve({ transport: 'ok', http: r.status, data: data });
                     },
-                    onerror: () => resolve({ transport: 'error' }),
-                    ontimeout: () => resolve({ transport: 'timeout' })
+                    onerror: () => { ppNoteMini(false, 'could not be reached'); resolve({ transport: 'error' }); },
+                    ontimeout: () => { ppNoteMini(false, 'did not answer in time'); resolve({ transport: 'timeout' }); }
                 });
             } catch (e) {
                 resolve({ transport: 'error' });
             }
         });
+    }
+    function ppNoteMini(up, why) {
+        const was = ppMini.down;
+        if (up) {
+            ppMini.down = false; ppMini.why = ''; ppMini.probeDelay = 30000;
+            clearTimeout(ppMini.probeTimer); ppMini.probeTimer = null;
+        } else {
+            if (!was) ppMini.since = Date.now();
+            ppMini.down = true; ppMini.why = why;
+            ppScheduleProbe();
+        }
+        if (was !== ppMini.down) {
+            console.log('[Mini]', ppMini.down ? `not responding (${why})` : 'back');
+            Object.values(ppMini.hooks).forEach(fn => { try { fn(); } catch (e) { console.error('[Mini] hook failed:', e); } });
+        }
+    }
+    function ppScheduleProbe() {
+        if (ppMini.probeTimer) return;
+        const delay = ppMini.probeDelay;
+        ppMini.nextProbeAt = Date.now() + delay;
+        ppMini.probeTimer = setTimeout(() => {
+            ppMini.probeTimer = null;
+            ppMini.probeDelay = Math.min(delay * 2, 300000);
+            ppRequest('/pp/status', {}, 10000);
+        }, delay);
+    }
+    // "Retry now": probe at once. Resolves true when the Mini answered.
+    async function ppRetryMini() {
+        clearTimeout(ppMini.probeTimer); ppMini.probeTimer = null; ppMini.probeDelay = 30000;
+        const r = await ppRequest('/pp/status', {}, 10000);
+        return r.transport === 'ok';
+    }
+    function ppMiniDownText() {
+        const mins = Math.max(0, Math.round((Date.now() - ppMini.since) / 60000));
+        const next = Math.max(0, Math.round((ppMini.nextProbeAt - Date.now()) / 1000));
+        return `The Mini ${ppMini.why || 'is not responding'}` + (mins ? ` (for ${mins} min)` : '') +
+            (ppMini.probeTimer ? `. Checking again in ${next < 60 ? next + 's' : Math.round(next / 60) + ' min'}.` : '.');
     }
     function ppDescribe(r) {
         if (r.transport === 'error') return 'the Mini could not be reached';
@@ -7035,6 +7126,8 @@
         try { GM_setValue(PP_TOKEN_KEY, ''); } catch (e) {}
     }
     async function ppShip(orderId) {
+        // Known down: nothing is sent, so the tab path is safe and saves a timeout per order.
+        if (ppMini.down) return { ok: false, why: ppMiniDownText() + ' Using tabs.' };
         const r = await ppRequest('/pp/ship', { order_id: orderId }, 90000);
         const st = r.data && r.data.status;
         if (r.transport === 'ok' && r.http === 200 && (st === 'shipped' || st === 'already_shipped')) {
@@ -7043,6 +7136,8 @@
         return { ok: false, why: ppDescribe(r) };
     }
     async function ppMessage(orderId, text) {
+        // Known down: the request is never made, so nothing went out and the tab may send it.
+        if (ppMini.down) return { outcome: 'fallback', why: ppMiniDownText() + ' Using tabs.' };
         const r = await ppRequest('/pp/message', { order_id: orderId, text: text }, 90000);
         const st = r.data && r.data.status;
         // The request may have been processed: never resend through a tab.
@@ -7059,6 +7154,7 @@
     const ppAddressCache = new Map();
     async function ppAddress(orderId) {
         if (ppAddressCache.has(orderId)) return ppAddressCache.get(orderId);
+        if (ppMini.down) return null; // no badge change; the card's own layout check still shows
         const r = await ppRequest('/pp/address', { order_id: orderId }, 30000);
         const res = (r.transport === 'ok' && r.http === 200 && r.data) ? r.data : null;
         // Remember every answer for this page load, errors included: eBay
@@ -7078,11 +7174,15 @@
         ppEarningsTimer = setTimeout(ppFlushEarnings, 400);
     }
     async function ppFlushEarnings() {
-        const ids = Array.from(ppEarningsQueue);
+        const ids = Array.from(ppEarningsQueue).filter(id => !ppEarningsCache.has(id));
         ppEarningsQueue.clear();
+        if (ppMini.down) { ids.forEach(id => ppEarningsQueue.add(id)); if (ppEarningsOnUpdate) ppEarningsOnUpdate(); return; }
         for (let i = 0; i < ids.length; i += 100) {
-            const r = await ppRequest('/pp/earnings', { order_ids: ids.slice(i, i + 100) }, 60000);
-            const d = r.transport === 'ok' && r.http === 200 ? r.data : null;
+            const batch = ids.slice(i, i + 100);
+            const r = await ppRequest('/pp/earnings', { order_ids: batch }, 20000);
+            // Unreachable or slow: keep the ids, the Mini-back hook asks again.
+            if (r.transport !== 'ok') { ids.slice(i).forEach(id => ppEarningsQueue.add(id)); ppEarningsError = ppDescribe(r); break; }
+            const d = r.http === 200 ? r.data : null;
             if (d && d.orders) {
                 Object.entries(d.orders).forEach(([id, v]) => ppEarningsCache.set(id, v));
                 if (d.economics) ppEconomics = d.economics;
@@ -7093,8 +7193,13 @@
         }
         if (ppEarningsOnUpdate) ppEarningsOnUpdate();
     }
+    ppMini.hooks.earnings = () => {
+        if (!ppMini.down && ppEarningsQueue.size) ppFlushEarnings();
+        else if (ppEarningsOnUpdate) ppEarningsOnUpdate();
+    };
 
     async function ppNote(orderId, text) {
+        if (ppMini.down) return { ok: false, why: ppMiniDownText() + ' Using tabs.' };
         const r = await ppRequest('/pp/note', { order_id: orderId, text: text }, 60000);
         // A note replaces itself, so anything short of a clear yes goes to the tab.
         if (r.transport === 'ok' && r.http === 200 && r.data && r.data.status === 'noted') return { ok: true };

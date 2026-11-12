@@ -1,5 +1,18 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.71
+- **Profit now includes $0.15 per envelope** for the envelope and printing, on top of postage
+  ($0.10 standard, $0.25 large, $0.78 tracked). The Mini sends these figures with the earnings
+  (one copy, `data/shipping-costs.json`); the script's own copy only covers a cold start.
+- **When the Mini does not answer**, the page says so instead of waiting:
+  - cards show `Earn —`, and the SKU panel shows **⚠ Mini not responding** with **Retry now**;
+  - the Defaults panel reads *Mini not responding, using tabs · retry*;
+  - ship, thank-you and order notes go **straight to the tab fallback** while it is down, instead
+    of waiting out a timeout on every order. Nothing is sent to the Mini, so nothing can be sent twice;
+  - the script checks again by itself (30 s, then doubling to every 5 min) and fills in the
+    missing figures as soon as it answers.
+- Earnings requests time out after 20 s instead of 60 s.
+
 ## v4.70
 - **The per-card figures now show.** v4.69 painted only the total: a declaration lower in the
   script reset the repaint hook after the page had set it.
