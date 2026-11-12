@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v4.95-balanced-pipe-fix
+// @version      20261111-v4.96-rounded-corners
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -1171,12 +1171,15 @@
             const configPanel = document.getElementById('altheastix-config-container');
             if (!skuPanel) return;
             skuPanel.style.maxHeight = 'none';
-            skuPanel.style.overflowY = 'visible';
+            // 'clip', not 'visible': it trims the title bar to the panel's rounded corners (which
+            // 'visible' stopped doing in v4.82, leaving square corners), without the scrollbar or
+            // cut-off content of the old 'auto'. The panel grows to its content, so nothing is cut.
+            skuPanel.style.overflow = 'clip';
             skuPanel.style.position = '';
             // The stylesheet animates `top` over 0.3s; driven by scroll, that lags behind the page.
             skuPanel.style.transition = 'none';
             if (configPanel) {
-                configPanel.style.maxHeight = 'none'; configPanel.style.overflowY = 'visible'; configPanel.style.position = '';
+                configPanel.style.maxHeight = 'none'; configPanel.style.overflow = 'clip'; configPanel.style.position = '';
                 configPanel.style.transition = 'none';
             }
             const skuH = skuPanel.scrollHeight;

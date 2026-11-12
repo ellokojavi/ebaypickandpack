@@ -1,5 +1,10 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.96
+- The SKU panel's title bar has rounded corners again. Since v4.82 the panel no longer trimmed its
+  contents, so the lighter title bar showed square corners over the panel's rounded ones. The panels
+  now trim to their rounded corners, still without a scrollbar or anything cut off.
+
 ## v4.95
 - Fix for v4.94: the gap before the pipe was still 16px. eBay's span around the order links adds
   its own 8px margin, which is now removed, so it is 8px on each side.
