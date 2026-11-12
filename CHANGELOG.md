@@ -1,5 +1,9 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.03
+- **Bigger thumbnails in compact rows.** Orders with 3+ items show each sticker at 63px
+  instead of 42px (+50%), so the design is readable at a glance while picking.
+
 ## v5.02
 - **Profit and filled-in SKUs come first.** The USPS address checks go out one at a time (~0.7s
   each), so on a 42-order page they held the profit and SKU answers back about 30 seconds. They now

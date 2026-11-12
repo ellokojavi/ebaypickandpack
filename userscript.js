@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v5.02-profit-before-address
+// @version      20261112-v5.03-bigger-compact-thumbs
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -628,7 +628,7 @@
                 ${CONFIG.selectors.orderItem}.pp-compact .item { padding: 3px 0 !important; margin: 0 !important; border-bottom: 1px solid rgba(128,128,128,.18); }
                 ${CONFIG.selectors.orderItem}.pp-compact .item.pp-last-item { border-bottom: 0; }
                 ${CONFIG.selectors.orderItem}.pp-compact .item > div, ${CONFIG.selectors.orderItem}.pp-compact .item > div > div { padding: 0 !important; margin: 0 !important; display: flex; align-items: center; gap: 12px; width: 100%; }
-                ${CONFIG.selectors.orderItem}.pp-compact .item__image { width: 42px !important; height: 42px !important; }
+                ${CONFIG.selectors.orderItem}.pp-compact .item__image { width: 63px !important; height: 63px !important; } /* 42px until v5.03 (Javier: too small to read while picking) */
                 ${CONFIG.selectors.orderItem}.pp-compact ${CONFIG.selectors.itemDescription} { display: flex !important; align-items: center; gap: 14px; max-width: none !important; min-width: 0 !important; font-size: 13px !important; padding: 0 !important; }
                 ${CONFIG.selectors.orderItem}.pp-compact ${CONFIG.selectors.itemDescription} h2 { order: 2; flex: 1 1 auto; min-width: 0; margin: 0 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px !important; font-weight: normal; }
                 ${CONFIG.selectors.orderItem}.pp-compact ${CONFIG.selectors.itemDetailsContainer} { order: 1; flex-direction: row !important; align-items: baseline; gap: 10px; min-width: 0 !important; flex-shrink: 0; margin: 0; padding: 0; }
