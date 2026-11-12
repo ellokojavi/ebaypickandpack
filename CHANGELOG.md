@@ -1,5 +1,10 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.80
+- **update now** link under *Always run the latest version*. One click checks GitHub at once,
+  skipping the 5-minute wait. If a newer version is there it says "v4.xx found, reloading…" and
+  reloads the page by itself; otherwise "up to date". Switching the setting on does the same.
+
 ## v4.79
 - The profit total moved to the top of the SKU panel. It now reads **Est. profit: $X**,
   right-aligned on the "checked just now" line, in green at that line's size. The box at the

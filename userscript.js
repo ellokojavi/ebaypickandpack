@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v4.79-profit-in-header
+// @version      20261111-v4.80-update-now
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -5883,11 +5883,39 @@
                     cfgBody.appendChild(autoRow.row);
                     const autoStatus = document.createElement('div');
                     autoStatus.style.cssText = `font-size: 11px; margin: 2px 0 0 46px; color: ${isDarkMode ? '#999' : '#777'};`;
+                    const short = v => (String(v).match(/v\d+\.\d+/) || [v])[0];
+                    // "update now" (v4.80, Javier): check GitHub at once, skipping the 5-minute
+                    // wait, and reload by itself when a newer version is there.
                     const paintAuto = (note) => {
                         const r = PP_RUNNING_NOW;
-                        const short = v => (String(v).match(/v\d+\.\d+/) || [v])[0];
                         autoStatus.textContent = (r.source === 'installed' ? `running installed ${short(r.version)}`
                             : `running ${short(r.version)} from GitHub (${r.sha.slice(0, 7)})`) + (note ? ' · ' + note : '');
+                        if (!note && autoRow.input.checked) {
+                            const link = document.createElement('a');
+                            link.href = '#';
+                            link.textContent = 'update now';
+                            link.title = 'Check GitHub now and reload if there is a newer version';
+                            link.addEventListener('click', (ev) => { ev.preventDefault(); updateNow(); });
+                            autoStatus.append(' · ', link);
+                        }
+                    };
+                    const updateNow = async () => {
+                        autoStatus.textContent = '';
+                        autoStatus.append(...ppLoadingNodes('checking GitHub'));
+                        try {
+                            const c = await ppRefreshLatest();
+                            let bad = null;
+                            try { bad = GM_getValue(PP_BAD_KEY, null); } catch (err) {}
+                            if (ppVersionNum(c.version) <= ppVersionNum(PP_RUNNING_NOW.version)) {
+                                paintAuto('up to date');
+                                setTimeout(() => paintAuto(), 4000);
+                            } else if (bad === c.sha) {
+                                paintAuto(`${short(c.version)} failed to start before, so it is skipped`);
+                            } else {
+                                paintAuto(`${short(c.version)} found, reloading…`);
+                                setTimeout(() => location.reload(), 700);
+                            }
+                        } catch (err) { paintAuto('could not reach GitHub: ' + err.message); }
                     };
                     paintAuto();
                     cfgBody.appendChild(autoStatus);
@@ -5896,12 +5924,7 @@
                         try { GM_setValue(PP_AUTO_KEY, on); } catch (err) {}
                         CFGDBG('autoLatest:set', on);
                         if (!on) { paintAuto('off: reload to run the installed copy'); return; }
-                        paintAuto('checking GitHub…');
-                        try {
-                            const c = await ppRefreshLatest();
-                            paintAuto(ppVersionNum(c.version) > ppVersionNum(PP_RUNNING_NOW.version)
-                                ? `${(c.version.match(/v\d+\.\d+/) || [c.version])[0]} ready: reload to use it` : 'up to date');
-                        } catch (err) { paintAuto('could not reach GitHub: ' + err.message); }
+                        updateNow();
                     });
                 }
 
