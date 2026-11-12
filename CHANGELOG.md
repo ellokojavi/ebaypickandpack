@@ -1,5 +1,11 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.78
+- **The Defaults panel no longer falls off the bottom of the screen** when the SKU list is long.
+  The left column is now laid out as a whole. If both panels fit, nothing changes. If not, the
+  Defaults panel keeps its full height up to about 45% of the column (scrolling beyond that), and
+  the SKU list scrolls inside its own box. Expanding or collapsing Defaults re-lays it out.
+
 ## v4.77
 - **Always run the latest version** switch in the Defaults panel. When on, every page runs the
   newest version from GitHub, so a new version arrives on the next reload without pasting.

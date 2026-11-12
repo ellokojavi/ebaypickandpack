@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v4.77-auto-latest
+// @version      20261111-v4.78-fit-left-column
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -1134,6 +1134,39 @@
             `;
         }
 
+        // The left column (SKU panel, then the Defaults panel under it) must fit in the window.
+        // Before v4.78 the Defaults panel was simply placed under the SKU panel, so with a long
+        // SKU list it sat below the bottom of the screen and could not be reached (Javier, Nov 11
+        // 2026). Now: if both fit, nothing changes. If not, the Defaults panel keeps its full
+        // height up to ~45% of the column and scrolls beyond that, and the SKU list gets the rest
+        // and scrolls inside its own box. Heights are read from scrollHeight, which is the full
+        // content height whatever cap is set, so measuring never needs the caps removed.
+        function layoutLeftColumn(skuTop) {
+            const skuPanel = document.getElementById(CONFIG.ids.skuPanelContainer);
+            const configPanel = document.getElementById('altheastix-config-container');
+            if (!skuPanel) return;
+            const gap = 12, bottom = 12;
+            const avail = window.innerHeight - skuTop - bottom;
+            const skuNat = skuPanel.scrollHeight;
+            if (!configPanel) { skuPanel.style.maxHeight = `${avail}px`; return; }
+            const cfgNat = configPanel.scrollHeight;
+            let skuMax = skuNat, cfgMax = cfgNat;
+            if (skuNat + gap + cfgNat > avail) {
+                cfgMax = Math.min(cfgNat, Math.max(Math.round(avail * 0.45), 60));
+                skuMax = Math.max(avail - gap - cfgMax, 160);
+                cfgMax = Math.max(Math.min(cfgNat, avail - gap - skuMax), 48);
+            }
+            skuPanel.style.maxHeight = `${skuMax}px`;
+            configPanel.style.maxHeight = `${cfgMax}px`;
+            configPanel.style.overflowY = cfgNat > cfgMax ? 'auto' : '';
+            configPanel.style.top = `${skuTop + Math.min(skuNat, skuMax) + gap}px`;
+            if (!configPanel.ppResizeWatched && typeof ResizeObserver !== 'undefined') {
+                // Expanding or collapsing the Defaults panel changes its height: lay out again.
+                configPanel.ppResizeWatched = true;
+                new ResizeObserver(() => { try { layoutLeftColumn(parseInt(skuPanel.style.top) || 110); } catch (e) {} }).observe(configPanel.firstElementChild || configPanel);
+            }
+        }
+
         function updateSkuPanelPosition() {
             const skuPanel = document.getElementById(CONFIG.ids.skuPanelContainer);
             const configPanel = document.getElementById('altheastix-config-container');
@@ -1145,11 +1178,8 @@
             const newLeft = ordersContainerLeft - skuPanelWidth - gap;
             const leftPos = Math.max(20, newLeft);
             skuPanel.style.left = `${leftPos}px`;
-            if (configPanel) {
-                configPanel.style.left = `${leftPos}px`;
-                const skuPanelTopNum = parseInt(skuPanel.style.top) || 110;
-                configPanel.style.top = `${skuPanelTopNum + skuPanel.offsetHeight + 12}px`;
-            }
+            if (configPanel) configPanel.style.left = `${leftPos}px`;
+            layoutLeftColumn(parseInt(skuPanel.style.top) || 110);
             const scrollTopBtn = document.getElementById('altheastix-scroll-top-btn');
             if (scrollTopBtn) {
                 scrollTopBtn.style.left = `${ordersContainer.getBoundingClientRect().right + 8}px`;
@@ -1174,7 +1204,7 @@
             const skuPanelTop = headerRect.bottom < 0 ? 20 : 110;
             skuPanel.style.top = `${skuPanelTop}px`;
             if (configPanel) {
-                configPanel.style.top = `${skuPanelTop + skuPanel.offsetHeight + 12}px`;
+                layoutLeftColumn(skuPanelTop);
             }
 
             const scrollTopBtn = document.getElementById('altheastix-scroll-top-btn');
