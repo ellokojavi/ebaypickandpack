@@ -1,5 +1,8 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.86
+- No functional change: a version bump to test that an open bulk page reloads by itself when idle.
+
 ## v4.85
 - **Auto-reload.** With *Always run the latest version* on, the bulk shipping page asks the Mini
   every **5 seconds** whether there is a new version. The Mini asks GitHub's git server, at most
