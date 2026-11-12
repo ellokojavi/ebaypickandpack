@@ -4719,7 +4719,15 @@
             // 2026-08-23) the wall-clock cost was ~29s each — eBay confirms in
             // 23–31s and the inter-order pause and tab teardown add the rest.
             // The old 20s estimate under-promised a 10-order run by ~40%.
-            const mins = Math.max(1, Math.round((cards.length * 30) / 60));
+            // v5.04: that 30s is the TAB path. Through the Mini API (v4.57+)
+            // the Mini's ledger shows consecutive batch shipments 6-7s apart
+            // (20 of 22 gaps, Nov 9-12 2026), ship + note + thank-you included,
+            // so 8s/order. Tabs stay at 30s when the API is off or the Mini is down.
+            const viaApi = ppApiEnabled() && !ppMini.down;
+            const secsEach = viaApi ? 8 : 30;
+            const totalSecs = cards.length * secsEach;
+            const timeText = totalSecs < 60 ? `~${Math.max(5, Math.round(totalSecs / 5) * 5)}s`
+                : `~${Math.round(totalSecs / 60)} min`;
 
             const overlay = document.createElement('div');
             overlay.className = 'canned-modal-overlay';
@@ -4737,7 +4745,7 @@
                 ['Thank-you messages', withMsg],
                 ['"Will be shipped on" notes', withNote],
                 ['"Shipped on" notes', withShippedNote],
-                ['Rough time, one at a time', `~${mins} min`]
+                [viaApi ? 'Rough time via Mini API (~8s each)' : 'Rough time via eBay tabs (~30s each)', timeText]
             ].forEach(([label, value]) => {
                 const li = document.createElement('li');
                 const l = document.createElement('span');
@@ -4749,10 +4757,15 @@
             });
             content.appendChild(list);
 
-            if (withMsg > 0) {
+            if (viaApi) {
+                const info = document.createElement('p');
+                info.className = 'ship-confirm-warn';
+                info.textContent = 'Shipping, notes and thank-yous go through the Mini API: no tabs open and the browser stays usable. An order the API cannot finish falls back to eBay tabs, which take about 30s each.';
+                content.appendChild(info);
+            } else if (withMsg > 0) {
                 const warn = document.createElement('p');
                 warn.className = 'ship-confirm-warn';
-                warn.textContent = `${withMsg} message tab${withMsg === 1 ? '' : 's'} will open in the foreground and take focus as they go, so the browser won't be usable during the run. Turn off "Send thank you msg" in Configuration to keep everything in background tabs.`;
+                warn.textContent = `${withMsg} message tab${withMsg === 1 ? '' : 's'} will open in the foreground and take focus as they go, so the browser won't be usable during the run. Turn off "Send thank you msg" in Settings to keep everything in background tabs.`;
                 content.appendChild(warn);
             }
 
