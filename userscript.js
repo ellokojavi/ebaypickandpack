@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v4.94-balanced-pipe
+// @version      20261111-v4.95-balanced-pipe-fix
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -575,6 +575,9 @@
                 .${CONFIG.classNames.shippingInfoBlock} p a:not(.${CONFIG.classNames.addTrackingLink}):not(.${CONFIG.classNames.addNoteLink}) { text-decoration: underline; }
                 .${CONFIG.classNames.shippingInfoBlock} span { vertical-align: top; }
                 span.pp-sep { display: inline-block; margin: 0 8px; color: ${isDarkMode ? '#777' : '#aaa'}; }
+                /* eBay's span around the order links carries its own 8px right margin, which made the
+                   gap before the pipe 16px against 8px after it (seen live, v4.94). */
+                .${CONFIG.classNames.shippingInfoBlock} p > .combined-ids > span:last-child { margin-right: 0 !important; }
                 .pp-earn { font-weight: 700; color: ${isDarkMode ? '#7ee2a8' : '#137333'}; cursor: help; }
                 .pp-earn.pp-earn-wait { font-weight: 400; color: ${isDarkMode ? '#888' : '#999'}; }
                 .pp-earn.pp-earn-loss { color: ${isDarkMode ? '#ff8a80' : '#c5221f'}; }

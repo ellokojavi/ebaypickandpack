@@ -1,5 +1,9 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.95
+- Fix for v4.94: the gap before the pipe was still 16px. eBay's span around the order links adds
+  its own 8px margin, which is now removed, so it is 8px on each side.
+
 ## v4.94
 - The `│` in the order header is evenly spaced: 8px on each side. As plain text, the space after it
   collapsed against the Total pill (12px left, 4px right).
