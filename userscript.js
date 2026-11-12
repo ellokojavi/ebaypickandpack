@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261110-v4.68-use-usps-version
+// @version      20261111-v4.69-real-earnings
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -454,6 +454,10 @@
                 .${CONFIG.classNames.shippingInfoBlock} p { margin: 0; font-size: 13px; color: ${isDarkMode ? '#b0b0b0' : '#555'}; white-space: normal; word-break: break-word; overflow-wrap: anywhere; text-decoration: none; }
                 .${CONFIG.classNames.shippingInfoBlock} p a:not(.${CONFIG.classNames.addTrackingLink}):not(.${CONFIG.classNames.addNoteLink}) { text-decoration: underline; }
                 .${CONFIG.classNames.shippingInfoBlock} span { vertical-align: top; }
+                .pp-earn { font-weight: 700; color: ${isDarkMode ? '#7ee2a8' : '#137333'}; cursor: help; }
+                .pp-earn.pp-earn-wait { font-weight: 400; color: ${isDarkMode ? '#888' : '#999'}; }
+                #pp-earn-total { margin-left: auto; align-self: center; padding: 2px 10px; border-radius: 6px; font-size: 13px; white-space: nowrap; cursor: help; color: ${isDarkMode ? '#ccc' : '#444'}; background: ${isDarkMode ? 'rgba(126,226,168,0.10)' : '#e6f4ea'}; }
+                #pp-earn-total strong { color: ${isDarkMode ? '#7ee2a8' : '#137333'}; }
                 .${CONFIG.classNames.shippingInfoBlock} ${CONFIG.selectors.uniqueOrderIdLink} { font-weight: bold; color: ${isDarkMode ? '#99ccff' : '#003087'}; }
                 .${CONFIG.classNames.buyerNoteCallout} { display: flex; align-items: flex-start; gap: 8px; margin: -2px 0 10px; padding: 8px 12px; border-radius: 8px; border-left: 3px solid ${isDarkMode ? '#c97d20' : '#f59e0b'}; background: ${isDarkMode ? 'rgba(255,179,71,0.08)' : '#fffbeb'}; font-size: 13px; line-height: 1.45; color: ${isDarkMode ? '#FFD580' : '#78350f'}; }
                 .${CONFIG.classNames.buyerNoteCallout} .buyer-note-icon { flex: 0 0 auto; font-size: 14px; line-height: 1.4; }
@@ -1549,6 +1553,7 @@
                     input.indeterminate = state === 'partial';
                 }
             });
+            try { renderEarningsTotal(); } catch (err) { console.error('[Earnings] total failed:', err); }
         }
 
         // --- Address Warning Banner ---
@@ -1702,6 +1707,91 @@
             card.dataset.uspsSuggestion = JSON.stringify(res.suggestion || []);
             paintUsps(card);
         }
+        // Real earnings next to the Total (v4.69): what the order pays Javier
+        // after the discount, eBay's transaction fees and the General ad fee,
+        // read from the Mini (pipeline/order_earnings.py). A combined card sums
+        // its orders. The tooltip shows the arithmetic and what is left out.
+        function earningsFor(ids) {
+            const rs = ids.map(id => ppEarningsCache.get(id));
+            if (rs.some(r => !r)) return { state: 'wait' };
+            if (rs.some(r => r.earnings == null)) {
+                return { state: 'unknown', why: rs.map(r => r.detail).filter(Boolean)[0] || 'not available' };
+            }
+            const sum = k => rs.reduce((a, r) => a + (Number(r[k]) || 0), 0);
+            return {
+                state: 'ok', earnings: sum('earnings'), subtotal: sum('subtotal'), discount: sum('discount'),
+                shipping: sum('shipping'), fees: sum('fees'), adFee: sum('ad_fee'),
+                adPosted: rs.some(r => r.ad_fee_posted), cancelled: rs.some(r => r.cancelled)
+            };
+        }
+        function paintEarnings(card) {
+            const p = card.querySelector(`.${CONFIG.classNames.shippingInfoBlock} p`);
+            const ids = (card.dataset.orderId || '').split(',').filter(Boolean);
+            if (!p || !ids.length) return;
+            let wrap = p.querySelector('.pp-earn-wrap');
+            if (!wrap) {
+                wrap = document.createElement('span');
+                wrap.className = 'pp-earn-wrap';
+                wrap.append(document.createTextNode(' │ '));
+                const inner = document.createElement('span');
+                inner.className = 'pp-earn';
+                wrap.append(inner);
+                p.append(wrap);
+            }
+            const span = wrap.querySelector('.pp-earn');
+            const e = earningsFor(ids);
+            span.classList.toggle('pp-earn-wait', e.state !== 'ok');
+            if (e.state === 'wait') { span.textContent = 'Earn …'; span.title = 'Asking the Mini'; return; }
+            if (e.state === 'unknown') { span.textContent = 'Earn ?'; span.title = 'Earnings unknown: ' + e.why; return; }
+            const m = v => '$' + v.toFixed(2);
+            span.textContent = 'Earn ' + m(e.earnings) + (e.cancelled ? ' (cancel requested)' : '');
+            span.title = [
+                `Subtotal ${m(e.subtotal)}`,
+                e.discount ? `− Discount ${m(e.discount)}` : null,
+                e.shipping ? `+ Shipping paid ${m(e.shipping)}` : null,
+                `− eBay transaction fees ${m(e.fees)}`,
+                e.adPosted ? `− Ad fee (General) ${m(e.adFee)}` : '− Ad fee: none booked',
+                `= Earnings ${m(e.earnings)}`,
+                '',
+                'Not included: Priority ad clicks, postage.'
+            ].filter(l => l !== null).join('\n');
+        }
+        // One pill at the right of the batch bar: what the orders still to
+        // ship will earn. Shipped cards drop out as they are marked.
+        function renderEarningsTotal() {
+            const bar = document.querySelector(CONFIG.selectors.batchSelect);
+            let el = document.getElementById('pp-earn-total');
+            if (!bar || !ppApiEnabled()) { if (el) el.remove(); return; }
+            if (!el) { el = document.createElement('span'); el.id = 'pp-earn-total'; }
+            if (el.parentElement !== bar) bar.appendChild(el);
+            let total = 0, sales = 0, n = 0, waiting = 0, unknown = 0;
+            batchSelectCandidates().forEach(card => {
+                const ids = (card.dataset.orderId || '').split(',').filter(Boolean);
+                if (!ids.length) return;
+                const e = earningsFor(ids);
+                if (e.state === 'wait') waiting++;
+                else if (e.state === 'unknown') unknown++;
+                else { total += e.earnings; sales += e.subtotal - e.discount + e.shipping; n++; }
+            });
+            el.textContent = '';
+            el.append('Earnings to ship: ');
+            const strong = document.createElement('strong');
+            strong.textContent = '$' + total.toFixed(2);
+            el.append(strong, ` · ${n} order${n === 1 ? '' : 's'}`);
+            if (waiting) el.append(` · ${waiting} loading`);
+            if (unknown) el.append(` · ${unknown} unknown`);
+            if (ppEarningsError) el.append(' · ⚠');
+            el.title = `Buyers paid $${sales.toFixed(2)} for these ${n} orders (before tax); eBay keeps fees and General ad fees.\n` +
+                'Not included: Priority ad clicks, postage.' +
+                (ppEarningsError ? `\n\nLast request failed: ${ppEarningsError}` : '');
+        }
+        ppEarningsOnUpdate = () => {
+            document.querySelectorAll(CONFIG.selectors.orderItem).forEach(card => {
+                try { paintEarnings(card); } catch (err) { console.error('[Earnings] paint failed:', err); }
+            });
+            try { renderEarningsTotal(); } catch (err) { console.error('[Earnings] total failed:', err); }
+        };
+
         // Re-checks the address exactly as the card now shows it, after Fix or
         // Edit (v4.67). Sends street to City/State/ZIP only: not the buyer's
         // name, not the country line. US addresses only.
@@ -1848,6 +1938,7 @@
             }
 
             if (allOrderIds && ppApiEnabled()) applyUspsCheck(orderItem, allOrderIds.split(',')[0]);
+            if (allOrderIds && ppApiEnabled()) ppQueueEarnings(allOrderIds.split(','));
 
             // --- Append "United States" for domestic orders ---
             // eBay only renders a .print__address__country span for international
@@ -6917,6 +7008,34 @@
         // from the Mini's daily allowance each time. A reload asks again.
         if (res) ppAddressCache.set(orderId, res);
         return res;
+    }
+
+    // Real earnings per order, from the Mini (v4.69). Cards ask for their ids;
+    // the asks are batched into one request a moment later, so a page of 40
+    // cards is one round trip. Answers are kept for this page load. A failed
+    // request is not cached, so the next re-render asks again.
+    var ppEarningsCache = new Map();
+    var ppEarningsQueue = new Set();
+    var ppEarningsTimer = null, ppEarningsError = '', ppEarningsOnUpdate = null;
+    function ppQueueEarnings(ids) {
+        ids.forEach(id => { if (id && !ppEarningsCache.has(id)) ppEarningsQueue.add(id); });
+        clearTimeout(ppEarningsTimer);
+        ppEarningsTimer = setTimeout(ppFlushEarnings, 400);
+    }
+    async function ppFlushEarnings() {
+        const ids = Array.from(ppEarningsQueue);
+        ppEarningsQueue.clear();
+        for (let i = 0; i < ids.length; i += 100) {
+            const r = await ppRequest('/pp/earnings', { order_ids: ids.slice(i, i + 100) }, 60000);
+            const d = r.transport === 'ok' && r.http === 200 ? r.data : null;
+            if (d && d.orders) {
+                Object.entries(d.orders).forEach(([id, v]) => ppEarningsCache.set(id, v));
+                ppEarningsError = d.status === 'ok' ? '' : (d.detail || 'the Mini could not read eBay');
+            } else {
+                ppEarningsError = ppDescribe(r);
+            }
+        }
+        if (ppEarningsOnUpdate) ppEarningsOnUpdate();
     }
 
     async function ppNote(orderId, text) {

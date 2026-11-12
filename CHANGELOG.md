@@ -1,5 +1,14 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.69
+- **Earn $X.XX** after each card's Total: what the order pays after the discount, eBay's
+  transaction fees and the General ad fee, read from the Mini (`POST /pp/earnings`). Hover it for
+  the arithmetic. A combined card adds up its orders. Example: Total $10.98 earns $6.96.
+- **Earnings to ship** pill at the right of the batch bar: the sum for every order not yet
+  shipped, updated as orders are marked shipped.
+- Not included, and the tooltips say so: Priority (cost-per-click) ad spend, which eBay does not
+  charge per order, and postage. Needs the Mini login; with the API off nothing is shown.
+
 ## v4.68
 - **Use USPS** button next to Edit/Copy when USPS offers an address that differs from the card.
   It replaces the card's address with USPS's version, puts the unit on its own line, and
