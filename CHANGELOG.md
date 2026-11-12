@@ -1,5 +1,19 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.85
+- **Auto-reload.** With *Always run the latest version* on, the bulk shipping page asks the Mini
+  every **5 seconds** whether there is a new version. The Mini asks GitHub's git server, at most
+  once every 4 seconds however many tabs ask, so GitHub's 60-an-hour API limit is never hit. A new
+  version is fetched once, and the page reloads by itself, **but only when nothing would be lost**.
+  It waits while:
+  - a shipping batch is running, or an order is waiting for eBay;
+  - an address is being edited, or a dialog is open;
+  - orders are ticked;
+  - you clicked, typed or scrolled in the last 2 minutes (a background tab counts as idle).
+- While waiting, the line under the switch says what it is waiting for, with a **reload now** link.
+- Without a Mini login it falls back to checking GitHub every 5 minutes.
+- Only the bulk shipping page reloads itself; tabs the script opens never do.
+
 ## v4.84
 - **Custom Envelope** (left) and **History** (right) now share one line under the buttons in the
   SKU panel, saving a line.

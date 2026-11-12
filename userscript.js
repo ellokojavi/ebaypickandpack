@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v4.84-one-line-links
+// @version      20261111-v4.85-auto-reload
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -69,9 +69,10 @@
         }));
     }
     // Looks up the newest commit and, if it changed, fetches that copy into the cache.
-    async function ppRefreshLatest() {
-        const sha = (await ppGet('https://api.github.com/repos/ellokojavi/ebaypickandpack/commits/main',
-            { Accept: 'application/vnd.github.sha' })).trim();
+    async function ppRefreshLatest(knownSha) {
+        const sha = /^[0-9a-f]{40}$/.test(knownSha || '') ? knownSha
+            : (await ppGet('https://api.github.com/repos/ellokojavi/ebaypickandpack/commits/main',
+                { Accept: 'application/vnd.github.sha' })).trim();
         if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error('unexpected commit id');
         let c = null;
         try { c = GM_getValue(PP_CACHE_KEY, null); } catch (e) {}
@@ -2061,6 +2062,66 @@
             else if (ppEarningsError) lines.push('', `Last request failed: ${ppEarningsError}`);
             el.title = lines.join('\n');
         }
+        // AUTO-RELOAD (v4.85, Javier: "every 5 seconds"). With "Always run the latest version" on,
+        // this page asks the Mini every 5s for the newest commit (POST /pp/version: one git lookup
+        // per 4s however many tabs ask, so GitHub's 60-an-hour API limit is never touched). A new
+        // commit is fetched once into the cache. If it is newer than what runs here, the page
+        // reloads, but ONLY when nothing would be lost. Otherwise the Settings line says what it
+        // is waiting for, with a "reload now" link. With no Mini login it falls back to the
+        // GitHub API every 5 minutes. Only this page does this: tabs the script opens never reload.
+        const ppAutoReload = { pending: null, blockedBy: '', lastInput: Date.now(), lastApiCheck: 0, paint: null, timer: null, busy: false };
+        ['mousemove', 'keydown', 'mousedown', 'wheel', 'touchstart'].forEach(ev =>
+            window.addEventListener(ev, () => { ppAutoReload.lastInput = Date.now(); }, { passive: true, capture: true }));
+        function ppReloadBlocker() {
+            if (shipQueue && shipQueue.running) return 'a shipping batch is running';
+            if (document.querySelector(`.${CONFIG.classNames.pendingOverlay}`)) return 'an order is waiting for eBay';
+            if (document.querySelector(`.${CONFIG.classNames.isEditingAddress}`)) return 'an address is being edited';
+            if (document.querySelector('.altheastix-history-overlay, .custom-envelope-overlay, .canned-modal-overlay')) return 'a dialog is open';
+            if (document.querySelector(`${CONFIG.selectors.orderItem} ${CONFIG.selectors.checkbox}:checked`)) return 'orders are ticked';
+            if (!document.hidden && Date.now() - ppAutoReload.lastInput < 120000) return 'you are using the page';
+            return '';
+        }
+        async function ppAutoReloadTick() {
+            if (ppAutoReload.busy) return;
+            let auto = false;
+            try { auto = !!GM_getValue(PP_AUTO_KEY, false); } catch (e) {}
+            if (!auto) return;
+            ppAutoReload.busy = true;
+            try {
+                if (!ppAutoReload.pending) {
+                    let sha = null;
+                    if (ppApiEnabled() && !ppMini.down) {
+                        const r = await ppRequest('/pp/version', {}, 4000);
+                        if (r.transport === 'ok' && r.http === 200 && r.data && /^[0-9a-f]{40}$/.test(r.data.sha || '')) sha = r.data.sha;
+                    }
+                    let c = null;
+                    try { c = GM_getValue(PP_CACHE_KEY, null); } catch (e) {}
+                    try {
+                        if (sha && (!c || c.sha !== sha)) c = await ppRefreshLatest(sha);
+                        else if (!sha && Date.now() - Math.max(ppAutoReload.lastApiCheck, (c && c.checkedAt) || 0) > 5 * 60000) {
+                            ppAutoReload.lastApiCheck = Date.now();
+                            c = await ppRefreshLatest();
+                        }
+                    } catch (e) { return; }
+                    let bad = null;
+                    try { bad = GM_getValue(PP_BAD_KEY, null); } catch (e) {}
+                    if (c && c.code && c.sha !== bad && ppVersionNum(c.version) > ppVersionNum(PP_RUNNING_NOW.version)) {
+                        ppAutoReload.pending = c;
+                        console.log('[Auto-update] ' + c.version + ' is out; reloading when nothing would be lost');
+                    }
+                }
+                if (ppAutoReload.pending) {
+                    const why = ppReloadBlocker();
+                    if (why !== ppAutoReload.blockedBy || !ppAutoReload.shown) {
+                        ppAutoReload.blockedBy = why; ppAutoReload.shown = true;
+                        if (ppAutoReload.paint) ppAutoReload.paint();
+                    }
+                    if (!why) { console.log('[Auto-update] reloading for ' + ppAutoReload.pending.version); location.reload(); }
+                }
+            } finally { ppAutoReload.busy = false; }
+        }
+        if (!ppAutoReload.timer) ppAutoReload.timer = setInterval(ppAutoReloadTick, 5000);
+
         ppEarningsOnUpdate = () => {
             document.querySelectorAll(CONFIG.selectors.orderItem).forEach(card => {
                 try { paintEarnings(card); } catch (err) { console.error('[Earnings] paint failed:', err); }
@@ -5905,6 +5966,15 @@
                         const r = PP_RUNNING_NOW;
                         autoStatus.textContent = (r.source === 'installed' ? `running installed ${short(r.version)}`
                             : `running ${short(r.version)} from GitHub (${r.sha.slice(0, 7)})`) + (note ? ' · ' + note : '');
+                        if (!note && ppAutoReload.pending && autoRow.input.checked) {
+                            const now = document.createElement('a');
+                            now.href = '#';
+                            now.textContent = 'reload now';
+                            now.addEventListener('click', (ev) => { ev.preventDefault(); location.reload(); });
+                            autoStatus.append(` · ${short(ppAutoReload.pending.version)} ready: reloads when idle` +
+                                (ppAutoReload.blockedBy ? ` (waiting: ${ppAutoReload.blockedBy})` : '') + ' · ', now);
+                            return;
+                        }
                         if (!note && autoRow.input.checked) {
                             const link = document.createElement('a');
                             link.href = '#';
@@ -5918,7 +5988,12 @@
                         autoStatus.textContent = '';
                         autoStatus.append(...ppLoadingNodes('checking GitHub'));
                         try {
-                            const c = await ppRefreshLatest();
+                            let sha = null;
+                            if (ppApiEnabled() && !ppMini.down) {
+                                const r = await ppRequest('/pp/version', {}, 6000);
+                                if (r.transport === 'ok' && r.http === 200 && r.data) sha = r.data.sha;
+                            }
+                            const c = await ppRefreshLatest(sha);
                             let bad = null;
                             try { bad = GM_getValue(PP_BAD_KEY, null); } catch (err) {}
                             if (ppVersionNum(c.version) <= ppVersionNum(PP_RUNNING_NOW.version)) {
@@ -5933,6 +6008,7 @@
                         } catch (err) { paintAuto('could not reach GitHub: ' + err.message); }
                     };
                     paintAuto();
+                    ppAutoReload.paint = () => { if (autoStatus.isConnected) paintAuto(); };
                     cfgBody.appendChild(autoStatus);
                     autoRow.input.addEventListener('change', async (e) => {
                         const on = !!e.target.checked;
