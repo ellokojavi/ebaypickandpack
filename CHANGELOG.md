@@ -1,5 +1,13 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.83
+- **The left boxes float again, and still show in full.**
+  - If they fit, they stay pinned as before.
+  - If they are taller than the window, they scroll up with the page until the bottom of Settings
+    reaches the bottom of the window, then float there. Scrolling back up brings the top back.
+  - They stop above the eBay footer instead of covering it.
+  - Replaces v4.82, where tall boxes scrolled away with the page.
+
 ## v4.82
 - **Both left boxes are always shown in full.** Nothing inside them is cut off or scrolled.
   - If they fit in the window, they stay pinned as before.

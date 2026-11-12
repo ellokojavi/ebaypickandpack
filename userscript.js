@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v4.82-full-left-column
+// @version      20261111-v4.83-floating-left-column
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -1131,48 +1131,52 @@
             `;
         }
 
-        // The left column: the SKU panel, then Settings under it. Both are ALWAYS shown in full,
-        // never cut or scrolled inside (Javier, Nov 11 2026; v4.78 had capped them to fit).
-        //  - If the column fits in the window, it stays pinned (fixed) as before.
-        //  - If not, it scrolls with the page (absolute, from the same starting point), and the
-        //    eBay footer is pushed down so it starts below the bottom of Settings.
-        // The fit test uses the header-visible top (110px) so the mode does not flip while the
-        // page scrolls the header away. Heights come from scrollHeight, the full content height.
-        const LEFT_COLUMN_TOP = 110, LEFT_GAP = 12, LEFT_BOTTOM = 12;
-        function layoutLeftColumn(skuTop) {
+        // The left column: the SKU panel, then Settings under it. Both always FLOAT (fixed) and are
+        // always shown in full, never cut or scrolled inside (Javier, Nov 11 2026).
+        //  - Fits in the window: pinned at 110px, or 20px once the header has scrolled away.
+        //  - Taller than the window: it scrolls up with the page until the bottom of Settings
+        //    reaches the bottom of the window, then floats there; scrolling back up brings the top
+        //    back. Its position is a pure function of scrollY, so it never drifts.
+        //  - Either way it stops above the eBay footer instead of covering it, and the footer is
+        //    pushed down when the page is too short to show the whole column above it.
+        const LEFT_COLUMN_TOP = 110, LEFT_GAP = 12, LEFT_BOTTOM = 12, LEFT_PINNED_TOP = 20;
+        function layoutLeftColumn() {
             const skuPanel = document.getElementById(CONFIG.ids.skuPanelContainer);
             const configPanel = document.getElementById('altheastix-config-container');
             if (!skuPanel) return;
             skuPanel.style.maxHeight = 'none';
             skuPanel.style.overflowY = 'visible';
-            if (configPanel) { configPanel.style.maxHeight = 'none'; configPanel.style.overflowY = 'visible'; }
+            skuPanel.style.position = '';
+            // The stylesheet animates `top` over 0.3s; driven by scroll, that lags behind the page.
+            skuPanel.style.transition = 'none';
+            if (configPanel) {
+                configPanel.style.maxHeight = 'none'; configPanel.style.overflowY = 'visible'; configPanel.style.position = '';
+                configPanel.style.transition = 'none';
+            }
             const skuH = skuPanel.scrollHeight;
             const cfgH = configPanel ? configPanel.scrollHeight : 0;
             const columnH = skuH + (configPanel ? LEFT_GAP + cfgH : 0);
-            const fits = LEFT_COLUMN_TOP + columnH + LEFT_BOTTOM <= window.innerHeight;
             const footer = document.querySelector(CONFIG.selectors.pageFooter);
-            if (fits) {
-                skuPanel.dataset.ppFlow = 'pinned';
-                skuPanel.style.position = '';
-                skuPanel.style.top = `${skuTop}px`;
-                if (configPanel) { configPanel.style.position = ''; configPanel.style.top = `${skuTop + skuH + LEFT_GAP}px`; }
-                if (footer) footer.style.removeProperty('margin-top');
-            } else {
-                skuPanel.dataset.ppFlow = 'page';
-                skuPanel.style.position = 'absolute';
-                skuPanel.style.top = `${LEFT_COLUMN_TOP}px`;
-                if (configPanel) { configPanel.style.position = 'absolute'; configPanel.style.top = `${LEFT_COLUMN_TOP + skuH + LEFT_GAP}px`; }
-                if (footer) {
-                    footer.style.removeProperty('margin-top');
-                    const footerTop = footer.getBoundingClientRect().top + window.scrollY;
-                    const need = LEFT_COLUMN_TOP + columnH + 24 - footerTop;
-                    if (need > 0) footer.style.setProperty('margin-top', `${Math.ceil(need)}px`, 'important');
-                }
+            let footerTopVp = Infinity;
+            if (footer) {
+                // Room for the whole column above the footer, measured without our own margin.
+                const ours = parseFloat(footer.style.getPropertyValue('margin-top')) || 0;
+                const naturalTopDoc = footer.getBoundingClientRect().top + window.scrollY - ours;
+                const need = Math.ceil(LEFT_COLUMN_TOP + columnH + 24 - naturalTopDoc);
+                if (need > 0) {
+                    if (Math.abs(need - ours) > 1) footer.style.setProperty('margin-top', `${need}px`, 'important');
+                } else if (ours) footer.style.removeProperty('margin-top');
+                footerTopVp = footer.getBoundingClientRect().top;
             }
+            let top = Math.max(LEFT_COLUMN_TOP - window.scrollY,
+                Math.min(LEFT_PINNED_TOP, window.innerHeight - columnH - LEFT_BOTTOM));
+            top = Math.min(top, footerTopVp - columnH - 24);
+            skuPanel.style.top = `${Math.round(top)}px`;
+            if (configPanel) configPanel.style.top = `${Math.round(top + skuH + LEFT_GAP)}px`;
             if (configPanel && !configPanel.ppResizeWatched && typeof ResizeObserver !== 'undefined') {
                 // Expanding or collapsing Settings changes its height: lay out again.
                 configPanel.ppResizeWatched = true;
-                new ResizeObserver(() => { try { updateSkuPanelOnScroll(); } catch (e) {} }).observe(configPanel.firstElementChild || configPanel);
+                new ResizeObserver(() => { try { layoutLeftColumn(); } catch (e) {} }).observe(configPanel.firstElementChild || configPanel);
             }
         }
 
@@ -1188,8 +1192,7 @@
             const leftPos = Math.max(20, newLeft);
             skuPanel.style.left = `${leftPos}px`;
             if (configPanel) configPanel.style.left = `${leftPos}px`;
-            layoutLeftColumn(skuPanel.dataset.ppFlow === 'page' ? LEFT_COLUMN_TOP
-                : (document.querySelector(CONFIG.selectors.header)?.getBoundingClientRect().bottom < 0 ? 20 : LEFT_COLUMN_TOP));
+            layoutLeftColumn();
             const scrollTopBtn = document.getElementById('altheastix-scroll-top-btn');
             if (scrollTopBtn) {
                 scrollTopBtn.style.left = `${ordersContainer.getBoundingClientRect().right + 8}px`;
@@ -1210,12 +1213,7 @@
             const header = document.querySelector(CONFIG.selectors.header);
             if (!skuPanel || !header) return;
 
-            const headerRect = header.getBoundingClientRect();
-            const skuPanelTop = headerRect.bottom < 0 ? 20 : 110;
-            if (skuPanel.dataset.ppFlow !== 'page') skuPanel.style.top = `${skuPanelTop}px`;
-            if (configPanel) {
-                layoutLeftColumn(skuPanelTop);
-            }
+            layoutLeftColumn();
 
             const scrollTopBtn = document.getElementById('altheastix-scroll-top-btn');
             if (scrollTopBtn) {
