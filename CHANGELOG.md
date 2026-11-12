@@ -1,5 +1,12 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.74
+- **The loading dots no longer shake the line.** They used to grow in width four times a second,
+  so a line near the edge kept wrapping and unwrapping. They now keep a fixed width and are revealed
+  in place. `· Profit ~$x` and `Total: $x` never break across two lines.
+- Sizing is better on the Mini side: purchase rows that name a SKU or design without a size are
+  now sized from the listing (D02 -> 3in), so the per-size costs rest on more orders.
+
 ## v4.73
 - **Sticker cost by size.** Profit now costs each sticker by its size (3in, 4in, 5in, 6in and up)
   from what that size cost on the shelf over the last 12 months of print orders, Sticker Mule promo

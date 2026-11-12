@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v4.73-cost-by-size
+// @version      20261111-v4.74-steady-dots
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -471,9 +471,11 @@
                 .pp-earn.pp-earn-wait { font-weight: 400; color: ${isDarkMode ? '#888' : '#999'}; }
                 .pp-earn.pp-earn-loss { color: ${isDarkMode ? '#ff8a80' : '#c5221f'}; }
                 span.pp-spin { display: inline-block; width: 9px; height: 9px; margin: 0 5px 0 3px; box-sizing: border-box; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; vertical-align: -1px; animation: pp-rot 0.8s linear infinite; }
-                span.pp-dots::after { content: '...'; display: inline-block; overflow: hidden; vertical-align: bottom; width: 0; animation: pp-dots 1.2s steps(4, end) infinite; }
+                span.pp-dots::after { content: '...'; display: inline-block; width: 1.2em; text-align: left; vertical-align: bottom; clip-path: inset(0 100% 0 0); animation: pp-dots 1.2s steps(4, end) infinite; }
+                span.pp-earn-wrap { white-space: nowrap; }
+                strong.pp-total { white-space: nowrap; }
                 @keyframes pp-rot { to { transform: rotate(360deg); } }
-                @keyframes pp-dots { to { width: 1.2em; } }
+                @keyframes pp-dots { to { clip-path: inset(0 0 0 0); } }
                 #pp-earn-total { margin-top: 10px; padding: 8px 10px; border-radius: 8px; font-size: 13px; line-height: 1.6; cursor: help; color: ${isDarkMode ? '#ccc' : '#444'}; background: ${isDarkMode ? 'rgba(126,226,168,0.08)' : '#e6f4ea'}; }
                 #pp-earn-total:empty { display: none; }
                 #pp-earn-total .pp-row { display: flex; justify-content: space-between; gap: 8px; }
