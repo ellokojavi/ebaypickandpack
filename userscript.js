@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v4.93-shipping-only-when-it-matters
+// @version      20261111-v4.94-balanced-pipe
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -574,6 +574,7 @@
                 .${CONFIG.classNames.shippingInfoBlock} p { margin: 0; font-size: 13px; color: ${isDarkMode ? '#b0b0b0' : '#555'}; white-space: normal; word-break: break-word; overflow-wrap: anywhere; text-decoration: none; }
                 .${CONFIG.classNames.shippingInfoBlock} p a:not(.${CONFIG.classNames.addTrackingLink}):not(.${CONFIG.classNames.addNoteLink}) { text-decoration: underline; }
                 .${CONFIG.classNames.shippingInfoBlock} span { vertical-align: top; }
+                span.pp-sep { display: inline-block; margin: 0 8px; color: ${isDarkMode ? '#777' : '#aaa'}; }
                 .pp-earn { font-weight: 700; color: ${isDarkMode ? '#7ee2a8' : '#137333'}; cursor: help; }
                 .pp-earn.pp-earn-wait { font-weight: 400; color: ${isDarkMode ? '#888' : '#999'}; }
                 .pp-earn.pp-earn-loss { color: ${isDarkMode ? '#ff8a80' : '#c5221f'}; }
@@ -2399,7 +2400,10 @@
                     if (shippingCostMatch) shippingText = `Shipping: <span style="font-weight: bold; color: red;">${shippingCostMatch[0]}</span>`;
                 }
                 if (orderItem.dataset.isCanadian === 'true') shippingText = shippingText ? `${shippingText} 🇨🇦` : '🇨🇦 Canada';
-                infoBlock.innerHTML = `<p>${orderIdContainer.innerHTML} │ ${totalHTML}${shippingText ? ` │ ${shippingText}` : ''}</p>`;
+                // The pipe gets its own element with equal margins: as plain " │ " text the space
+                // after it collapsed against the Total pill (12px left, 4px right, v4.94).
+                const sep = '<span class="pp-sep">│</span>';
+                infoBlock.innerHTML = `<p>${orderIdContainer.innerHTML.trim()}${sep}${totalHTML}${shippingText ? `${sep}${shippingText}` : ''}</p>`;
                 tcellItem.insertBefore(infoBlock, tcellItem.firstChild);
                 transactionCell.style.display = 'none';
 

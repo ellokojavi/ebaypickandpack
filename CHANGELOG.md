@@ -1,5 +1,9 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.94
+- The `│` in the order header is evenly spaced: 8px on each side. As plain text, the space after it
+  collapsed against the Total pill (12px left, 4px right).
+
 ## v4.93
 - "│ Free Shipping" is gone from the order header. Shipping now shows only when it matters:
   - **Shipping: $X** in red when the buyer paid for it;
