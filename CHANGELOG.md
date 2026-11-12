@@ -1,5 +1,15 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.01
+- **Missing SKUs are filled in.** eBay shows the SKU an item had when it was ordered, so older
+  orders show none and the pick list stayed nearly empty. The Mini now looks up each card's item
+  number: today's listing first, then order history for listings that have ended. The SKU appears
+  on the card marked `*` (hover to see why), and in the pick list, highlights and sort order like
+  any other.
+- **Variation listings** are filled only when the card shows which variation sold (e.g. "3
+  inches"). A wrong SKU on a pick list is worse than a missing one.
+- Needs the Mini login.
+
 ## v5.00
 - **Items inside an order are sorted by SKU:** box letter, then number, starting with A (A21, A22,
   A24, A49, A49 DeadLove, B18, D06, ...). An item with no SKU goes last.

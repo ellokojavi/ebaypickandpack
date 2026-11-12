@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v5.00-sort-items-by-sku
+// @version      20261111-v5.01-fill-missing-skus
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -574,6 +574,8 @@
                 .${CONFIG.classNames.shippingInfoBlock} p { margin: 0; font-size: 13px; color: ${isDarkMode ? '#b0b0b0' : '#555'}; white-space: normal; word-break: break-word; overflow-wrap: anywhere; text-decoration: none; }
                 .${CONFIG.classNames.shippingInfoBlock} p a:not(.${CONFIG.classNames.addTrackingLink}):not(.${CONFIG.classNames.addNoteLink}) { text-decoration: underline; }
                 .${CONFIG.classNames.shippingInfoBlock} span { vertical-align: top; }
+                /* A SKU filled in from the listing (v5.01): the order itself carries none. */
+                li.pp-sku-filled::after { content: ' *'; font-weight: 400; opacity: 0.55; }
                 span.pp-sep { display: inline-block; margin: 0 8px; color: ${isDarkMode ? '#777' : '#aaa'}; }
                 /* eBay's span around the order links carries its own 8px right margin, which made the
                    gap before the pipe 16px against 8px after it (seen live, v4.94). */
@@ -2182,6 +2184,79 @@
             try { renderEarningsTotal(); } catch (err) { console.error('[Earnings] total failed:', err); }
         };
 
+        // MISSING SKUs (v5.01, Javier: "so I can always use this page as a demo"). eBay shows the
+        // SKU an item had when it was ORDERED, so older orders show none and the pick list stayed
+        // nearly empty. The Mini maps the item number on the card to the listing's SKU today
+        // (POST /pp/skus: current listings first, then order history for ended listings). The SKU
+        // is added as a "SKU: X" line marked with *, so every part of the script that reads SKUs
+        // (pick list, highlights, sort, printing) treats it like any other. A variation listing is
+        // filled only when the card shows which variation it is: a wrong SKU on a pick list is
+        // worse than none.
+        const ppItemSkus = new Map();          // item number -> candidates (or [] when unknown)
+        const ppSkuQueue = new Set();
+        let ppSkuTimer = null;
+        function itemNumberOf(item) {
+            const a = item.querySelector(`${CONFIG.selectors.itemDescription} h2 a:not(.${CONFIG.classNames.reviseLink})`);
+            const m = (a && a.getAttribute('href') || '').match(/[?&]item=(\d{9,15})/);
+            return m ? m[1] : null;
+        }
+        function pickSku(cands, item) {
+            if (!cands || !cands.length) return null;
+            if (cands.length === 1) return cands[0].sku;
+            // The card shows the variation it sold (e.g. "3 inches"); match single-value variations only.
+            const seen = Array.from(item.querySelectorAll('ul li')).map(l => l.textContent.toLowerCase()).join(' | ');
+            const hits = cands.filter(c => {
+                const val = (c.variation.split('=')[1] || '').trim().toLowerCase();
+                return val && !val.includes(';') && seen.includes(val);
+            });
+            return hits.length === 1 ? hits[0].sku : null;
+        }
+        function fillMissingSkus(card) {
+            if (!ppApiEnabled()) return false;
+            let changed = false;
+            card.querySelectorAll('.item').forEach(item => {
+                const ul = item.querySelector('ul[class*="item__details"]');
+                if (!ul || Array.from(ul.children).some(li => /^SKU:/.test(li.textContent.trim()))) return;
+                const id = itemNumberOf(item);
+                if (!id) return;
+                if (!ppItemSkus.has(id)) { ppSkuQueue.add(id); return; }
+                const sku = pickSku(ppItemSkus.get(id), item);
+                if (!sku) return;
+                const li = document.createElement('li');
+                li.className = 'pp-sku-filled';
+                li.textContent = 'SKU: ' + sku;
+                li.title = "This order has no SKU on eBay; this is the listing's SKU today (item " + id + ').';
+                ul.prepend(li);
+                changed = true;
+            });
+            if (ppSkuQueue.size) { clearTimeout(ppSkuTimer); ppSkuTimer = setTimeout(ppFlushSkus, 300); }
+            return changed;
+        }
+        async function ppFlushSkus() {
+            const ids = Array.from(ppSkuQueue).filter(id => !ppItemSkus.has(id));
+            ppSkuQueue.clear();
+            for (let i = 0; i < ids.length; i += 200) {
+                const r = await ppRequest('/pp/skus', { item_ids: ids.slice(i, i + 200) }, 20000);
+                if (!(r.transport === 'ok' && r.http === 200 && r.data && r.data.status === 'ok')) return; // ask again next render
+                ids.slice(i, i + 200).forEach(id => ppItemSkus.set(id, (r.data.skus || {})[id] || []));
+            }
+            let any = false;
+            document.querySelectorAll(CONFIG.selectors.orderItem).forEach(card => {
+                if (!fillMissingSkus(card)) return;
+                any = true;
+                // What the per-card pass derives from SKUs, redone for the filled ones.
+                const skus = Array.from(card.querySelectorAll(`${CONFIG.selectors.itemDetailsContainer} li`))
+                    .map(li => li.innerText).filter(t => t.startsWith('SKU: ')).map(t => t.toLowerCase());
+                const cn = CONFIG.classNames;
+                card.classList.remove(cn.highlightManila, cn.borderManila, cn.highlightLg, cn.borderLg, cn.highlightMultiItem);
+                if (skus.some(t => t.includes('manila'))) card.classList.add(cn.highlightManila, cn.borderManila);
+                else if (skus.some(t => t.includes('lg'))) card.classList.add(cn.highlightLg, cn.borderLg);
+                else if (skus.length > 1) card.classList.add(cn.highlightMultiItem);
+                sortCardItemsBySku(card);
+            });
+            if (any) { try { repaintSkuPanel(); } catch (e) { console.error('[SKU fill] panel repaint failed:', e); } }
+        }
+
         // Items inside a card, sorted by SKU: box letter, then number, then the rest (v5.00, Javier:
         // "sort the SKUs inside a multi-SKU order by SKU ID, starting with A"). A21 < A22 < A49 <
         // A49 DeadLove < B18 < ... Visual only, through CSS `order` on eBay's flex container: the
@@ -2469,6 +2544,7 @@
                 }
             }
 
+            fillMissingSkus(orderItem);
             let hasManila = false, hasLg = false, skuCount = 0;
             orderItem.querySelectorAll(`${CONFIG.selectors.itemDetailsContainer} li`).forEach(li => {
                 const text = li.innerText;
