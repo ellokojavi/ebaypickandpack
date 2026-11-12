@@ -1,5 +1,15 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.04
+- **The batch dialog's time estimate follows the route the orders will take.** It assumed 30s an
+  order, measured on the eBay tab method. Through the Mini API, consecutive batch shipments land 6–7s
+  apart (20 of 22, Nov 9–12 2026), ship, note and thank-you included. With the API on and the Mini
+  answering, the dialog now reads **Rough time via Mini API (~8s each)**, e.g. `~1 min` for 8
+  orders instead of `~4 min`. With the API off or the Mini down, it keeps the 30s tab estimate.
+- With the API on, the "message tabs will take focus" warning is replaced by a note that no tabs
+  open, and that an order the API cannot finish falls back to tabs at ~30s each. The tab warning
+  now points to **Settings**, not "Configuration".
+
 ## v5.03
 - **Bigger thumbnails in compact rows.** Orders with 3+ items show each sticker at 63px
   instead of 42px (+50%), so the design is readable at a glance while picking.
