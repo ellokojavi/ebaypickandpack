@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v4.83-floating-left-column
+// @version      20261111-v4.84-one-line-links
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -5664,11 +5664,15 @@
                 const customEnvLink = document.createElement('a');
                 customEnvLink.href = '#';
                 customEnvLink.textContent = '✉ Custom Envelope';
-                customEnvLink.style.cssText = `display:block;text-align:center;margin-top:6px;font-size:12px;color:${isDarkMode ? '#78BFFF' : '#3665f3'};text-decoration:none;cursor:pointer;opacity:0.75;transition:opacity 0.2s;`;
+                customEnvLink.style.cssText = `font-size:12px;color:${isDarkMode ? '#78BFFF' : '#3665f3'};text-decoration:none;cursor:pointer;opacity:0.75;transition:opacity 0.2s;`;
                 customEnvLink.onmouseenter = () => { customEnvLink.style.opacity = '1'; };
                 customEnvLink.onmouseleave = () => { customEnvLink.style.opacity = '0.75'; };
                 customEnvLink.addEventListener('click', (e) => { e.preventDefault(); showCustomEnvelopeModal(); });
-                contentWrapper.appendChild(customEnvLink);
+                // One line under the buttons: Custom Envelope on the left, History on the right.
+                const panelLinksRow = document.createElement('div');
+                panelLinksRow.style.cssText = 'display:flex;justify-content:space-between;align-items:baseline;margin-top:8px;';
+                panelLinksRow.appendChild(customEnvLink);
+                contentWrapper.appendChild(panelLinksRow);
                 // --- END CUSTOM ENVELOPE FEATURE (link) ---
 
                 // Last child of the panel, right-aligned: the bottom right
@@ -5679,12 +5683,12 @@
                 historyLink.href = '#';
                 historyLink.textContent = 'History';
                 historyLink.title = 'What was printed and what eBay confirmed as shipped';
-                historyLink.style.cssText = `display:block;text-align:right;margin-top:8px;font-size:11px;color:${isDarkMode ? '#8a8a8a' : '#999'};text-decoration:none;cursor:pointer;transition:color 0.2s;`;
+                historyLink.style.cssText = `font-size:11px;color:${isDarkMode ? '#8a8a8a' : '#999'};text-decoration:none;cursor:pointer;transition:color 0.2s;`;
                 historyLink.onmouseenter = () => { historyLink.style.color = isDarkMode ? '#78BFFF' : '#3665f3'; };
                 historyLink.onmouseleave = () => { historyLink.style.color = isDarkMode ? '#8a8a8a' : '#999'; };
                 historyLink.addEventListener('click', (e) => { e.preventDefault(); showEnvelopeHistoryModal(); });
                 setTimeout(() => { try { if (ppEarningsOnUpdate) ppEarningsOnUpdate(); } catch (err) { console.error('[Earnings] refill failed:', err); } }, 0);
-                contentWrapper.appendChild(historyLink);
+                panelLinksRow.appendChild(historyLink);
 
                 // --- Defaults panel (separate floating panel) ---
                 // Every control here is persisted in GM storage and re-read on

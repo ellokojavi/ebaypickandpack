@@ -1,5 +1,9 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.84
+- **Custom Envelope** (left) and **History** (right) now share one line under the buttons in the
+  SKU panel, saving a line.
+
 ## v4.83
 - **The left boxes float again, and still show in full.**
   - If they fit, they stay pinned as before.
