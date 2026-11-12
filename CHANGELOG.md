@@ -1,5 +1,10 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.91
+- Fix for v4.90: on a compact card the buyer box stuck out 24px past the card's right edge.
+  eBay's details wrapper grew to fit the longest one-line title. It now stays inside the card,
+  lined up with the other cards.
+
 ## v4.90
 - **Compact rows for orders with 3 or more items.** Each item becomes one line:
   - a small thumbnail, still click-to-zoom;

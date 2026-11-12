@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v4.90-compact-multi-item
+// @version      20261111-v4.91-compact-no-overflow
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -610,6 +610,10 @@
                    thumbnail (still click-to-zoom), SKU, quantity, the rest small, title cut to one
                    line. An 11-item card went from 1,793px to about 750px. eBay's inner wrappers
                    have scrambled class names, so they are targeted by position, not by name. */
+                /* Without these, eBay's details wrapper (flex 1 1 100%) grew to the longest one-line
+                   title and pushed the buyer box 24px past the card's right edge (seen live, v4.90). */
+                ${CONFIG.selectors.orderItem}.pp-compact .orders-list__item__details { flex: 1 1 0 !important; min-width: 0 !important; }
+                ${CONFIG.selectors.orderItem}.pp-compact ${CONFIG.selectors.tcellItem} { overflow: hidden; }
                 ${CONFIG.selectors.orderItem}.pp-compact .item { padding: 3px 0 !important; margin: 0 !important; border-bottom: 1px solid rgba(128,128,128,.18); }
                 ${CONFIG.selectors.orderItem}.pp-compact .item:last-of-type { border-bottom: 0; }
                 ${CONFIG.selectors.orderItem}.pp-compact .item > div, ${CONFIG.selectors.orderItem}.pp-compact .item > div > div { padding: 0 !important; margin: 0 !important; display: flex; align-items: center; gap: 12px; width: 100%; }
