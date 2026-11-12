@@ -1,5 +1,14 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.72
+- **Profit only.** Cards read `Total: $10.98 · Profit ~$5.76`; the separate "Earn" figure is gone.
+  Hovering the profit shows the whole arithmetic: subtotal, discount, eBay fees, ad fee, what eBay
+  pays, sticker cost, postage, envelope and printing. A loss shows in red.
+- The SKU panel shows **Est. profit (N orders)** only.
+- **Loading shows a spinner with animated dots**, on each card ("Profit…") and in the panel, plus
+  "Loading N more…" while some orders are still coming in. They redraw only when something
+  changes, so the animation does not restart on every repaint.
+
 ## v4.71
 - **Profit now includes $0.15 per envelope** for the envelope and printing, on top of postage
   ($0.10 standard, $0.25 large, $0.78 tracked). The Mini sends these figures with the earnings

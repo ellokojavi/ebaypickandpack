@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v4.71-packing-and-mini-offline
+// @version      20261111-v4.72-profit-only-spinners
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -469,7 +469,11 @@
                 .${CONFIG.classNames.shippingInfoBlock} span { vertical-align: top; }
                 .pp-earn { font-weight: 700; color: ${isDarkMode ? '#7ee2a8' : '#137333'}; cursor: help; }
                 .pp-earn.pp-earn-wait { font-weight: 400; color: ${isDarkMode ? '#888' : '#999'}; }
-                .pp-profit { color: ${isDarkMode ? '#b0b0b0' : '#555'}; cursor: help; }
+                .pp-earn.pp-earn-loss { color: ${isDarkMode ? '#ff8a80' : '#c5221f'}; }
+                span.pp-spin { display: inline-block; width: 9px; height: 9px; margin: 0 5px 0 3px; box-sizing: border-box; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; vertical-align: -1px; animation: pp-rot 0.8s linear infinite; }
+                span.pp-dots::after { content: '...'; display: inline-block; overflow: hidden; vertical-align: bottom; width: 0; animation: pp-dots 1.2s steps(4, end) infinite; }
+                @keyframes pp-rot { to { transform: rotate(360deg); } }
+                @keyframes pp-dots { to { width: 1.2em; } }
                 #pp-earn-total { margin-top: 10px; padding: 8px 10px; border-radius: 8px; font-size: 13px; line-height: 1.6; cursor: help; color: ${isDarkMode ? '#ccc' : '#444'}; background: ${isDarkMode ? 'rgba(126,226,168,0.08)' : '#e6f4ea'}; }
                 #pp-earn-total:empty { display: none; }
                 #pp-earn-total .pp-row { display: flex; justify-content: space-between; gap: 8px; }
@@ -1761,6 +1765,18 @@
             }
             return out(cfg.standard, 'standard envelope');
         }
+        // A spinner plus an animated ellipsis, for "the Mini is working on it".
+        function ppLoadingNodes(label) {
+            const spin = document.createElement('span');
+            spin.className = 'pp-spin';
+            spin.setAttribute('aria-hidden', 'true');
+            const text = document.createElement('span');
+            text.className = 'pp-dots';
+            text.textContent = label;
+            return [spin, text];
+        }
+        // Profit after the Total (v4.72: profit only). The tooltip carries the
+        // whole arithmetic, from what the buyer paid down to the estimate.
         function paintEarnings(card) {
             const total = card.querySelector(`.${CONFIG.classNames.shippingInfoBlock} .pp-total`);
             const ids = (card.dataset.orderId || '').split(',').filter(Boolean);
@@ -1773,80 +1789,86 @@
                 wrap.append(document.createTextNode(' · '));
                 const inner = document.createElement('span');
                 inner.className = 'pp-earn';
-                const prof = document.createElement('span');
-                prof.className = 'pp-profit';
-                wrap.append(inner, prof);
+                wrap.append(inner);
                 total.after(wrap);
             }
             const span = wrap.querySelector('.pp-earn');
-            const profSpan = wrap.querySelector('.pp-profit');
-            profSpan.textContent = '';
             const e = earningsFor(ids);
-            span.classList.toggle('pp-earn-wait', e.state !== 'ok');
-            if (e.state === 'wait' && ppMini.down) {
-                span.textContent = 'Earn —';
-                span.title = ppMiniDownText() + '\nShipping and messages use tabs meanwhile. The figures fill in when it answers.';
+            const state = e.state === 'wait' && ppMini.down ? 'down' : e.state;
+            span.classList.toggle('pp-earn-wait', state !== 'ok');
+            // Re-render only on a change of state, so the spinner does not restart on every repaint.
+            if (state === 'wait') {
+                if (span.dataset.state !== 'wait') { span.textContent = ''; span.append(...ppLoadingNodes('Profit')); }
+                span.dataset.state = 'wait';
+                span.title = 'Asking the Mini';
                 return;
             }
-            if (e.state === 'wait') { span.textContent = 'Earn …'; span.title = 'Asking the Mini'; return; }
-            if (e.state === 'unknown') { span.textContent = 'Earn ?'; span.title = 'Earnings unknown: ' + e.why; return; }
-            const m = v => '$' + v.toFixed(2);
-            span.textContent = 'Earn ' + m(e.earnings) + (e.cancelled ? ' (cancel requested)' : '');
+            span.dataset.state = state;
+            span.classList.remove('pp-earn-loss');
+            if (state === 'down') {
+                span.textContent = 'Profit —';
+                span.title = ppMiniDownText() + '\nShipping and messages use tabs meanwhile. The figure fills in when it answers.';
+                return;
+            }
+            if (state === 'unknown') { span.textContent = 'Profit ?'; span.title = 'Profit unknown: ' + e.why; return; }
+            const m = v => (v < 0 ? '−$' : '$') + Math.abs(v).toFixed(2);
             const ec = ppEconomics || {};
             const post = postageFor(card);
             const profit = e.profitBeforePostage - post.amount;
-            profSpan.textContent = ` · Profit ~${m(profit)}`;
-            profSpan.title = [
-                `Earnings ${m(e.earnings)}`,
-                `− ${m(e.stickerCost)} for ${e.stickers} sticker${e.stickers === 1 ? '' : 's'} at $${Number(ec.sticker_cost || 0).toFixed(4)} average cost`,
-                `− ${m(post.postage)} postage, ${post.kind}`,
-                `− ${m(post.packing)} envelope and printing`,
-                `≈ Profit ${m(profit)}`,
-                '',
-                'Shop averages: sticker cost is measured over the trailing 12 months of print orders (' + (ec.sticker_cost_basis || '?') + ').',
-                'A 4in sticker costs more than a 3in.',
-                e.packUnknown ? 'A pack listed without a count was counted as 1 sticker, so this is high.' : null
-            ].filter(l => l !== null).join('\n');
+            span.textContent = `Profit ~${m(profit)}` + (e.cancelled ? ' (cancel requested)' : '');
+            span.classList.toggle('pp-earn-loss', profit < 0);
             span.title = [
                 `Subtotal ${m(e.subtotal)}`,
                 e.discount ? `− Discount ${m(e.discount)}` : null,
                 e.shipping ? `+ Shipping paid ${m(e.shipping)}` : null,
                 `− eBay transaction fees ${m(e.fees)}`,
                 e.adPosted ? `− Ad fee (General) ${m(e.adFee)}` : '− Ad fee: none booked',
-                `= Earnings ${m(e.earnings)}`,
+                `= eBay pays ${m(e.earnings)}`,
+                `− ${m(e.stickerCost)} for ${e.stickers} sticker${e.stickers === 1 ? '' : 's'} at $${Number(ec.sticker_cost || 0).toFixed(4)} average cost`,
+                `− ${m(post.postage)} postage, ${post.kind}`,
+                `− ${m(post.packing)} envelope and printing`,
+                `≈ Profit ${m(profit)}`,
                 '',
-                'Not included: Priority ad clicks, postage.'
+                'Sticker cost is the shop average over the last 12 months of print orders; a 4in costs more than a 3in.',
+                'Not included: Priority ad clicks.',
+                e.packUnknown ? 'A pack listed without a count was counted as 1 sticker, so this is high.' : null
             ].filter(l => l !== null).join('\n');
         }
-        // One pill at the right of the batch bar: what the orders still to
-        // ship will earn. Shipped cards drop out as they are marked.
+        // Total under the SKU list: estimated profit on the orders still to ship.
+        // Shipped cards drop out as they are marked.
         function renderEarningsTotal() {
             const el = document.getElementById('pp-earn-total');
             if (!el) return;
-            if (!ppApiEnabled()) { el.textContent = ''; return; }
-            let total = 0, sales = 0, n = 0, waiting = 0, unknown = 0, profitSum = 0;
+            if (!ppApiEnabled()) { el.textContent = ''; el.dataset.sig = ''; return; }
+            let n = 0, waiting = 0, unknown = 0, profitSum = 0, paid = 0;
             batchSelectCandidates().forEach(card => {
                 const ids = (card.dataset.orderId || '').split(',').filter(Boolean);
                 if (!ids.length) return;
                 const e = earningsFor(ids);
                 if (e.state === 'wait') waiting++;
                 else if (e.state === 'unknown') unknown++;
-                else { total += e.earnings; profitSum += e.profitBeforePostage - postageFor(card).amount; sales += e.subtotal - e.discount + e.shipping; n++; }
+                else { profitSum += e.profitBeforePostage - postageFor(card).amount; paid += e.earnings; n++; }
             });
+            const down = ppMini.down;
+            // Same signature, nothing to redraw: keeps the spinner from restarting.
+            const sig = [n, waiting, unknown, profitSum.toFixed(2), down, !!ppEarningsError].join('|');
+            if (el.dataset.sig === sig) return;
+            el.dataset.sig = sig;
             el.textContent = '';
-            const row = (label, value) => {
-                const r = document.createElement('div');
-                r.className = 'pp-row';
-                const l = document.createElement('span');
-                l.textContent = label;
-                const v = document.createElement('strong');
-                v.textContent = '$' + value.toFixed(2);
-                r.append(l, v);
-                el.append(r);
-            };
-            row(`Earnings to ship (${n} order${n === 1 ? '' : 's'})`, total);
-            row('Est. profit', profitSum);
-            if (ppMini.down) {
+            const r = document.createElement('div');
+            r.className = 'pp-row';
+            const l = document.createElement('span');
+            const v = document.createElement('strong');
+            if (n === 0 && waiting && !down) {
+                l.textContent = 'Est. profit';
+                v.append(...ppLoadingNodes(''));
+            } else {
+                l.textContent = `Est. profit (${n} order${n === 1 ? '' : 's'})`;
+                v.textContent = (profitSum < 0 ? '−$' : '$') + Math.abs(profitSum).toFixed(2);
+            }
+            r.append(l, v);
+            el.append(r);
+            if (down) {
                 const off = document.createElement('div');
                 off.className = 'pp-earn-sub pp-earn-offline';
                 off.textContent = `⚠ Mini not responding${waiting ? ` · ${waiting} order${waiting === 1 ? '' : 's'} not loaded` : ''} · `;
@@ -1855,24 +1877,30 @@
                 retry.textContent = 'Retry now';
                 retry.addEventListener('click', async (ev) => {
                     ev.preventDefault();
-                    retry.textContent = 'Checking…';
-                    if (!(await ppRetryMini())) renderEarningsTotal();
+                    retry.textContent = '';
+                    retry.append(...ppLoadingNodes('Checking'));
+                    if (!(await ppRetryMini())) { el.dataset.sig = ''; renderEarningsTotal(); }
                 });
                 off.append(retry);
                 off.title = ppMiniDownText() + '\nShip, message and notes go through tabs until it answers.';
                 el.append(off);
-                waiting = 0;
+            } else if (waiting && n) {
+                const more = document.createElement('div');
+                more.className = 'pp-earn-sub';
+                more.append(...ppLoadingNodes(`Loading ${waiting} more`));
+                el.append(more);
             }
-            const note = [waiting ? `${waiting} loading` : '', unknown ? `${unknown} unknown` : '',
-                !ppMini.down && ppEarningsError ? '⚠ last request failed' : ''].filter(Boolean).join(' · ');
+            const note = [unknown ? `${unknown} unknown` : '', !down && ppEarningsError ? '⚠ last request failed' : '']
+                .filter(Boolean).join(' · ');
             if (note) {
                 const sub = document.createElement('div');
                 sub.className = 'pp-earn-sub';
                 sub.textContent = note;
                 el.append(sub);
             }
-            el.title = `Buyers paid $${sales.toFixed(2)} for these ${n} orders (before tax); eBay keeps fees and General ad fees.\n` +
-                'Not included: Priority ad clicks.\nProfit = earnings − average sticker cost − postage per envelope ($0.10 standard, $0.25 large, $0.78 tracked) − $0.15 envelope and printing. Hover a card for its breakdown.' +
+            el.title = `eBay pays $${paid.toFixed(2)} for these ${n} orders after the discount, fees and General ad fees.\n` +
+                'Profit then takes off the average sticker cost, postage per envelope ($0.10 standard, $0.25 large, $0.78 tracked) and $0.15 for the envelope and printing. ' +
+                'Not included: Priority ad clicks. Hover a card for its breakdown.' +
                 (ppEarningsError ? `\n\nLast request failed: ${ppEarningsError}` : '');
         }
         ppEarningsOnUpdate = () => {
