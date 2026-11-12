@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v4.98-settings-collapsed-small-header
+// @version      20261111-v4.99-settings-summary-short
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -6165,11 +6165,14 @@
                 configSection.appendChild(cfgBody);
                 const paintCfgSummary = () => {
                     const on = (key, d) => { try { return !!GM_getValue(key, d); } catch (e) { return d; } };
+                    // The ship date always; anything else only when it is NOT the usual setting,
+                    // so a normal day reads just "ships Tomorrow" and fits the narrow panel.
                     const parts = [
-                        on(THANK_YOU_GLOBAL_KEY, true) ? 'thank-you ✓' : 'no thank-you',
-                        ppConfigured() ? (ppApiEnabled() ? 'Mini ✓' : 'Mini off') : null,
-                        on(PP_AUTO_KEY, false) ? 'auto-update ✓' : null,
-                        'ships ' + (on(SHIP_WHEN_TOMORROW_KEY, true) ? 'Tomorrow' : 'Today')
+                        'ships ' + (on(SHIP_WHEN_TOMORROW_KEY, true) ? 'Tomorrow' : 'Today'),
+                        on(THANK_YOU_GLOBAL_KEY, true) ? null : 'no thank-you',
+                        on(AUTO_SEND_MESSAGES_KEY, true) ? null : 'no auto-send',
+                        ppConfigured() && !ppApiEnabled() ? 'Mini off' : null,
+                        on(PP_AUTO_KEY, false) ? null : 'no auto-update'
                     ].filter(Boolean);
                     cfgSummary.textContent = cfgBody.style.display === 'none' ? parts.join(' · ') : '';
                     cfgSummary.title = cfgSummary.textContent;

@@ -1,5 +1,10 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.99
+- Shorter Settings summary, which was cut off in the narrow panel. It always shows the ship date,
+  and mentions any other setting only when it is not the usual one (e.g. `ships Today · Mini off`).
+  A normal day reads just `ships Tomorrow`.
+
 ## v4.98
 - **Settings starts collapsed** on every page load. While collapsed, its header shows a summary,
   e.g. `thank-you ✓ · Mini ✓ · auto-update ✓ · ships Tomorrow`. Once opened, it stays open for the
