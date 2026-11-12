@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v4.69-real-earnings
+// @version      20261111-v4.70-profit-and-placement
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -33,6 +33,13 @@
 
 (function() {
     'use strict';
+
+    // Earnings state (v4.69/v4.70). Declared first on purpose: main() sets the
+    // repaint hook early, and in v4.69 a declaration further down reset it to
+    // null, so the per-card figures never painted.
+    const ppEarningsCache = new Map();
+    const ppEarningsQueue = new Set();
+    let ppEarningsTimer = null, ppEarningsError = '', ppEarningsOnUpdate = null, ppEconomics = null;
 
     // ===================================================================
     // GLOBAL CONSTANTS & STORAGE KEYS
@@ -456,8 +463,12 @@
                 .${CONFIG.classNames.shippingInfoBlock} span { vertical-align: top; }
                 .pp-earn { font-weight: 700; color: ${isDarkMode ? '#7ee2a8' : '#137333'}; cursor: help; }
                 .pp-earn.pp-earn-wait { font-weight: 400; color: ${isDarkMode ? '#888' : '#999'}; }
-                #pp-earn-total { margin-left: auto; align-self: center; padding: 2px 10px; border-radius: 6px; font-size: 13px; white-space: nowrap; cursor: help; color: ${isDarkMode ? '#ccc' : '#444'}; background: ${isDarkMode ? 'rgba(126,226,168,0.10)' : '#e6f4ea'}; }
+                .pp-profit { color: ${isDarkMode ? '#b0b0b0' : '#555'}; cursor: help; }
+                #pp-earn-total { margin-top: 10px; padding: 8px 10px; border-radius: 8px; font-size: 13px; line-height: 1.6; cursor: help; color: ${isDarkMode ? '#ccc' : '#444'}; background: ${isDarkMode ? 'rgba(126,226,168,0.08)' : '#e6f4ea'}; }
+                #pp-earn-total:empty { display: none; }
+                #pp-earn-total .pp-row { display: flex; justify-content: space-between; gap: 8px; }
                 #pp-earn-total strong { color: ${isDarkMode ? '#7ee2a8' : '#137333'}; }
+                #pp-earn-total .pp-earn-sub { font-size: 11px; color: ${isDarkMode ? '#8a8a8a' : '#777'}; }
                 .${CONFIG.classNames.shippingInfoBlock} ${CONFIG.selectors.uniqueOrderIdLink} { font-weight: bold; color: ${isDarkMode ? '#99ccff' : '#003087'}; }
                 .${CONFIG.classNames.buyerNoteCallout} { display: flex; align-items: flex-start; gap: 8px; margin: -2px 0 10px; padding: 8px 12px; border-radius: 8px; border-left: 3px solid ${isDarkMode ? '#c97d20' : '#f59e0b'}; background: ${isDarkMode ? 'rgba(255,179,71,0.08)' : '#fffbeb'}; font-size: 13px; line-height: 1.45; color: ${isDarkMode ? '#FFD580' : '#78350f'}; }
                 .${CONFIG.classNames.buyerNoteCallout} .buyer-note-icon { flex: 0 0 auto; font-size: 14px; line-height: 1.4; }
@@ -1714,37 +1725,69 @@
         function earningsFor(ids) {
             const rs = ids.map(id => ppEarningsCache.get(id));
             if (rs.some(r => !r)) return { state: 'wait' };
-            if (rs.some(r => r.earnings == null)) {
+            if (rs.some(r => r.earnings == null || r.profit_before_postage == null)) {
                 return { state: 'unknown', why: rs.map(r => r.detail).filter(Boolean)[0] || 'not available' };
             }
             const sum = k => rs.reduce((a, r) => a + (Number(r[k]) || 0), 0);
             return {
                 state: 'ok', earnings: sum('earnings'), subtotal: sum('subtotal'), discount: sum('discount'),
                 shipping: sum('shipping'), fees: sum('fees'), adFee: sum('ad_fee'),
-                adPosted: rs.some(r => r.ad_fee_posted), cancelled: rs.some(r => r.cancelled)
+                adPosted: rs.some(r => r.ad_fee_posted), cancelled: rs.some(r => r.cancelled),
+                profitBeforePostage: sum('profit_before_postage'), stickerCost: sum('sticker_cost_total'), stickers: sum('stickers'),
+                orders: rs.length, packUnknown: rs.some(r => r.pack_unknown)
             };
         }
+        // Postage per envelope, Javier's figures (Nov 11 2026). One card is one
+        // envelope, even when it carries combined orders. Tracked wins over
+        // large, large over standard. Overridable in USER_CONFIG.postageEstimate.
+        function postageFor(card) {
+            const cfg = Object.assign({ standard: 0.10, large: 0.25, tracked: 0.78 },
+                (typeof USER_CONFIG !== 'undefined' && USER_CONFIG.postageEstimate) || {});
+            if (card.dataset.shipsWithLabel === 'true') return { amount: cfg.tracked, kind: 'eBay tracked label (over $' + USER_CONFIG.trackingOrderAmountThreshold + ')' };
+            if (card.classList.contains(CONFIG.classNames.highlightManila) || card.classList.contains(CONFIG.classNames.highlightLg)) {
+                return { amount: cfg.large, kind: 'large envelope' };
+            }
+            return { amount: cfg.standard, kind: 'standard envelope' };
+        }
         function paintEarnings(card) {
-            const p = card.querySelector(`.${CONFIG.classNames.shippingInfoBlock} p`);
+            const total = card.querySelector(`.${CONFIG.classNames.shippingInfoBlock} .pp-total`);
             const ids = (card.dataset.orderId || '').split(',').filter(Boolean);
-            if (!p || !ids.length) return;
-            let wrap = p.querySelector('.pp-earn-wrap');
+            if (!total || !ids.length) return;
+            let wrap = card.querySelector(`.${CONFIG.classNames.shippingInfoBlock} .pp-earn-wrap`);
             if (!wrap) {
                 wrap = document.createElement('span');
                 wrap.className = 'pp-earn-wrap';
-                wrap.append(document.createTextNode(' │ '));
+                wrap.append(document.createTextNode(' · '));
                 const inner = document.createElement('span');
                 inner.className = 'pp-earn';
-                wrap.append(inner);
-                p.append(wrap);
+                const prof = document.createElement('span');
+                prof.className = 'pp-profit';
+                wrap.append(inner, prof);
+                total.after(wrap);
             }
             const span = wrap.querySelector('.pp-earn');
+            const profSpan = wrap.querySelector('.pp-profit');
+            profSpan.textContent = '';
             const e = earningsFor(ids);
             span.classList.toggle('pp-earn-wait', e.state !== 'ok');
             if (e.state === 'wait') { span.textContent = 'Earn …'; span.title = 'Asking the Mini'; return; }
             if (e.state === 'unknown') { span.textContent = 'Earn ?'; span.title = 'Earnings unknown: ' + e.why; return; }
             const m = v => '$' + v.toFixed(2);
             span.textContent = 'Earn ' + m(e.earnings) + (e.cancelled ? ' (cancel requested)' : '');
+            const ec = ppEconomics || {};
+            const post = postageFor(card);
+            const profit = e.profitBeforePostage - post.amount;
+            profSpan.textContent = ` · Profit ~${m(profit)}`;
+            profSpan.title = [
+                `Earnings ${m(e.earnings)}`,
+                `− ${m(e.stickerCost)} for ${e.stickers} sticker${e.stickers === 1 ? '' : 's'} at $${Number(ec.sticker_cost || 0).toFixed(4)} average cost`,
+                `− ${m(post.amount)} postage, ${post.kind}`,
+                `≈ Profit ${m(profit)}`,
+                '',
+                'Shop averages: sticker cost is measured over the trailing 12 months of print orders (' + (ec.sticker_cost_basis || '?') + ').',
+                'A 4in sticker costs more than a 3in.',
+                e.packUnknown ? 'A pack listed without a count was counted as 1 sticker, so this is high.' : null
+            ].filter(l => l !== null).join('\n');
             span.title = [
                 `Subtotal ${m(e.subtotal)}`,
                 e.discount ? `− Discount ${m(e.discount)}` : null,
@@ -1759,30 +1802,41 @@
         // One pill at the right of the batch bar: what the orders still to
         // ship will earn. Shipped cards drop out as they are marked.
         function renderEarningsTotal() {
-            const bar = document.querySelector(CONFIG.selectors.batchSelect);
-            let el = document.getElementById('pp-earn-total');
-            if (!bar || !ppApiEnabled()) { if (el) el.remove(); return; }
-            if (!el) { el = document.createElement('span'); el.id = 'pp-earn-total'; }
-            if (el.parentElement !== bar) bar.appendChild(el);
-            let total = 0, sales = 0, n = 0, waiting = 0, unknown = 0;
+            const el = document.getElementById('pp-earn-total');
+            if (!el) return;
+            if (!ppApiEnabled()) { el.textContent = ''; return; }
+            let total = 0, sales = 0, n = 0, waiting = 0, unknown = 0, profitSum = 0;
             batchSelectCandidates().forEach(card => {
                 const ids = (card.dataset.orderId || '').split(',').filter(Boolean);
                 if (!ids.length) return;
                 const e = earningsFor(ids);
                 if (e.state === 'wait') waiting++;
                 else if (e.state === 'unknown') unknown++;
-                else { total += e.earnings; sales += e.subtotal - e.discount + e.shipping; n++; }
+                else { total += e.earnings; profitSum += e.profitBeforePostage - postageFor(card).amount; sales += e.subtotal - e.discount + e.shipping; n++; }
             });
             el.textContent = '';
-            el.append('Earnings to ship: ');
-            const strong = document.createElement('strong');
-            strong.textContent = '$' + total.toFixed(2);
-            el.append(strong, ` · ${n} order${n === 1 ? '' : 's'}`);
-            if (waiting) el.append(` · ${waiting} loading`);
-            if (unknown) el.append(` · ${unknown} unknown`);
-            if (ppEarningsError) el.append(' · ⚠');
+            const row = (label, value) => {
+                const r = document.createElement('div');
+                r.className = 'pp-row';
+                const l = document.createElement('span');
+                l.textContent = label;
+                const v = document.createElement('strong');
+                v.textContent = '$' + value.toFixed(2);
+                r.append(l, v);
+                el.append(r);
+            };
+            row(`Earnings to ship (${n} order${n === 1 ? '' : 's'})`, total);
+            row('Est. profit', profitSum);
+            const note = [waiting ? `${waiting} loading` : '', unknown ? `${unknown} unknown` : '',
+                ppEarningsError ? '⚠ last request failed' : ''].filter(Boolean).join(' · ');
+            if (note) {
+                const sub = document.createElement('div');
+                sub.className = 'pp-earn-sub';
+                sub.textContent = note;
+                el.append(sub);
+            }
             el.title = `Buyers paid $${sales.toFixed(2)} for these ${n} orders (before tax); eBay keeps fees and General ad fees.\n` +
-                'Not included: Priority ad clicks, postage.' +
+                'Not included: Priority ad clicks.\nProfit = earnings − average sticker cost − postage per envelope ($0.10 standard, $0.25 large, $0.78 tracked). Hover a card for its breakdown.' +
                 (ppEarningsError ? `\n\nLast request failed: ${ppEarningsError}` : '');
         }
         ppEarningsOnUpdate = () => {
@@ -2023,8 +2077,8 @@
                 const infoBlock = document.createElement('div');
                 infoBlock.className = CONFIG.classNames.shippingInfoBlock;
                 const totalHTML = totalItemsPrice > USER_CONFIG.trackingOrderAmountThreshold
-                    ? `<strong style="color: #000; background: #ffd54f; padding: 2px 6px; border-radius: 4px; font-weight: 700;">Total: $${totalItemsPrice.toFixed(2)}</strong>`
-                    : `<strong>Total: $${totalItemsPrice.toFixed(2)}</strong>`;
+                    ? `<strong style="color: #000; background: #ffd54f; padding: 2px 6px; border-radius: 4px; font-weight: 700;" class="pp-total">Total: $${totalItemsPrice.toFixed(2)}</strong>`
+                    : `<strong class="pp-total">Total: $${totalItemsPrice.toFixed(2)}</strong>`;
                 let shippingText = 'Free Shipping';
                 if (transactionCell.querySelector(CONFIG.selectors.buyerPaidService)?.innerText.trim() && !transactionCell.querySelector(CONFIG.selectors.buyerPaidService)?.innerText.trim().includes("$0.00")) {
                     const shippingCostMatch = transactionCell.querySelector(CONFIG.selectors.buyerPaidService)?.innerText.trim().match(/\$\d+\.\d{2}/);
@@ -5406,6 +5460,10 @@
                 historyLink.onmouseenter = () => { historyLink.style.color = isDarkMode ? '#78BFFF' : '#3665f3'; };
                 historyLink.onmouseleave = () => { historyLink.style.color = isDarkMode ? '#8a8a8a' : '#999'; };
                 historyLink.addEventListener('click', (e) => { e.preventDefault(); showEnvelopeHistoryModal(); });
+                const earnSlot = document.createElement('div');
+                earnSlot.id = 'pp-earn-total';
+                contentWrapper.appendChild(earnSlot);
+                setTimeout(() => { try { if (ppEarningsOnUpdate) ppEarningsOnUpdate(); } catch (err) { console.error('[Earnings] refill failed:', err); } }, 0);
                 contentWrapper.appendChild(historyLink);
 
                 // --- Defaults panel (separate floating panel) ---
@@ -7014,9 +7072,6 @@
     // the asks are batched into one request a moment later, so a page of 40
     // cards is one round trip. Answers are kept for this page load. A failed
     // request is not cached, so the next re-render asks again.
-    var ppEarningsCache = new Map();
-    var ppEarningsQueue = new Set();
-    var ppEarningsTimer = null, ppEarningsError = '', ppEarningsOnUpdate = null;
     function ppQueueEarnings(ids) {
         ids.forEach(id => { if (id && !ppEarningsCache.has(id)) ppEarningsQueue.add(id); });
         clearTimeout(ppEarningsTimer);
@@ -7030,6 +7085,7 @@
             const d = r.transport === 'ok' && r.http === 200 ? r.data : null;
             if (d && d.orders) {
                 Object.entries(d.orders).forEach(([id, v]) => ppEarningsCache.set(id, v));
+                if (d.economics) ppEconomics = d.economics;
                 ppEarningsError = d.status === 'ok' ? '' : (d.detail || 'the Mini could not read eBay');
             } else {
                 ppEarningsError = ppDescribe(r);

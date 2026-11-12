@@ -1,5 +1,17 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.70
+- **The per-card figures now show.** v4.69 painted only the total: a declaration lower in the
+  script reset the repaint hook after the page had set it.
+- The figures sit **right after the Total**: `Total: $10.98 · Earn $6.96 · Profit ~$5.91`.
+- **Estimated profit** = earnings − stickers shipped × the shop's average sticker cost (measured on
+  the Mini from the last 12 months of print orders) − postage for the envelope: **$0.10** standard,
+  **$0.25** large/manila, **$0.78** tracked label (orders over the tracking threshold). A combined
+  card is one envelope. Hover for the breakdown. Postage figures can be overridden with
+  `USER_CONFIG.postageEstimate`.
+- The **Earnings to ship / Est. profit** totals moved from eBay's batch bar into the SKU panel,
+  above History. The bar is untouched again.
+
 ## v4.69
 - **Earn $X.XX** after each card's Total: what the order pays after the discount, eBay's
   transaction fees and the General ad fee, read from the Mini (`POST /pp/earnings`). Hover it for
