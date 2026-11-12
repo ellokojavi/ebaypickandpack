@@ -1,5 +1,15 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.87
+- **Reload on focus, no buttons.** With *Always run the latest version* on, coming back to the bulk
+  shipping tab checks for a new version at once. The Mini answers in about 0.3s. If there is one,
+  the page reloads by itself.
+- **Also checks every 5 minutes.** If a new version is found while the tab is in the background,
+  it reloads then. If you are using the tab, it reloads the next time you come back to it.
+- **Never in the middle of work that would break:** a running shipping batch, an order waiting for
+  eBay, an address being edited, or an open dialog. It reloads as soon as that finishes.
+- Replaces v4.85's 5-second polling and 2-minute idle rule.
+
 ## v4.86
 - No functional change: a version bump to test that an open bulk page reloads by itself when idle.
 
