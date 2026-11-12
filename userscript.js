@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v4.88-focus-test
+// @version      20261111-v4.89-focus-only
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -2066,8 +2066,8 @@
         // After that, checks every 5 minutes or so. If I put the focus and a new version is
         // available, it automatically refreshes." No buttons, no waiting for idle).
         //  - Focus on the tab: check at once (the Mini answers in ~0.3s); a newer version reloads.
-        //  - Every 5 minutes: check. Newer and the tab is in the background: reload now. Newer
-        //    while it is in use: reload the next time it gets focus.
+        //  - Nothing else (v4.89, Javier): a new version only ever comes from a coding session,
+        //    never while picking and packing, so there is no timer. Checking on focus is enough.
         //  - Never mid-flight: a running shipping batch, an order waiting for eBay, an address
         //    being edited or an open dialog would break or be lost, so the reload waits for it to
         //    finish (re-checked every 5s, no network).
@@ -2128,7 +2128,6 @@
             ppAutoReload.started = true;
             window.addEventListener('focus', () => ppAutoCheck('focus'));
             document.addEventListener('visibilitychange', () => { if (!document.hidden) ppAutoCheck('focus'); });
-            setInterval(() => ppAutoCheck('timer'), 5 * 60000);
         }
 
         ppEarningsOnUpdate = () => {

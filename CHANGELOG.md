@@ -1,5 +1,10 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.89
+- **Checks for a new version only when you come back to the tab.** The 5-minute timer is gone: a
+  new version only ever comes from a coding session, never while picking and packing, so checking
+  on focus is enough.
+
 ## v4.88
 - No functional change: a version bump to test reload-on-focus.
 
