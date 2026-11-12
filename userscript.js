@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v4.72-profit-only-spinners
+// @version      20261111-v4.73-cost-by-size
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -1746,7 +1746,14 @@
                 shipping: sum('shipping'), fees: sum('fees'), adFee: sum('ad_fee'),
                 adPosted: rs.some(r => r.ad_fee_posted), cancelled: rs.some(r => r.cancelled),
                 profitBeforePostage: sum('profit_before_postage'), stickerCost: sum('sticker_cost_total'), stickers: sum('stickers'),
-                orders: rs.length, packUnknown: rs.some(r => r.pack_unknown)
+                orders: rs.length, packUnknown: rs.some(r => r.pack_unknown),
+                // per-size sticker cost, merged across the card's orders
+                stickerLines: Object.values(rs.flatMap(r => r.sticker_lines || []).reduce((acc, l) => {
+                    const k = l.size;
+                    acc[k] = acc[k] || { size: k, n: 0, unit: l.unit };
+                    acc[k].n += l.n;
+                    return acc;
+                }, {}))
             };
         }
         // Postage per envelope, Javier's figures (Nov 11 2026). One card is one
@@ -1824,12 +1831,14 @@
                 `− eBay transaction fees ${m(e.fees)}`,
                 e.adPosted ? `− Ad fee (General) ${m(e.adFee)}` : '− Ad fee: none booked',
                 `= eBay pays ${m(e.earnings)}`,
-                `− ${m(e.stickerCost)} for ${e.stickers} sticker${e.stickers === 1 ? '' : 's'} at $${Number(ec.sticker_cost || 0).toFixed(4)} average cost`,
+                ...(e.stickerLines.length ? e.stickerLines.map(l =>
+                    `− ${m(l.n * l.unit)} for ${l.n} × ${l.size === 'blended' ? 'sticker of unknown size' : l.size} at $${Number(l.unit).toFixed(2)}`)
+                    : [`− ${m(e.stickerCost)} for ${e.stickers} sticker${e.stickers === 1 ? '' : 's'}`]),
                 `− ${m(post.postage)} postage, ${post.kind}`,
                 `− ${m(post.packing)} envelope and printing`,
                 `≈ Profit ${m(profit)}`,
                 '',
-                'Sticker cost is the shop average over the last 12 months of print orders; a 4in costs more than a 3in.',
+                'Sticker cost by size is what stock on the shelf cost (last 12 months of print orders, Sticker Mule promos included).',
                 'Not included: Priority ad clicks.',
                 e.packUnknown ? 'A pack listed without a count was counted as 1 sticker, so this is high.' : null
             ].filter(l => l !== null).join('\n');

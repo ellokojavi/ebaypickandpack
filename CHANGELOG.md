@@ -1,5 +1,12 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.73
+- **Sticker cost by size.** Profit now costs each sticker by its size (3in, 4in, 5in, 6in and up)
+  from what that size cost on the shelf over the last 12 months of print orders, Sticker Mule promo
+  stickers included. The Mini works out each line's size (a variation's own size wins over the
+  title). The tooltip lists it per size, e.g. `− $1.36 for 2 × 4in at $0.68`. A line with no
+  readable size uses the shop's average.
+
 ## v4.72
 - **Profit only.** Cards read `Total: $10.98 · Profit ~$5.76`; the separate "Earn" figure is gone.
   Hovering the profit shows the whole arithmetic: subtotal, discount, eBay fees, ad fee, what eBay
