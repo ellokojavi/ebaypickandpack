@@ -1,5 +1,12 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.79
+- The profit total moved to the top of the SKU panel. It now reads **Est. profit: $X**,
+  right-aligned on the "checked just now" line, in green at that line's size. The box at the
+  bottom of the panel is gone. Hover it for the details (orders counted, what eBay pays, still
+  loading, left out). While loading it shows a spinner; when the Mini is down it turns amber with
+  a **retry** link.
+
 ## v4.78
 - **The Defaults panel no longer falls off the bottom of the screen** when the SKU list is long.
   The left column is now laid out as a whole. If both panels fit, nothing changes. If not, the

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v4.78-fit-left-column
+// @version      20261111-v4.79-profit-in-header
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -582,13 +582,10 @@
                 strong.pp-total { white-space: nowrap; }
                 @keyframes pp-rot { to { transform: rotate(360deg); } }
                 @keyframes pp-dots { to { clip-path: inset(0 0 0 0); } }
-                #pp-earn-total { margin-top: 10px; padding: 8px 10px; border-radius: 8px; font-size: 13px; line-height: 1.6; cursor: help; color: ${isDarkMode ? '#ccc' : '#444'}; background: ${isDarkMode ? 'rgba(126,226,168,0.08)' : '#e6f4ea'}; }
-                #pp-earn-total:empty { display: none; }
-                #pp-earn-total .pp-row { display: flex; justify-content: space-between; gap: 8px; }
-                #pp-earn-total strong { color: ${isDarkMode ? '#7ee2a8' : '#137333'}; }
-                #pp-earn-total .pp-earn-sub { font-size: 11px; color: ${isDarkMode ? '#8a8a8a' : '#777'}; }
-                #pp-earn-total .pp-earn-offline { color: ${isDarkMode ? '#d99e3c' : '#9a6a08'}; margin-top: 4px; }
-                #pp-earn-total .pp-earn-offline a { color: inherit; text-decoration: underline; cursor: pointer; }
+                #SKUListContainer #pp-earn-total { margin-left: auto; white-space: nowrap; font-size: 11px; font-weight: 600; cursor: help; color: ${isDarkMode ? '#7ee2a8' : '#137333'}; }
+                #SKUListContainer #pp-earn-total:empty { display: none; }
+                #SKUListContainer #pp-earn-total.pp-earn-warn { color: ${isDarkMode ? '#d99e3c' : '#9a6a08'}; }
+                #SKUListContainer #pp-earn-total a { color: inherit; text-decoration: underline; cursor: pointer; }
                 .${CONFIG.classNames.shippingInfoBlock} ${CONFIG.selectors.uniqueOrderIdLink} { font-weight: bold; color: ${isDarkMode ? '#99ccff' : '#003087'}; }
                 .${CONFIG.classNames.buyerNoteCallout} { display: flex; align-items: flex-start; gap: 8px; margin: -2px 0 10px; padding: 8px 12px; border-radius: 8px; border-left: 3px solid ${isDarkMode ? '#c97d20' : '#f59e0b'}; background: ${isDarkMode ? 'rgba(255,179,71,0.08)' : '#fffbeb'}; font-size: 13px; line-height: 1.45; color: ${isDarkMode ? '#FFD580' : '#78350f'}; }
                 .${CONFIG.classNames.buyerNoteCallout} .buyer-note-icon { flex: 0 0 auto; font-size: 14px; line-height: 1.4; }
@@ -1981,18 +1978,31 @@
                 e.packUnknown ? 'A pack listed without a count was counted as 1 sticker, so this is high.' : null
             ].filter(l => l !== null).join('\n');
         }
-        // Total under the SKU list: estimated profit on the orders still to ship.
-        // Shipped cards drop out as they are marked.
+        // "Est. profit: $X" at the right of the "checked just now" row (v4.79, Javier). The
+        // profit on the orders still to ship; shipped cards drop out as they are marked.
         function renderEarningsTotal() {
-            const el = document.getElementById('pp-earn-total');
-            if (!el) return;
-            // The profit row fills in after the Defaults panel was placed under the SKU panel, so
-            // the SKU panel grew underneath it and History was hidden (seen live, v4.75). Re-place
-            // the Defaults panel whenever the SKU panel changes height, whatever made it change.
-            const skuPanel = document.getElementById(CONFIG.ids.skuPanelContainer);
-            if (skuPanel && !skuPanel.ppResizeWatched && typeof ResizeObserver !== 'undefined') {
-                skuPanel.ppResizeWatched = true;
-                new ResizeObserver(() => { try { updateSkuPanelPosition(); } catch (err) {} }).observe(skuPanel);
+            const panel = document.getElementById(CONFIG.ids.skuPanelContainer);
+            if (!panel) return;
+            // The profit row fills in after the Defaults panel was placed: lay out again whenever
+            // the SKU panel changes height (v4.76).
+            if (!panel.ppResizeWatched && typeof ResizeObserver !== 'undefined') {
+                panel.ppResizeWatched = true;
+                new ResizeObserver(() => { try { updateSkuPanelPosition(); } catch (err) {} }).observe(panel);
+            }
+            let el = document.getElementById('pp-earn-total');
+            const row = panel.querySelector(`.${CONFIG.classNames.orderWatchStatus}`);
+            if (!el) {
+                el = document.createElement('span');
+                el.id = 'pp-earn-total';
+            }
+            if (row && el.parentElement !== row) row.appendChild(el);
+            else if (!row && !el.isConnected) {
+                // Order watch turned off: no status row, so give the figure a row of its own.
+                const own = document.createElement('div');
+                own.className = CONFIG.classNames.orderWatchStatus;
+                own.append(el);
+                const title = panel.querySelector('h2.sku-title');
+                if (title) title.insertAdjacentElement('afterend', own); else panel.prepend(own);
             }
             if (!ppApiEnabled()) { el.textContent = ''; el.dataset.sig = ''; return; }
             let n = 0, waiting = 0, unknown = 0, profitSum = 0, paid = 0;
@@ -2005,58 +2015,40 @@
                 else { profitSum += e.profitBeforePostage - postageFor(card).amount; paid += e.earnings; n++; }
             });
             const down = ppMini.down;
-            // Same signature, nothing to redraw: keeps the spinner from restarting.
             const sig = [n, waiting, unknown, profitSum.toFixed(2), down, !!ppEarningsError].join('|');
-            if (el.dataset.sig === sig) return;
+            if (el.dataset.sig === sig && el.childNodes.length) return; // keeps the spinner from restarting
             el.dataset.sig = sig;
             el.textContent = '';
-            const r = document.createElement('div');
-            r.className = 'pp-row';
-            const l = document.createElement('span');
-            const v = document.createElement('strong');
-            if (n === 0 && waiting && !down) {
-                l.textContent = 'Est. profit';
-                v.append(...ppLoadingNodes(''));
-            } else {
-                l.textContent = `Est. profit (${n} order${n === 1 ? '' : 's'})`;
-                v.textContent = (profitSum < 0 ? '−$' : '$') + Math.abs(profitSum).toFixed(2);
-            }
-            r.append(l, v);
-            el.append(r);
+            el.classList.toggle('pp-earn-warn', down);
+            const money = (profitSum < 0 ? '−$' : '$') + Math.abs(profitSum).toFixed(2);
             if (down) {
-                const off = document.createElement('div');
-                off.className = 'pp-earn-sub pp-earn-offline';
-                off.textContent = `⚠ Mini not responding${waiting ? ` · ${waiting} order${waiting === 1 ? '' : 's'} not loaded` : ''} · `;
+                el.append(`⚠ Est. profit: ${n ? money : '—'} · `);
                 const retry = document.createElement('a');
-                retry.href = '#';
-                retry.textContent = 'Retry now';
+                retry.textContent = 'retry';
                 retry.addEventListener('click', async (ev) => {
                     ev.preventDefault();
                     retry.textContent = '';
-                    retry.append(...ppLoadingNodes('Checking'));
+                    retry.append(...ppLoadingNodes('checking'));
                     if (!(await ppRetryMini())) { el.dataset.sig = ''; renderEarningsTotal(); }
                 });
-                off.append(retry);
-                off.title = ppMiniDownText() + '\nShip, message and notes go through tabs until it answers.';
-                el.append(off);
-            } else if (waiting && n) {
-                const more = document.createElement('div');
-                more.className = 'pp-earn-sub';
-                more.append(...ppLoadingNodes(`Loading ${waiting} more`));
-                el.append(more);
+                el.append(retry);
+            } else if (n === 0 && waiting) {
+                el.append(...ppLoadingNodes('Est. profit'));
+            } else {
+                el.append(`Est. profit: ${money}`);
+                if (waiting) { const sp = document.createElement('span'); sp.className = 'pp-spin'; el.append(sp); }
             }
-            const note = [unknown ? `${unknown} unknown` : '', !down && ppEarningsError ? '⚠ last request failed' : '']
-                .filter(Boolean).join(' · ');
-            if (note) {
-                const sub = document.createElement('div');
-                sub.className = 'pp-earn-sub';
-                sub.textContent = note;
-                el.append(sub);
-            }
-            el.title = `eBay pays $${paid.toFixed(2)} for these ${n} orders after the discount, fees and General ad fees.\n` +
-                'Profit then takes off the average sticker cost, postage per envelope ($0.10 standard, $0.25 large, $0.78 tracked) and $0.15 for the envelope and printing. ' +
-                'Not included: Priority ad clicks. Hover a card for its breakdown.' +
-                (ppEarningsError ? `\n\nLast request failed: ${ppEarningsError}` : '');
+            const lines = [
+                `Estimated profit on the ${n} order${n === 1 ? '' : 's'} still to ship.`,
+                `eBay pays $${paid.toFixed(2)} for them after the discount, fees and General ad fees.`,
+                'Then: average sticker cost by size, postage per envelope ($0.10 standard, $0.25 large, $0.78 tracked) and $0.15 for the envelope and printing.',
+                'Not included: Priority ad clicks. Hover a card for its breakdown.'
+            ];
+            if (waiting) lines.push(`${waiting} order${waiting === 1 ? '' : 's'} still loading.`);
+            if (unknown) lines.push(`${unknown} order${unknown === 1 ? '' : 's'} could not be priced and are left out.`);
+            if (down) lines.push('', ppMiniDownText(), 'Ship, message and notes go through tabs until it answers.');
+            else if (ppEarningsError) lines.push('', `Last request failed: ${ppEarningsError}`);
+            el.title = lines.join('\n');
         }
         ppEarningsOnUpdate = () => {
             document.querySelectorAll(CONFIG.selectors.orderItem).forEach(card => {
@@ -3637,6 +3629,7 @@
             el.classList.toggle(CONFIG.classNames.orderWatchStatusWarn, state.tone === 'warn');
             const label = el.querySelector(`.${CONFIG.classNames.orderWatchStatusLabel}`);
             if (label) label.textContent = `· ${state.text} ·`;
+            if (!el.querySelector('#pp-earn-total')) { try { renderEarningsTotal(); } catch (e) {} }
         }
 
         function flashOrderWatchStatus(text) {
@@ -5679,9 +5672,6 @@
                 historyLink.onmouseenter = () => { historyLink.style.color = isDarkMode ? '#78BFFF' : '#3665f3'; };
                 historyLink.onmouseleave = () => { historyLink.style.color = isDarkMode ? '#8a8a8a' : '#999'; };
                 historyLink.addEventListener('click', (e) => { e.preventDefault(); showEnvelopeHistoryModal(); });
-                const earnSlot = document.createElement('div');
-                earnSlot.id = 'pp-earn-total';
-                contentWrapper.appendChild(earnSlot);
                 setTimeout(() => { try { if (ppEarningsOnUpdate) ppEarningsOnUpdate(); } catch (err) { console.error('[Earnings] refill failed:', err); } }, 0);
                 contentWrapper.appendChild(historyLink);
 
