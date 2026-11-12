@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v4.75-dev-channel
+// @version      20261111-v4.76-panel-overlap
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -1907,6 +1907,14 @@
         function renderEarningsTotal() {
             const el = document.getElementById('pp-earn-total');
             if (!el) return;
+            // The profit row fills in after the Defaults panel was placed under the SKU panel, so
+            // the SKU panel grew underneath it and History was hidden (seen live, v4.75). Re-place
+            // the Defaults panel whenever the SKU panel changes height, whatever made it change.
+            const skuPanel = document.getElementById(CONFIG.ids.skuPanelContainer);
+            if (skuPanel && !skuPanel.ppResizeWatched && typeof ResizeObserver !== 'undefined') {
+                skuPanel.ppResizeWatched = true;
+                new ResizeObserver(() => { try { updateSkuPanelPosition(); } catch (err) {} }).observe(skuPanel);
+            }
             if (!ppApiEnabled()) { el.textContent = ''; el.dataset.sig = ''; return; }
             let n = 0, waiting = 0, unknown = 0, profitSum = 0, paid = 0;
             batchSelectCandidates().forEach(card => {

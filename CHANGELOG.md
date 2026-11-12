@@ -1,5 +1,11 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.76
+- The Defaults panel no longer covers the bottom of the SKU panel. The profit row fills in after
+  the Defaults panel has been placed, so the SKU panel grew underneath it and hid History. The
+  Defaults panel now moves whenever the SKU panel changes height. Found in the first live test
+  through the dev channel.
+
 ## v4.75
 - **Dev channel, for testing a push without reinstalling.** A tab that holds
   `sessionStorage['pp-dev-channel']` runs the newest commit on `main` instead of the installed
