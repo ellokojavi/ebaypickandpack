@@ -1,5 +1,15 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.98
+- **Settings starts collapsed** on every page load. While collapsed, its header shows a summary,
+  e.g. `thank-you ✓ · Mini ✓ · auto-update ✓ · ships Tomorrow`. Once opened, it stays open for the
+  rest of the visit.
+- **Smaller eBay header.** It used to take 98px before the first order, mostly the 50px logo box.
+  The logo is now a third smaller and the margins are tighter, so the orders start about 50px
+  higher.
+- The left column now lines up with the top of the orders column wherever the header ends,
+  instead of a fixed 110px.
+
 ## v4.97
 - **Buy shipping label →** sits to the right of **Print Envelope**, on the same line, saving a line
   on every card. A "Sent to printer" note, when there is one, follows after it.

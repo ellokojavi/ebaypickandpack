@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v4.97-label-link-inline
+// @version      20261111-v4.98-settings-collapsed-small-header
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -705,6 +705,12 @@
                 #${CONFIG.ids.printAllEnvelopesButton}:hover { box-shadow: 0 2px 2px rgba(255,255,255,0.12); }
                 ${CONFIG.selectors.headerBottom} { display: flex; align-items: center; gap: 20px; padding-top: 0px; }
                 ${CONFIG.selectors.header} { margin-bottom: 0; }
+                /* Smaller eBay header (v4.98, Javier): it took 98px before the first order, mostly a
+                   50px logo box. The logo is a CSS background, so it is resized, not replaced. The
+                   orders now start ~50px higher. */
+                ${CONFIG.selectors.header} { margin-top: 2px !important; padding-bottom: 0 !important; }
+                ${CONFIG.selectors.headerBottom} .ebay-logo { margin: 4px 8px 4px 0 !important; height: 30px !important; width: 68px !important; background-size: auto 27px !important; background-position: left center !important; }
+                ${CONFIG.selectors.headerBottom} .header__links { margin-top: 0 !important; }
                 ${CONFIG.selectors.ordersContainer} { margin-bottom: 0 !important; }
                 .${CONFIG.classNames.markAsShippedBtn} { display: block; width: 100%; margin-top: 10px; padding: 8px 12px; font-size: 14px; font-weight: bold; color: #fff !important; background-color: ${isDarkMode ? '#3665f3' : '#0070d2'}; border: none; border-radius: 6px; cursor: pointer; text-align: center; text-decoration: none !important; transition: background-color 0.2s ease; }
                 .${CONFIG.classNames.markAsShippedBtn}:hover { background-color: ${isDarkMode ? '#5a82f5' : '#005fb8'}; text-decoration: none !important; }
@@ -1166,7 +1172,13 @@
         //    back. Its position is a pure function of scrollY, so it never drifts.
         //  - Either way it stops above the eBay footer instead of covering it, and the footer is
         //    pushed down when the page is too short to show the whole column above it.
-        const LEFT_COLUMN_TOP = 110, LEFT_GAP = 12, LEFT_BOTTOM = 12, LEFT_PINNED_TOP = 20;
+        const LEFT_GAP = 12, LEFT_BOTTOM = 12, LEFT_PINNED_TOP = 20;
+        // Where the column starts on the page: level with the orders column. It was a fixed 110px,
+        // which stopped matching once the header got smaller (v4.98).
+        function leftColumnTop() {
+            const orders = document.querySelector(CONFIG.selectors.bulkLabelsAppCard);
+            return orders ? Math.round(orders.getBoundingClientRect().top + window.scrollY) : 110;
+        }
         function layoutLeftColumn() {
             const skuPanel = document.getElementById(CONFIG.ids.skuPanelContainer);
             const configPanel = document.getElementById('altheastix-config-container');
@@ -1192,13 +1204,13 @@
                 // Room for the whole column above the footer, measured without our own margin.
                 const ours = parseFloat(footer.style.getPropertyValue('margin-top')) || 0;
                 const naturalTopDoc = footer.getBoundingClientRect().top + window.scrollY - ours;
-                const need = Math.ceil(LEFT_COLUMN_TOP + columnH + 24 - naturalTopDoc);
+                const need = Math.ceil(leftColumnTop() + columnH + 24 - naturalTopDoc);
                 if (need > 0) {
                     if (Math.abs(need - ours) > 1) footer.style.setProperty('margin-top', `${need}px`, 'important');
                 } else if (ours) footer.style.removeProperty('margin-top');
                 footerTopVp = footer.getBoundingClientRect().top;
             }
-            let top = Math.max(LEFT_COLUMN_TOP - window.scrollY,
+            let top = Math.max(leftColumnTop() - window.scrollY,
                 Math.min(LEFT_PINNED_TOP, window.innerHeight - columnH - LEFT_BOTTOM));
             top = Math.min(top, footerTopVp - columnH - 24);
             skuPanel.style.top = `${Math.round(top)}px`;
@@ -2103,6 +2115,10 @@
         // The commit comes from the Mini (POST /pp/version: one git lookup per 4s however many tabs
         // ask), so GitHub's 60-an-hour API limit is never touched; with no Mini login it falls back
         // to the GitHub API at most every 5 minutes. Only this page reloads itself.
+        // Settings starts collapsed on every page load (v4.98, Javier). Opening it holds for the
+        // rest of the visit, even though the panel is rebuilt on every tick and ship; it is not
+        // remembered across reloads.
+        let ppSettingsOpen = false;
         const ppAutoReload = { pending: null, blockedBy: '', lastApiCheck: 0, paint: null, busy: false, retry: null };
         function ppReloadBlocker() {
             if (shipQueue && shipQueue.running) return 'a shipping batch is running';
@@ -5810,13 +5826,16 @@
                 configSection.style.cssText = 'padding: 10px 15px;';
 
                 const CFG_COLLAPSED_KEY = 'configPanelCollapsed';
-                const cfgIsCollapsed = localStorage.getItem(CFG_COLLAPSED_KEY) !== 'false';
+                const cfgIsCollapsed = !ppSettingsOpen;
 
                 const cfgHeader = document.createElement('div');
                 cfgHeader.style.cssText = `display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px; color: ${isDarkMode ? '#e0e0e0' : '#333'}; cursor: pointer; user-select: none;`;
                 const cfgTitle = document.createElement('span');
                 cfgTitle.textContent = 'Settings';
-                cfgTitle.style.cssText = 'flex: 1 1 auto;';
+                cfgTitle.style.cssText = 'flex: 0 0 auto;';
+                // While collapsed, the header says what is set, so it rarely needs opening.
+                const cfgSummary = document.createElement('span');
+                cfgSummary.style.cssText = `flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 400; color: ${isDarkMode ? '#8a8a8a' : '#888'};`;
                 const cfgChevron = document.createElement('span');
                 cfgChevron.textContent = cfgIsCollapsed ? '▸' : '▾';
                 cfgChevron.style.cssText = 'font-size: 11px; opacity: 0.6;';
@@ -5842,7 +5861,7 @@
                     PrintSKUTable();
                 });
 
-                cfgHeader.append(cfgTitle, darkWrap, cfgChevron);
+                cfgHeader.append(cfgTitle, cfgSummary, darkWrap, cfgChevron);
                 configSection.appendChild(cfgHeader);
 
                 const cfgBody = document.createElement('div');
@@ -6144,11 +6163,24 @@
                 });
 
                 configSection.appendChild(cfgBody);
+                const paintCfgSummary = () => {
+                    const on = (key, d) => { try { return !!GM_getValue(key, d); } catch (e) { return d; } };
+                    const parts = [
+                        on(THANK_YOU_GLOBAL_KEY, true) ? 'thank-you ✓' : 'no thank-you',
+                        ppConfigured() ? (ppApiEnabled() ? 'Mini ✓' : 'Mini off') : null,
+                        on(PP_AUTO_KEY, false) ? 'auto-update ✓' : null,
+                        'ships ' + (on(SHIP_WHEN_TOMORROW_KEY, true) ? 'Tomorrow' : 'Today')
+                    ].filter(Boolean);
+                    cfgSummary.textContent = cfgBody.style.display === 'none' ? parts.join(' · ') : '';
+                    cfgSummary.title = cfgSummary.textContent;
+                };
+                paintCfgSummary();
                 cfgHeader.addEventListener('click', () => {
                     const nowCollapsed = cfgBody.style.display !== 'none';
                     cfgBody.style.display = nowCollapsed ? 'none' : 'block';
                     cfgChevron.textContent = nowCollapsed ? '▸' : '▾';
-                    localStorage.setItem(CFG_COLLAPSED_KEY, String(nowCollapsed));
+                    ppSettingsOpen = !nowCollapsed;
+                    paintCfgSummary();
                     updateSkuPanelPosition();
                 });
 
