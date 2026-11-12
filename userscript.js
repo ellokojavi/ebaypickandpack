@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v4.91-compact-no-overflow
+// @version      20261111-v4.92-compact-price-only
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -623,6 +623,8 @@
                 ${CONFIG.selectors.orderItem}.pp-compact ${CONFIG.selectors.itemDetailsContainer} { order: 1; flex-direction: row !important; align-items: baseline; gap: 10px; min-width: 0 !important; flex-shrink: 0; margin: 0; padding: 0; }
                 ${CONFIG.selectors.orderItem}.pp-compact ${CONFIG.selectors.itemDetailsContainer} li { white-space: nowrap; font-size: 12px !important; }
                 ${CONFIG.selectors.orderItem}.pp-compact ${CONFIG.selectors.itemDetailsContainer} li:empty { display: none; }
+                ${CONFIG.selectors.orderItem}.pp-compact ${CONFIG.selectors.itemDetailsContainer} li[data-pp-price] { font-size: 0 !important; }
+                ${CONFIG.selectors.orderItem}.pp-compact ${CONFIG.selectors.itemDetailsContainer} li[data-pp-price]::after { content: attr(data-pp-price); font-size: 12px; }
                 ${CONFIG.selectors.orderItem}.pp-compact ${CONFIG.selectors.itemDetailsContainer} li:first-child { font-size: 17px !important; min-width: 120px; }
                 ${CONFIG.selectors.orderItem}.pp-compact ${CONFIG.selectors.itemDetailsContainer} li.${CONFIG.classNames.quantityMulti} { font-size: 15px !important; }
                 .${CONFIG.classNames.reviseLink} {
@@ -2417,6 +2419,10 @@
             let hasManila = false, hasLg = false, skuCount = 0;
             orderItem.querySelectorAll(`${CONFIG.selectors.itemDetailsContainer} li`).forEach(li => {
                 const text = li.innerText;
+                // Compact rows show just the price (v4.92, Javier). Done in CSS from this attribute,
+                // so the li keeps its "Sold for:" text, which other code here reads.
+                const priceOnly = text.trim().match(/^(?:Sold for|Item price):\s*(\S+)/i);
+                if (priceOnly) li.dataset.ppPrice = priceOnly[1];
                 if (/^(Quantity|Qty):\s*/i.test(text) && parseInt(text.replace(/^(?:Quantity|Qty):\s*/i, '')) > 1) li.classList.add(CONFIG.classNames.quantityMulti);
                 if (text.startsWith("SKU: ")) {
                     skuCount++;

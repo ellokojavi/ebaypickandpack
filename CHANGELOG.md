@@ -1,5 +1,9 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.92
+- Compact rows show the price alone, `$4.99` instead of `Sold for: $4.99`, which leaves more room
+  for the title. Cards with 1 or 2 items are unchanged.
+
 ## v4.91
 - Fix for v4.90: on a compact card the buyer box stuck out 24px past the card's right edge.
   eBay's details wrapper grew to fit the longest one-line title. It now stays inside the card,
