@@ -1,5 +1,11 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.00
+- **Items inside an order are sorted by SKU:** box letter, then number, starting with A (A21, A22,
+  A24, A49, A49 DeadLove, B18, D06, ...). An item with no SKU goes last.
+- The sort is visual only. The page elements are not moved, so eBay's own code and the script's
+  printing, SKU list and messages are unaffected.
+
 ## v4.99
 - Shorter Settings summary, which was cut off in the narrow panel. It always shows the ship date,
   and mentions any other setting only when it is not the usual one (e.g. `ships Today · Mini off`).

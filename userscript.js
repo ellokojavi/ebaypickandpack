@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v4.99-settings-summary-short
+// @version      20261111-v5.00-sort-items-by-sku
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -619,7 +619,7 @@
                 ${CONFIG.selectors.orderItem}.pp-compact .orders-list__item__details { flex: 1 1 0 !important; min-width: 0 !important; }
                 ${CONFIG.selectors.orderItem}.pp-compact ${CONFIG.selectors.tcellItem} { overflow: hidden; }
                 ${CONFIG.selectors.orderItem}.pp-compact .item { padding: 3px 0 !important; margin: 0 !important; border-bottom: 1px solid rgba(128,128,128,.18); }
-                ${CONFIG.selectors.orderItem}.pp-compact .item:last-of-type { border-bottom: 0; }
+                ${CONFIG.selectors.orderItem}.pp-compact .item.pp-last-item { border-bottom: 0; }
                 ${CONFIG.selectors.orderItem}.pp-compact .item > div, ${CONFIG.selectors.orderItem}.pp-compact .item > div > div { padding: 0 !important; margin: 0 !important; display: flex; align-items: center; gap: 12px; width: 100%; }
                 ${CONFIG.selectors.orderItem}.pp-compact .item__image { width: 42px !important; height: 42px !important; }
                 ${CONFIG.selectors.orderItem}.pp-compact ${CONFIG.selectors.itemDescription} { display: flex !important; align-items: center; gap: 14px; max-width: none !important; min-width: 0 !important; font-size: 13px !important; padding: 0 !important; }
@@ -2182,6 +2182,30 @@
             try { renderEarningsTotal(); } catch (err) { console.error('[Earnings] total failed:', err); }
         };
 
+        // Items inside a card, sorted by SKU: box letter, then number, then the rest (v5.00, Javier:
+        // "sort the SKUs inside a multi-SKU order by SKU ID, starting with A"). A21 < A22 < A49 <
+        // A49 DeadLove < B18 < ... Visual only, through CSS `order` on eBay's flex container: the
+        // elements are not moved, so eBay's page code and everything here that walks the items
+        // (printing, the SKU panel, messages) still sees eBay's own order. No SKU sorts last.
+        function sortCardItemsBySku(card) {
+            const items = Array.from(card.querySelectorAll('.item'));
+            if (items.length < 2 || new Set(items.map(i => i.parentElement)).size !== 1) return;
+            const keyOf = (it) => {
+                const li = Array.from(it.querySelectorAll(`${CONFIG.selectors.itemDetailsContainer} li`))
+                    .find(l => /^SKU:\s*/.test(l.textContent.trim()));
+                const sku = li ? li.textContent.trim().replace(/^SKU:\s*/, '') : '';
+                const m = sku.match(/^([A-Za-z]+)(\d+)/);
+                return { sku: sku, box: m ? m[1].toUpperCase() : '\uffff', num: m ? parseInt(m[2], 10) : Infinity };
+            };
+            const ranked = items.map((it, i) => ({ it, i, k: keyOf(it) })).sort((a, b) =>
+                a.k.box.localeCompare(b.k.box) || (a.k.num - b.k.num) ||
+                a.k.sku.localeCompare(b.k.sku, undefined, { numeric: true, sensitivity: 'base' }) || (a.i - b.i));
+            ranked.forEach((x, rank) => {
+                x.it.style.order = String(rank);
+                x.it.classList.toggle('pp-last-item', rank === ranked.length - 1);
+            });
+        }
+
         // Re-checks the address exactly as the card now shows it, after Fix or
         // Edit (v4.67). Sends street to City/State/ZIP only: not the buyer's
         // name, not the country line. US addresses only.
@@ -2461,6 +2485,7 @@
             });
             // Orders with 3+ items get one compact row per item (v4.90).
             orderItem.classList.toggle('pp-compact', orderItem.querySelectorAll('.item').length >= 3);
+            sortCardItemsBySku(orderItem);
             if (hasManila) orderItem.classList.add(CONFIG.classNames.highlightManila, CONFIG.classNames.borderManila);
             else if (hasLg) orderItem.classList.add(CONFIG.classNames.highlightLg, CONFIG.classNames.borderLg);
             else if (skuCount > 1) orderItem.classList.add(CONFIG.classNames.highlightMultiItem);
