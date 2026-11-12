@@ -1,5 +1,16 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.77
+- **Always run the latest version** switch in the Defaults panel. When on, every page runs the
+  newest version from GitHub, so a new version arrives on the next reload without pasting.
+  - It runs from a copy kept in Tampermonkey storage, so pages never wait on the network. That copy
+    is refreshed in the background at most every 5 minutes, within GitHub's 60 lookups an hour,
+    even when a shipping batch opens many tabs.
+  - It only runs a copy **newer** than the installed one, so a pasted version still wins.
+  - A copy that fails to start is marked bad and skipped; the installed copy runs instead.
+  - Under the switch: which version is running, and whether a newer one is ready.
+- The dev channel (one test tab) shares the same fetch code.
+
 ## v4.76
 - The Defaults panel no longer covers the bottom of the SKU panel. The profit row fills in after
   the Defaults panel has been placed, so the SKU panel grew underneath it and hid History. The

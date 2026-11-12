@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v4.76-panel-overlap
+// @version      20261111-v4.77-auto-latest
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -37,21 +37,58 @@
     'use strict';
 
     // ===================================================================
-    // DEV CHANNEL (v4.75) -- test the newest push without reinstalling.
-    // A tab that holds sessionStorage 'pp-dev-channel' runs the latest commit
-    // on main instead of this installed copy: the commit is looked up through
-    // the GitHub API (raw.githubusercontent caches main for minutes), fetched
-    // at that exact commit, and run here with the same GM_* grants. Only that
-    // one tab is affected; every other tab, and tabs this script opens, run
-    // the installed copy. A dev badge (bottom left) names the commit and
-    // version. If anything fails the flag is dropped and the tab reloads on
-    // the installed copy, so a broken push cannot leave a dead page.
-    // Turn on:  sessionStorage.setItem('pp-dev-channel','1'); location.reload()
-    // Turn off: sessionStorage.removeItem('pp-dev-channel'); location.reload()
+    // LATEST VERSION WITHOUT REINSTALLING (v4.75 dev channel, v4.77 auto-update)
+    //
+    // Two ways to run a newer commit of this file than the one installed:
+    //
+    // 1. "Always run the latest version" (Defaults panel, GM key pp_auto_latest).
+    //    Every tab runs the newest version from a cache in Tampermonkey storage,
+    //    synchronously, so the page never waits on the network. The cache is
+    //    refreshed in the background at most every 5 minutes (the GitHub API
+    //    allows 60 lookups an hour, and a shipping batch opens many tabs), so a
+    //    push arrives on the next reload after the check. It only runs a cached
+    //    copy NEWER than the installed one, so pasting a newer version still wins.
+    //    A cached copy that throws on start is marked bad and skipped.
+    //
+    // 2. Dev channel (sessionStorage 'pp-dev-channel', one tab only): fetches the
+    //    newest commit before running, for testing a push right away, and shows a
+    //    purple badge. On any failure it drops the flag and reloads.
+    //    On:  sessionStorage.setItem('pp-dev-channel','1'); location.reload()
+    //
+    // The commit is looked up through the GitHub API because raw links to main
+    // are cached for minutes; the file is then fetched at that exact commit.
     // ===================================================================
+    const PP_AUTO_KEY = 'pp_auto_latest', PP_CACHE_KEY = 'pp_latest_cache', PP_BAD_KEY = 'pp_latest_bad_sha';
+    const PP_INSTALLED_VERSION = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '';
+    function ppVersionNum(v) { const m = String(v || '').match(/v(\d+)\.(\d+)/); return m ? (+m[1]) * 1000 + (+m[2]) : 0; }
+    function ppGet(url, headers) {
+        return new Promise((ok, bad) => GM_xmlhttpRequest({
+            method: 'GET', url: url, headers: headers || {}, timeout: 20000, anonymous: true,
+            onload: r => r.status === 200 ? ok(r.responseText) : bad(new Error(url.split('/').slice(2, 3) + ' answered ' + r.status)),
+            onerror: () => bad(new Error('GitHub unreachable')), ontimeout: () => bad(new Error('GitHub timed out'))
+        }));
+    }
+    // Looks up the newest commit and, if it changed, fetches that copy into the cache.
+    async function ppRefreshLatest() {
+        const sha = (await ppGet('https://api.github.com/repos/ellokojavi/ebaypickandpack/commits/main',
+            { Accept: 'application/vnd.github.sha' })).trim();
+        if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error('unexpected commit id');
+        let c = null;
+        try { c = GM_getValue(PP_CACHE_KEY, null); } catch (e) {}
+        if (c && c.sha === sha && c.code) {
+            c.checkedAt = Date.now();
+        } else {
+            const code = await ppGet(`https://raw.githubusercontent.com/ellokojavi/ebaypickandpack/${sha}/userscript.js`);
+            if (!/==UserScript==/.test(code)) throw new Error('fetched file is not the userscript');
+            c = { sha: sha, version: (code.match(/@version\s+(\S+)/) || [])[1] || '?', code: code, checkedAt: Date.now() };
+        }
+        try { GM_setValue(PP_CACHE_KEY, c); } catch (e) {}
+        return c;
+    }
     if (typeof PP_DEV_COPY === 'undefined') {
-        let ppDevFlag = null;
+        let ppDevFlag = null, ppAuto = false;
         try { ppDevFlag = sessionStorage.getItem('pp-dev-channel'); } catch (e) {}
+        try { ppAuto = !!GM_getValue(PP_AUTO_KEY, false); } catch (e) {}
         if (ppDevFlag) {
             const PP_DEV_COPY = true; // the copy run below sees this through eval's scope, and runs normally
             const devFail = (why) => {
@@ -59,37 +96,49 @@
                 try { sessionStorage.removeItem('pp-dev-channel'); sessionStorage.setItem('pp-dev-last-error', why); } catch (e) {}
                 location.reload();
             };
-            const get = (url, headers) => new Promise((ok, bad) => GM_xmlhttpRequest({
-                method: 'GET', url: url, headers: headers || {}, timeout: 20000, anonymous: true,
-                onload: r => r.status === 200 ? ok(r.responseText) : bad(new Error(url + ' answered ' + r.status)),
-                onerror: () => bad(new Error(url + ' unreachable')), ontimeout: () => bad(new Error(url + ' timed out'))
-            }));
             (async () => {
-                let code, sha;
-                try {
-                    sha = (await get('https://api.github.com/repos/ellokojavi/ebaypickandpack/commits/main',
-                        { Accept: 'application/vnd.github.sha' })).trim();
-                    if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error('unexpected commit id');
-                    code = await get(`https://raw.githubusercontent.com/ellokojavi/ebaypickandpack/${sha}/userscript.js`);
-                } catch (e) { return devFail('fetch failed: ' + e.message); }
-                const version = (code.match(/@version\s+(\S+)/) || [])[1] || '?';
-                try { sessionStorage.setItem('pp-dev-loaded', JSON.stringify({ sha: sha, version: version, at: Date.now() })); } catch (e) {}
-                console.log('[DEV channel] running ' + version + ' at ' + sha.slice(0, 7));
+                let c;
+                try { c = await ppRefreshLatest(); } catch (e) { return devFail('fetch failed: ' + e.message); }
+                const PP_RUNNING = { source: 'dev', sha: c.sha, version: c.version };
+                try { sessionStorage.setItem('pp-dev-loaded', JSON.stringify({ sha: c.sha, version: c.version, at: Date.now() })); } catch (e) {}
+                console.log('[DEV channel] running ' + c.version + ' at ' + c.sha.slice(0, 7));
                 const badge = () => {
                     if (!document.body || document.getElementById('pp-dev-badge')) return;
-                    const b = document.createElement('div');
-                    b.id = 'pp-dev-badge';
-                    b.textContent = `DEV ${sha.slice(0, 7)} · ${version}`;
-                    b.title = 'This tab runs the newest commit, not the installed script. Turn off: sessionStorage.removeItem("pp-dev-channel") and reload.';
-                    b.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:2147483647;padding:3px 8px;border-radius:6px;font:11px/1.4 ui-monospace,monospace;background:#6a1b9a;color:#fff;opacity:.85;pointer-events:auto;';
-                    document.body.appendChild(b);
+                    const el = document.createElement('div');
+                    el.id = 'pp-dev-badge';
+                    el.textContent = `DEV ${c.sha.slice(0, 7)} · ${c.version}`;
+                    el.title = 'This tab runs the newest commit, not the installed script. Turn off: sessionStorage.removeItem("pp-dev-channel") and reload.';
+                    el.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:2147483647;padding:3px 8px;border-radius:6px;font:11px/1.4 ui-monospace,monospace;background:#6a1b9a;color:#fff;opacity:.85;';
+                    document.body.appendChild(el);
                 };
                 if (document.body) badge(); else document.addEventListener('DOMContentLoaded', badge);
-                try { eval(code); } catch (e) { devFail('the new copy threw: ' + (e && e.message)); }
+                try { eval(c.code); } catch (e) { devFail('the new copy threw: ' + (e && e.message)); }
             })();
             return;
         }
+        if (ppAuto) {
+            let c = null, bad = null;
+            try { c = GM_getValue(PP_CACHE_KEY, null); bad = GM_getValue(PP_BAD_KEY, null); } catch (e) {}
+            if (!c || Date.now() - (c.checkedAt || 0) > 5 * 60000) {
+                ppRefreshLatest().then(n => { if (!c || n.sha !== c.sha) console.log('[Auto-update] ' + n.version + ' ready, runs on the next reload'); })
+                    .catch(e => console.warn('[Auto-update] check failed: ' + e.message + '. Running what is here.'));
+            }
+            if (c && c.code && c.sha !== bad && ppVersionNum(c.version) > ppVersionNum(PP_INSTALLED_VERSION)) {
+                const PP_DEV_COPY = true;
+                const PP_RUNNING = { source: 'latest', sha: c.sha, version: c.version };
+                let started = false;
+                try { eval(c.code); started = true; } catch (e) {
+                    // A syntax error stops before any of it runs; mark it and run the installed copy instead.
+                    console.error('[Auto-update] ' + c.version + ' failed to start (' + (e && e.message) + '); using the installed copy');
+                    try { GM_setValue(PP_BAD_KEY, c.sha); } catch (err) {}
+                }
+                if (started) return;
+            }
+        }
     }
+    // Which copy is running, for the Defaults panel. The eval'd copy inherits PP_RUNNING.
+    const PP_RUNNING_NOW = (typeof PP_RUNNING !== 'undefined') ? PP_RUNNING
+        : { source: 'installed', sha: '', version: PP_INSTALLED_VERSION };
 
     // Earnings state (v4.69/v4.70). Declared first on purpose: main() sets the
     // repaint hook early, and in v4.69 a declaration further down reset it to
@@ -5798,6 +5847,41 @@
                         try { GM_setValue(PP_USE_API_KEY, on); } catch (err) {}
                         CFGDBG('miniApi:set', on);
                         paintApiStatus();
+                    });
+                }
+
+                // Row: always run the latest version (v4.77).
+                {
+                    let autoPref = false;
+                    try { autoPref = !!GM_getValue(PP_AUTO_KEY, false); } catch (e) {}
+                    const autoRow = buildToggleRow(
+                        'auto-latest-toggle',
+                        'Always run the latest version',
+                        'ON: every page runs the newest version from GitHub, so updates arrive on the next reload without pasting. Checked at most every 5 minutes. A newer pasted version still wins, and a version that fails to start is skipped.',
+                        autoPref
+                    );
+                    cfgBody.appendChild(autoRow.row);
+                    const autoStatus = document.createElement('div');
+                    autoStatus.style.cssText = `font-size: 11px; margin: 2px 0 0 46px; color: ${isDarkMode ? '#999' : '#777'};`;
+                    const paintAuto = (note) => {
+                        const r = PP_RUNNING_NOW;
+                        const short = v => (String(v).match(/v\d+\.\d+/) || [v])[0];
+                        autoStatus.textContent = (r.source === 'installed' ? `running installed ${short(r.version)}`
+                            : `running ${short(r.version)} from GitHub (${r.sha.slice(0, 7)})`) + (note ? ' · ' + note : '');
+                    };
+                    paintAuto();
+                    cfgBody.appendChild(autoStatus);
+                    autoRow.input.addEventListener('change', async (e) => {
+                        const on = !!e.target.checked;
+                        try { GM_setValue(PP_AUTO_KEY, on); } catch (err) {}
+                        CFGDBG('autoLatest:set', on);
+                        if (!on) { paintAuto('off: reload to run the installed copy'); return; }
+                        paintAuto('checking GitHub…');
+                        try {
+                            const c = await ppRefreshLatest();
+                            paintAuto(ppVersionNum(c.version) > ppVersionNum(PP_RUNNING_NOW.version)
+                                ? `${(c.version.match(/v\d+\.\d+/) || [c.version])[0]} ready: reload to use it` : 'up to date');
+                        } catch (err) { paintAuto('could not reach GitHub: ' + err.message); }
                     });
                 }
 
