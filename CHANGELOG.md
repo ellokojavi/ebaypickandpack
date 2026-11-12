@@ -1,5 +1,10 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.02
+- **Profit and filled-in SKUs come first.** The USPS address checks go out one at a time (~0.7s
+  each), so on a 42-order page they held the profit and SKU answers back about 30 seconds. They now
+  wait for the first profit answer, for at most 8 seconds.
+
 ## v5.01
 - **Missing SKUs are filled in.** eBay shows the SKU an item had when it was ordered, so older
   orders show none and the pick list stayed nearly empty. The Mini now looks up each card's item

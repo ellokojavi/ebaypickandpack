@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v5.01-fill-missing-skus
+// @version      20261111-v5.02-profit-before-address
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -147,6 +147,11 @@
     const ppEarningsCache = new Map();
     const ppEarningsQueue = new Set();
     let ppEarningsTimer = null, ppEarningsError = '', ppEarningsOnUpdate = null, ppEconomics = null;
+    // The USPS address checks wait for the first profit/SKU answer (v5.02). They go out one at a
+    // time at ~0.7s each, so on a 42-order page they used to hold profit and SKUs back ~30s.
+    // Capped at 8s so a slow Mini never stalls the address checks for good.
+    let ppFirstFlushDone = null;
+    const ppFirstFlush = new Promise(r => { ppFirstFlushDone = r; setTimeout(r, 8000); });
     // Is the Mini answering? (v4.71) Set by every ppRequest: any HTTP answer
     // means up, a connection error or timeout means down. While down, ship,
     // message and note go straight to the tab fallback instead of waiting on
@@ -7662,6 +7667,7 @@
     const ppAddressCache = new Map();
     async function ppAddress(orderId) {
         if (ppAddressCache.has(orderId)) return ppAddressCache.get(orderId);
+        await ppFirstFlush;
         if (ppMini.down) return null; // no badge change; the card's own layout check still shows
         const r = await ppRequest('/pp/address', { order_id: orderId }, 30000);
         const res = (r.transport === 'ok' && r.http === 200 && r.data) ? r.data : null;
@@ -7700,6 +7706,7 @@
             }
         }
         if (ppEarningsOnUpdate) ppEarningsOnUpdate();
+        if (ppFirstFlushDone) ppFirstFlushDone();
     }
     ppMini.hooks.earnings = () => {
         if (!ppMini.down && ppEarningsQueue.size) ppFlushEarnings();
