@@ -1,5 +1,13 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.82
+- **Both left boxes are always shown in full.** Nothing inside them is cut off or scrolled.
+  - If they fit in the window, they stay pinned as before.
+  - If not, they scroll with the page, and the eBay footer is pushed down so it starts below the
+    bottom of Settings.
+  - This replaces v4.78, which shrank the boxes to fit and scrolled their contents.
+- "Defaults for all orders" is now called **Settings**.
+
 ## v4.81
 - No functional change: a version bump to test that **update now** finds a newer version and
   reloads the page by itself.

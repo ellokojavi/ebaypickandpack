@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v4.81-reload-test
+// @version      20261111-v4.82-full-left-column
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -1131,36 +1131,48 @@
             `;
         }
 
-        // The left column (SKU panel, then the Defaults panel under it) must fit in the window.
-        // Before v4.78 the Defaults panel was simply placed under the SKU panel, so with a long
-        // SKU list it sat below the bottom of the screen and could not be reached (Javier, Nov 11
-        // 2026). Now: if both fit, nothing changes. If not, the Defaults panel keeps its full
-        // height up to ~45% of the column and scrolls beyond that, and the SKU list gets the rest
-        // and scrolls inside its own box. Heights are read from scrollHeight, which is the full
-        // content height whatever cap is set, so measuring never needs the caps removed.
+        // The left column: the SKU panel, then Settings under it. Both are ALWAYS shown in full,
+        // never cut or scrolled inside (Javier, Nov 11 2026; v4.78 had capped them to fit).
+        //  - If the column fits in the window, it stays pinned (fixed) as before.
+        //  - If not, it scrolls with the page (absolute, from the same starting point), and the
+        //    eBay footer is pushed down so it starts below the bottom of Settings.
+        // The fit test uses the header-visible top (110px) so the mode does not flip while the
+        // page scrolls the header away. Heights come from scrollHeight, the full content height.
+        const LEFT_COLUMN_TOP = 110, LEFT_GAP = 12, LEFT_BOTTOM = 12;
         function layoutLeftColumn(skuTop) {
             const skuPanel = document.getElementById(CONFIG.ids.skuPanelContainer);
             const configPanel = document.getElementById('altheastix-config-container');
             if (!skuPanel) return;
-            const gap = 12, bottom = 12;
-            const avail = window.innerHeight - skuTop - bottom;
-            const skuNat = skuPanel.scrollHeight;
-            if (!configPanel) { skuPanel.style.maxHeight = `${avail}px`; return; }
-            const cfgNat = configPanel.scrollHeight;
-            let skuMax = skuNat, cfgMax = cfgNat;
-            if (skuNat + gap + cfgNat > avail) {
-                cfgMax = Math.min(cfgNat, Math.max(Math.round(avail * 0.45), 60));
-                skuMax = Math.max(avail - gap - cfgMax, 160);
-                cfgMax = Math.max(Math.min(cfgNat, avail - gap - skuMax), 48);
+            skuPanel.style.maxHeight = 'none';
+            skuPanel.style.overflowY = 'visible';
+            if (configPanel) { configPanel.style.maxHeight = 'none'; configPanel.style.overflowY = 'visible'; }
+            const skuH = skuPanel.scrollHeight;
+            const cfgH = configPanel ? configPanel.scrollHeight : 0;
+            const columnH = skuH + (configPanel ? LEFT_GAP + cfgH : 0);
+            const fits = LEFT_COLUMN_TOP + columnH + LEFT_BOTTOM <= window.innerHeight;
+            const footer = document.querySelector(CONFIG.selectors.pageFooter);
+            if (fits) {
+                skuPanel.dataset.ppFlow = 'pinned';
+                skuPanel.style.position = '';
+                skuPanel.style.top = `${skuTop}px`;
+                if (configPanel) { configPanel.style.position = ''; configPanel.style.top = `${skuTop + skuH + LEFT_GAP}px`; }
+                if (footer) footer.style.removeProperty('margin-top');
+            } else {
+                skuPanel.dataset.ppFlow = 'page';
+                skuPanel.style.position = 'absolute';
+                skuPanel.style.top = `${LEFT_COLUMN_TOP}px`;
+                if (configPanel) { configPanel.style.position = 'absolute'; configPanel.style.top = `${LEFT_COLUMN_TOP + skuH + LEFT_GAP}px`; }
+                if (footer) {
+                    footer.style.removeProperty('margin-top');
+                    const footerTop = footer.getBoundingClientRect().top + window.scrollY;
+                    const need = LEFT_COLUMN_TOP + columnH + 24 - footerTop;
+                    if (need > 0) footer.style.setProperty('margin-top', `${Math.ceil(need)}px`, 'important');
+                }
             }
-            skuPanel.style.maxHeight = `${skuMax}px`;
-            configPanel.style.maxHeight = `${cfgMax}px`;
-            configPanel.style.overflowY = cfgNat > cfgMax ? 'auto' : '';
-            configPanel.style.top = `${skuTop + Math.min(skuNat, skuMax) + gap}px`;
-            if (!configPanel.ppResizeWatched && typeof ResizeObserver !== 'undefined') {
-                // Expanding or collapsing the Defaults panel changes its height: lay out again.
+            if (configPanel && !configPanel.ppResizeWatched && typeof ResizeObserver !== 'undefined') {
+                // Expanding or collapsing Settings changes its height: lay out again.
                 configPanel.ppResizeWatched = true;
-                new ResizeObserver(() => { try { layoutLeftColumn(parseInt(skuPanel.style.top) || 110); } catch (e) {} }).observe(configPanel.firstElementChild || configPanel);
+                new ResizeObserver(() => { try { updateSkuPanelOnScroll(); } catch (e) {} }).observe(configPanel.firstElementChild || configPanel);
             }
         }
 
@@ -1176,7 +1188,8 @@
             const leftPos = Math.max(20, newLeft);
             skuPanel.style.left = `${leftPos}px`;
             if (configPanel) configPanel.style.left = `${leftPos}px`;
-            layoutLeftColumn(parseInt(skuPanel.style.top) || 110);
+            layoutLeftColumn(skuPanel.dataset.ppFlow === 'page' ? LEFT_COLUMN_TOP
+                : (document.querySelector(CONFIG.selectors.header)?.getBoundingClientRect().bottom < 0 ? 20 : LEFT_COLUMN_TOP));
             const scrollTopBtn = document.getElementById('altheastix-scroll-top-btn');
             if (scrollTopBtn) {
                 scrollTopBtn.style.left = `${ordersContainer.getBoundingClientRect().right + 8}px`;
@@ -1199,7 +1212,7 @@
 
             const headerRect = header.getBoundingClientRect();
             const skuPanelTop = headerRect.bottom < 0 ? 20 : 110;
-            skuPanel.style.top = `${skuPanelTop}px`;
+            if (skuPanel.dataset.ppFlow !== 'page') skuPanel.style.top = `${skuPanelTop}px`;
             if (configPanel) {
                 layoutLeftColumn(skuPanelTop);
             }
@@ -5690,7 +5703,7 @@
                 const cfgHeader = document.createElement('div');
                 cfgHeader.style.cssText = `display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px; color: ${isDarkMode ? '#e0e0e0' : '#333'}; cursor: pointer; user-select: none;`;
                 const cfgTitle = document.createElement('span');
-                cfgTitle.textContent = 'Defaults for all orders';
+                cfgTitle.textContent = 'Settings';
                 cfgTitle.style.cssText = 'flex: 1 1 auto;';
                 const cfgChevron = document.createElement('span');
                 cfgChevron.textContent = cfgIsCollapsed ? '▸' : '▾';
