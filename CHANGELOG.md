@@ -1,5 +1,9 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.97
+- **Buy shipping label →** sits to the right of **Print Envelope**, on the same line, saving a line
+  on every card. A "Sent to printer" note, when there is one, follows after it.
+
 ## v4.96
 - The SKU panel's title bar has rounded corners again. Since v4.82 the panel no longer trimmed its
   contents, so the lighter title bar showed square corners over the panel's rounded ones. The panels

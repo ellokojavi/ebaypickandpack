@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261111-v4.96-rounded-corners
+// @version      20261111-v4.97-label-link-inline
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -759,8 +759,9 @@
                 @media (prefers-reduced-motion: reduce) {
                     .${CONFIG.classNames.envReprintPill}.${CONFIG.classNames.envPrintNoteFresh} { animation: none; }
                 }
+                /* On the Print Envelope line, to its right (v4.97, Javier: saves a line). */
                 .${CONFIG.classNames.buyLabelLink} {
-                    display: block; margin-top: 6px; font-size: 13px; font-weight: 600;
+                    display: inline-block; margin-top: 0; flex-shrink: 0; white-space: nowrap; font-size: 13px; font-weight: 600;
                     color: ${isDarkMode ? '#5a82f5' : '#0070d2'}; text-decoration: none; cursor: pointer;
                 }
                 .${CONFIG.classNames.buyLabelLink}:hover { text-decoration: underline; }
@@ -2533,7 +2534,8 @@
                     e.preventDefault();
                     openAutomationTab(buyLabelLink.href, { active: true });
                 });
-                tcellItem.appendChild(buyLabelLink);
+                // Right after the button, before any "Sent to printer" note.
+                printRow.insertBefore(buyLabelLink, printButton.nextSibling);
             }
             orderItem.style.opacity = '1';
         }
