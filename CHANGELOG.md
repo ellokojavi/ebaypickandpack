@@ -1,5 +1,9 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v4.81
+- No functional change: a version bump to test that **update now** finds a newer version and
+  reloads the page by itself.
+
 ## v4.80
 - **update now** link under *Always run the latest version*. One click checks GitHub at once,
   skipping the 5-minute wait. If a newer version is there it says "v4.xx found, reloading…" and
