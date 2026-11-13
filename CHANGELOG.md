@@ -1,5 +1,9 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.08
+- The orange `DEMO` pill is gone, so demo screenshots look like the real page. Demo mode is
+  still on whenever the URL has `pp-demo`, and ship, message and note still send nothing.
+
 ## v5.07
 - **Demo cards show real profit for the whole group.** A grouped card now carries the order ids of
   every order merged into it, so its profit is the real sum of those orders (eBay payout, fees, ad

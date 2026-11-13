@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261113-v5.07-demo-real-group-profit
+// @version      20261113-v5.08-demo-no-badge
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -6654,13 +6654,6 @@
                 host.dataset.ppDemoIds = donorIds.filter(Boolean).join(',');
                 grouped++;
             }
-            const badge = document.createElement('div');
-            badge.id = 'pp-demo-badge';
-            badge.textContent = `DEMO · ${grouped} orders grouped from ${grouped + removed} · ship, message and note are off`;
-            badge.title = 'Remove pp-demo from the URL and reload to leave demo mode.';
-            badge.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:2147483646;background:#c2410c;color:#fff;' +
-                'font:600 12px/1.2 system-ui,sans-serif;padding:6px 10px;border-radius:999px;box-shadow:0 2px 6px rgba(0,0,0,.25)';
-            document.body.appendChild(badge);
             console.log(`[Demo] grouped ${grouped + removed} single-item cards into ${grouped}`);
         }
 
