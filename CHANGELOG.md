@@ -1,5 +1,10 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.13
+- **Hovering a SKU in the SKU box fades the other orders.** Every pill that belongs to a different
+  order drops to low opacity, so the SKUs of the order under the mouse stand out together. Moving
+  off the pills restores them.
+
 ## v5.12
 - **Demo order: three single-SKU orders, then multi-SKU ones.** The demo page opens with three
   one-sticker orders, and every order after them is a 4-, 3- or 2-SKU order (in that cycle).
