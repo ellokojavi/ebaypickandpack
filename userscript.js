@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261113-v5.21-pill-text-contrast
+// @version      20261113-v5.22-pill-contrast-aaa
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -64,9 +64,25 @@
             while (perBand > 1 && gcd(step, perBand) !== 1) step--;
             let k = (slot * step) % perBand;
             const hue = Math.round((k * 360 / perBand + 8 + band * (180 / perBand)) % 360);
-            out.push(band === 0 ? `hsl(${hue}, 85%, 80%)` : `hsl(${hue}, 65%, 66%)`);
+            const sat = band === 0 ? 85 : 65;
+            let light = band === 0 ? 80 : 66;
+            // Pill text is always #111. Lighten until the pair reaches a
+            // contrast of 7:1 (WCAG AAA), so no hue — blue is the darkest —
+            // can come out hard to read (v5.22).
+            while (light < 94 && contrastWithDarkText(hue, sat, light) < 7) light += 2;
+            out.push(`hsl(${hue}, ${sat}%, ${light}%)`);
         }
         return out;
+    }
+    // WCAG contrast ratio between hsl(h, s%, l%) and the pill text colour #111.
+    function contrastWithDarkText(h, s, l) {
+        s /= 100; l /= 100;
+        const a = s * Math.min(l, 1 - l);
+        const f = n => { const k = (n + h / 30) % 12; return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)); };
+        const lin = v => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+        const lum = (r, g, b) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+        const text = lum(17 / 255, 17 / 255, 17 / 255);
+        return (lum(f(0), f(8), f(4)) + 0.05) / (text + 0.05);
     }
 
     // ===================================================================
@@ -718,7 +734,7 @@
                 .${CONFIG.classNames.skuItem}.${CONFIG.classNames.multiItemSkuOrder} { background-color: ${isDarkMode ? '#2a4a3f' : '#E8F5E9'}; font-weight: bold; }
                 .${CONFIG.classNames.skuItem}.${CONFIG.classNames.skuLg} { background-color: ${isDarkMode ? '#2a3f4a' : '#B3E5FC'}; font-weight: bold; border: 2px solid #ffffb1 !important; }
                 .${CONFIG.classNames.skuItem}.${CONFIG.classNames.skuManila} { background-color: ${isDarkMode ? '#4a3f2a' : '#FFD54F'}; font-weight: bold; border: 3px solid orange !important; }
-                .${CONFIG.classNames.skuItem}.${CONFIG.classNames.skuMultiQty} { background-color: ${isDarkMode ? '#2e2a1e' : '#FAF3E0'}; color: ${isDarkMode ? '#c8902a' : '#8a5c00'} !important; border: 1px solid ${isDarkMode ? '#7a5c28' : '#c8a060'} !important; }
+                .${CONFIG.classNames.skuItem}.${CONFIG.classNames.skuMultiQty} { background-color: ${isDarkMode ? '#2e2a1e' : '#FAF3E0'}; color: ${isDarkMode ? '#e8b04a' : '#6b4700'} !important; border: 1px solid ${isDarkMode ? '#7a5c28' : '#c8a060'} !important; }
                 /* Ships-with-tracking marker. Same #ffd54f as the yellow
                    "Total:" pill on the order card, so the two read as one
                    signal. Own colour rule so it survives the pill-level
@@ -729,6 +745,8 @@
                    against its own background and vanishes. Fill stays exactly
                    #ffd54f; the 1.5px dark halo does the separating. */
                 .${CONFIG.classNames.skuItem} .${CONFIG.classNames.skuTrackingMark} { color: #ffd54f !important; font-weight: 900; margin-left: 2px; text-shadow: 0 0 1.5px rgba(0, 0, 0, 0.9); }
+                /* Yellow * is unreadable on a pastel order colour: dark there (v5.22). */
+                .${CONFIG.classNames.skuItem}.sku-order-colored .${CONFIG.classNames.skuTrackingMark} { color: #111 !important; text-shadow: none; }
                 .${CONFIG.classNames.highlightYellow} { color: #111; background-color: #ffffb1; padding: 1px 2px; border-radius: 2px; }
                 .${CONFIG.classNames.zoomOverlay} { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); z-index: 10000; display: flex; justify-content: center; align-items: center; }
                 .${CONFIG.classNames.zoomContainer} { max-width: 80%; max-height: 80%; position: relative; }
@@ -5991,6 +6009,7 @@
                         }
                         if (skuObject.isMultiItemOrder) {
                             skuItemLink.style.backgroundColor = orderIdToColorMap[skuObject.orderId];
+                            skuItemLink.classList.add('sku-order-colored');
                             skuItemLink.style.fontWeight = 'bold';
                             skuItemLink.style.borderColor = isDarkMode ? '#666' : '#888';
                             // Dark text on every order colour; the multi-qty class's

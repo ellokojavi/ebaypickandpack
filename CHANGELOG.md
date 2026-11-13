@@ -1,5 +1,12 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.22
+- **Every order colour now passes 7:1 contrast with its text** (WCAG AAA). Each generated colour is
+  checked against the dark pill text and lightened until it passes; before this the darkest blue
+  managed only 4.6:1. The yellow tracking `*` on an order-coloured pill is now dark too, because
+  yellow on pastel could not be read. The amber text on single-order multi-quantity pills ("x2")
+  was raised from about 5:1 to 7.3:1 in dark mode and 7.5:1 in light mode.
+
 ## v5.21
 - **Readable text on every order colour.** Pills of a multi-SKU order with quantity above 1 (e.g.
   "F49 x2") kept the amber multi-quantity text, which was hard to read on some of the new colours.
