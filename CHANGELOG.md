@@ -1,5 +1,9 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.17
+- **Compact rows show the title first**, then SKU · Qty · price · size, the same order as a
+  single-item card.
+
 ## v5.16
 - **Multi-SKU cards no longer have a green background.** They look like every other card. Their
   SKU pills in the SKU box keep their green tint.
