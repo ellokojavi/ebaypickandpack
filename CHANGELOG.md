@@ -1,5 +1,8 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.06
+- Fix: v5.05 demo grouping never ran (it was outside the scope that holds the page selectors).
+
 ## v5.05
 - **Demo mode groups orders into multi-SKU cards.** Add `&pp-demo=1` to a `/ship/bulk` URL of old,
   already-shipped orders and single-item cards are merged into 2-, 3- and 4-SKU cards (pattern

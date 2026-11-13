@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261113-v5.05-demo-multi-sku-grouping
+// @version      20261113-v5.06-demo-grouping-scope-fix
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -6624,6 +6624,39 @@
             new MutationObserver(applyNo).observe(document.body, { childList: true, subtree: true });
         }
 
+        // Demo mode (see PP_DEMO): merge single-item cards into multi-SKU cards, in a 4,1,1,2,1,3,1,1
+        // pattern so the page shows every card size. Runs once, before the cards are processed, so the
+        // pick list, highlights, compact rows and SKU sort all see the grouped cards as real ones.
+        function ppDemoGroupCards() {
+            if (!PP_DEMO) return;
+            const cards = Array.from(document.querySelectorAll(CONFIG.selectors.orderItem)).filter(c =>
+                c.querySelector(CONFIG.selectors.tcellItem) && c.querySelectorAll('.item').length === 1);
+            const pattern = [4, 1, 1, 2, 1, 3, 1, 1];
+            let i = 0, p = 0, grouped = 0, removed = 0;
+            while (i < cards.length) {
+                const group = cards.slice(i, i + pattern[p++ % pattern.length]);
+                i += group.length;
+                if (group.length < 2) continue;
+                const host = group[0];
+                const holder = host.querySelector('.item').parentElement;
+                group.slice(1).forEach(donor => {
+                    donor.querySelectorAll('.item').forEach(it => holder.appendChild(it.cloneNode(true)));
+                    donor.remove();
+                    removed++;
+                });
+                host.dataset.ppDemoGrouped = String(group.length);
+                grouped++;
+            }
+            const badge = document.createElement('div');
+            badge.id = 'pp-demo-badge';
+            badge.textContent = `DEMO · ${grouped} orders grouped from ${grouped + removed} · ship, message and note are off`;
+            badge.title = 'Remove pp-demo from the URL and reload to leave demo mode.';
+            badge.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:2147483646;background:#c2410c;color:#fff;' +
+                'font:600 12px/1.2 system-ui,sans-serif;padding:6px 10px;border-radius:999px;box-shadow:0 2px 6px rgba(0,0,0,.25)';
+            document.body.appendChild(badge);
+            console.log(`[Demo] grouped ${grouped + removed} single-item cards into ${grouped}`);
+        }
+
         async function main() {
             console.debug('[Tampermonkey][MAIN] main() start');
             initializePageLayout();
@@ -7435,39 +7468,6 @@
     // (active:false) never take focus in the first place, but they still need
     // the flag, because closing one while it IS focused (you clicked over to
     // check on it) should also land you back on pick-and-pack.
-    // Demo mode (see PP_DEMO): merge single-item cards into multi-SKU cards, in a 4,1,1,2,1,3,1,1
-    // pattern so the page shows every card size. Runs once, before the cards are processed, so the
-    // pick list, highlights, compact rows and SKU sort all see the grouped cards as real ones.
-    function ppDemoGroupCards() {
-        if (!PP_DEMO) return;
-        const cards = Array.from(document.querySelectorAll(CONFIG.selectors.orderItem)).filter(c =>
-            c.querySelector(CONFIG.selectors.tcellItem) && c.querySelectorAll('.item').length === 1);
-        const pattern = [4, 1, 1, 2, 1, 3, 1, 1];
-        let i = 0, p = 0, grouped = 0, removed = 0;
-        while (i < cards.length) {
-            const group = cards.slice(i, i + pattern[p++ % pattern.length]);
-            i += group.length;
-            if (group.length < 2) continue;
-            const host = group[0];
-            const holder = host.querySelector('.item').parentElement;
-            group.slice(1).forEach(donor => {
-                donor.querySelectorAll('.item').forEach(it => holder.appendChild(it.cloneNode(true)));
-                donor.remove();
-                removed++;
-            });
-            host.dataset.ppDemoGrouped = String(group.length);
-            grouped++;
-        }
-        const badge = document.createElement('div');
-        badge.id = 'pp-demo-badge';
-        badge.textContent = `DEMO · ${grouped} orders grouped from ${grouped + removed} · ship, message and note are off`;
-        badge.title = 'Remove pp-demo from the URL and reload to leave demo mode.';
-        badge.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:2147483646;background:#c2410c;color:#fff;' +
-            'font:600 12px/1.2 system-ui,sans-serif;padding:6px 10px;border-radius:999px;box-shadow:0 2px 6px rgba(0,0,0,.25)';
-        document.body.appendChild(badge);
-        console.log(`[Demo] grouped ${grouped + removed} single-item cards into ${grouped}`);
-    }
-
     function openAutomationTab(url, options) {
         if (PP_DEMO) { console.warn('[Demo] automation tab blocked:', url); return { close() {}, closed: true }; }
         const opts = Object.assign({ active: false }, options || {});
