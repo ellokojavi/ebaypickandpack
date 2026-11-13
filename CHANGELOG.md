@@ -1,5 +1,11 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.11
+- **The `revise` pill shows on every compact row.** A long title used to push it past the cut-off
+  point, so it was hidden on some rows. Only the title is shortened now.
+- **Qty alignment fixed for the last few pixels.** Rows with a filled-in SKU (`*`) sat 8px to the
+  right of rows without one. Cells now line up by their left edge as well as their width.
+
 ## v5.10
 - **Qty lines up in compact rows.** The SKU and Qty columns of a 3+ item card are as wide as
   the widest entry in that card, so Qty, price and size start at the same place on every row.
