@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261113-v5.19-demo-simulated-ship
+// @version      20261113-v5.20-distinct-colors-ship-spinner
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -44,6 +44,30 @@
     // every automation tab in this tab, and (v5.19) ship, note and thank-you are SIMULATED: they
     // succeed on screen exactly as through the Mini API, but nothing leaves the browser.
     const PP_DEMO = /\/ship\/bulk/.test(location.pathname) && new URLSearchParams(location.search).has('pp-demo');
+
+    // Pill colours for multi-SKU orders: one per order, spread evenly round the
+    // hue wheel for however many orders are on the page, so no two orders look
+    // alike. Past 12 orders a second, deeper band doubles the slots rather than
+    // squeezing hues together. Pastel enough for dark text.
+    function distinctOrderColors(n) {
+        if (n <= 0) return [];
+        const bands = n > 12 ? 2 : 1;
+        const perBand = Math.ceil(n / bands);
+        const out = [];
+        for (let i = 0; i < n; i++) {
+            const band = i % bands;
+            const slot = Math.floor(i / bands);
+            // Step through hues by roughly half the wheel each time, so orders
+            // listed next to each other land on opposite colours.
+            let step = Math.max(1, Math.floor(perBand / 2));
+            const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+            while (perBand > 1 && gcd(step, perBand) !== 1) step--;
+            let k = (slot * step) % perBand;
+            const hue = Math.round((k * 360 / perBand + 8 + band * (180 / perBand)) % 360);
+            out.push(band === 0 ? `hsl(${hue}, 85%, 80%)` : `hsl(${hue}, 65%, 66%)`);
+        }
+        return out;
+    }
 
     // ===================================================================
     // LATEST VERSION WITHOUT REINSTALLING (v4.75 dev channel, v4.77 auto-update)
@@ -236,18 +260,6 @@
         // on the owner's Tailscale network and needs a login (Defaults panel).
         // Set enabled to false to always use the tabs.
         miniApi: { enabled: true, base: 'http://100.85.107.8:8787' },
-        orderColors: [
-            // Expanded 40-color palette — hues spread across the spectrum and interleaved
-            // so that consecutive assignments are always visually distinct
-            '#FFADAD', '#A0C4FF', '#CAFFBF', '#FFC6FF', '#FDFFB6',  // red · blue · green · pink · yellow
-            '#9BF6FF', '#FFD6A5', '#BDB2FF', '#DDFFD0', '#F0D4FF',  // cyan · orange · purple · mint · lavender
-            '#FF9AA2', '#B5EAD7', '#FFDAC1', '#C7CEEA', '#E2F0CB',  // rose · teal · peach · periwinkle · sage
-            '#FFE4B5', '#D4F1F4', '#F8C8D4', '#D5F5E3', '#FAD7A0',  // moccasin · ice blue · blush · seafoam · amber
-            '#D7BDE2', '#A9DFBF', '#F9E79F', '#AED6F1', '#F5CBA7',  // soft violet · jade · straw · sky · apricot
-            '#A3E4D7', '#F1948A', '#85C1E9', '#82E0AA', '#F0B27A',  // aquamarine · coral · cornflower · emerald · pumpkin
-            '#C39BD3', '#76D7C4', '#F7DC6F', '#7FB3D3', '#F0A7A0',  // plum · turquoise · gold · steel blue · salmon
-            '#B7D7A8', '#D2B4DE', '#A9CCE3', '#F9C74F', '#90DBB0',  // leaf · mauve · powder blue · sunflower · spearmint
-        ],
         headerLinks: [
             { text: 'Seller Hub', href: 'https://www.ebay.com/sh/ovw' },
             { text: 'All Orders', href: 'https://www.ebay.com/sh/ord/?filter=status%3AALL_ORDERS' },
@@ -417,7 +429,6 @@
                 revisePrefix: "https://www.ebay.com/sl/list?mode=ReviseItem&itemId="
             },
             data: {
-                orderColors: USER_CONFIG.orderColors
             },
             styles: {},
 
@@ -1003,6 +1014,36 @@
                    indistinguishable from a real confirmation. It is now an
                    amber spinner that says what it is actually doing. */
                 @keyframes altheastix-spin { to { transform: rotate(360deg); } }
+                /* v5.20: card busy while the Mini API (or the demo) ships it */
+                ${CONFIG.selectors.orderItem}.pp-card-busy { position: relative; }
+                .pp-busy-overlay {
+                    position: absolute; inset: 0; z-index: 9; border-radius: 12px;
+                    display: flex; align-items: center; justify-content: center;
+                    background: ${isDarkMode ? 'rgba(30,30,30,0.55)' : 'rgba(255,255,255,0.6)'};
+                    backdrop-filter: blur(1.5px); -webkit-backdrop-filter: blur(1.5px);
+                    cursor: progress;
+                }
+                .pp-busy-pill {
+                    display: inline-flex; align-items: center; gap: 10px;
+                    padding: 9px 16px; border-radius: 999px; font-size: 14px; font-weight: 600;
+                    background: ${isDarkMode ? '#1f2937' : '#ffffff'};
+                    color: ${isDarkMode ? '#e5e7eb' : '#1f2937'};
+                    border: 1px solid ${isDarkMode ? '#3b82f6' : '#93c5fd'};
+                    box-shadow: 0 4px 14px rgba(0,0,0,${isDarkMode ? '0.45' : '0.12'});
+                }
+                .pp-busy-spinner, .pp-btn-busy::before {
+                    width: 16px; height: 16px; border-radius: 50%; box-sizing: border-box; flex: 0 0 auto;
+                    border: 2.5px solid ${isDarkMode ? 'rgba(96,165,250,0.25)' : 'rgba(37,99,235,0.2)'};
+                    border-top-color: ${isDarkMode ? '#60a5fa' : '#2563eb'};
+                    animation: altheastix-spin 800ms linear infinite;
+                }
+                .pp-btn-busy::before {
+                    content: ''; display: inline-block; width: 12px; height: 12px; margin-right: 7px;
+                    vertical-align: -1px; border-color: rgba(255,255,255,0.35); border-top-color: #fff;
+                }
+                @media (prefers-reduced-motion: reduce) {
+                    .pp-busy-spinner, .pp-btn-busy::before { animation-duration: 2.4s; }
+                }
                 .${CONFIG.classNames.processingIcon} {
                     background-color: ${isDarkMode ? '#b45309' : '#d97706'};
                     border: 3px solid rgba(255,255,255,0.3);
@@ -4837,7 +4878,39 @@
         // things: the overlay no longer claims success before eBay has
         // confirmed anything, a failure deadline is armed, and any previous
         // failed state on the card is cleared before a retry.
+        // v5.20: while a card is being shipped through the Mini API (or the
+        // demo), it shows a spinner and the step in progress. The tab path has
+        // its own pending overlay and clears this one before drawing it.
+        function setCardBusy(card, text) {
+            if (!card) return;
+            let el = card.querySelector(':scope > .pp-busy-overlay');
+            if (!el) {
+                el = document.createElement('div');
+                el.className = 'pp-busy-overlay';
+                el.innerHTML = '<div class="pp-busy-pill"><span class="pp-busy-spinner"></span><span class="pp-busy-text"></span></div>';
+                card.appendChild(el);
+            }
+            card.classList.add('pp-card-busy');
+            el.querySelector('.pp-busy-text').textContent = text;
+        }
+        function updateCardBusy(card, text) {
+            const el = card && card.querySelector(':scope > .pp-busy-overlay .pp-busy-text');
+            if (el) el.textContent = text;
+        }
+        function clearCardBusy(card) {
+            if (!card) return;
+            card.classList.remove('pp-card-busy');
+            card.querySelectorAll(':scope > .pp-busy-overlay').forEach(el => el.remove());
+            card.querySelectorAll('.pp-btn-busy').forEach(el => el.classList.remove('pp-btn-busy'));
+        }
         async function runShipForCard(orderItemElement, target) {
+            try {
+                return await runShipForCardInner(orderItemElement, target);
+            } finally {
+                clearCardBusy(orderItemElement);
+            }
+        }
+        async function runShipForCardInner(orderItemElement, target) {
             if (!orderItemElement || !target) return;
             // Bail before touching any state if there is nothing to ship —
             // otherwise the batch clears the card's banner, opens nothing, and
@@ -4873,6 +4946,9 @@
                 if (PP_DEMO || ppApiEnabled()) {
                     target.textContent = 'Shipping via API…';
                     target.disabled = true;
+                    target.classList.add('pp-btn-busy');
+                    const nIds = orderIdString.split(',').length;
+                    setCardBusy(orderItemElement, nIds > 1 ? `Marking ${nIds} orders as shipped…` : 'Marking as shipped…');
                     for (const oid of orderIdString.split(',')) {
                         const res = await ppShip(oid);
                         SHIPDBG('order:api-ship', { card: orderItemElement.id, ok: res.ok, status: res.status || '', why: res.why || '' });
@@ -4908,6 +4984,7 @@
                         : `Shipped on ${formattedDate}`;
 
                     const tabNoteIds = [];
+                    updateCardBusy(orderItemElement, 'Adding the dated note…');
                     for (const oid of orderIdString.split(',')) {
                         const res = (PP_DEMO || ppApiEnabled()) ? await ppNote(oid, noteText) : { ok: false, why: 'API off' };
                         SHIPDBG('order:api-note', { card: orderItemElement.id, ok: res.ok, why: res.why || '' });
@@ -4929,6 +5006,7 @@
 
                 if (thankYouCheckbox && thankYouCheckbox.checked && orderItemElement.dataset.shipMsgSent !== '1') {
                     orderItemElement.dataset.shipMsgSent = '1';
+                    updateCardBusy(orderItemElement, 'Sending the thank-you…');
                     let shipmentDate = new Date();
                     if (shipTomorrowCheckbox && shipTomorrowCheckbox.checked) {
                         shipmentDate = computeNextShipDateSkippingSunday(1);
@@ -5084,6 +5162,7 @@
                     return true;
                 }
                 const orderIds = orderIdString.split(',').filter(id => !apiShippedIds.includes(id));
+                clearCardBusy(orderItemElement);
                 const overlay = document.createElement('div');
                 overlay.className = CONFIG.classNames.pendingOverlay;
                 overlay.innerHTML = `<div class="${CONFIG.classNames.pendingOverlayContent}"><div class="${CONFIG.classNames.processingIcon}"></div><span id="overlay-text"></span><span class="pending-sub" id="overlay-sub"></span></div>`;
@@ -5875,7 +5954,8 @@
                     let orderIdToColorMap = {};
                     let colorIndex = 0;
                     const multiItemOrderIds = [...new Set(SKU.filter(s => s.isMultiItemOrder).map(s => s.orderId))];
-                    multiItemOrderIds.forEach(id => { orderIdToColorMap[id] = CONFIG.data.orderColors[colorIndex++ % CONFIG.data.orderColors.length]; });
+                    const orderPalette = distinctOrderColors(multiItemOrderIds.length);
+                    multiItemOrderIds.forEach(id => { orderIdToColorMap[id] = orderPalette[colorIndex++]; });
                     for (let k = 0; k < SKU.length; k++) {
                         if (k > 0 && SKU[k].text.substring(0, 1).toLowerCase() !== SKU[k - 1].text.substring(0, 1).toLowerCase()) {
                             flexContainer.insertAdjacentHTML('beforeend', `<div class="${CONFIG.classNames.skuGroupSeparator}"></div>`);

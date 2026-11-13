@@ -1,5 +1,16 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.20
+- **No two multi-SKU orders share a pill colour.** The fixed 40-colour list had near-twins (four
+  pinks, several blues) and handed them out in order, so different orders often looked alike.
+  Colours are now spread evenly round the colour wheel for however many multi-SKU orders are on
+  the page, with each order next in line landing on a far-away hue. Past 12 orders a second,
+  deeper shade doubles the slots. `USER_CONFIG.orderColors` is gone.
+- **Spinner on the card while it ships.** On the Mini API path (and the demo), the card dims with
+  a spinner that names the step: "Marking as shipped…", "Adding the dated note…", "Sending the
+  thank-you…". The button shows a small spinner too. It clears when the card is ✓ Shipped, or
+  hands over to the existing pending overlay if the order falls back to tabs.
+
 ## v5.19
 - **Demo mode: Mark as Shipped works as if it were real.** With `pp-demo` in the URL, "Mark as
   Shipped & Msg", the per-card button and the batch ship run their normal flow: "Shipping via
