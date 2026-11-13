@@ -1,5 +1,9 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.12
+- **Demo order: three single-SKU orders, then multi-SKU ones.** The demo page opens with three
+  one-sticker orders, and every order after them is a 4-, 3- or 2-SKU order (in that cycle).
+
 ## v5.11
 - **The `revise` pill shows on every compact row.** A long title used to push it past the cut-off
   point, so it was hidden on some rows. Only the title is shortened now.

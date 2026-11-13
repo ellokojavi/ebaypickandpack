@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261113-v5.11-compact-revise-visible
+// @version      20261113-v5.12-demo-singles-first
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -6649,17 +6649,19 @@
             new MutationObserver(applyNo).observe(document.body, { childList: true, subtree: true });
         }
 
-        // Demo mode (see PP_DEMO): merge single-item cards into multi-SKU cards, in a 4,1,1,2,1,3,1,1
-        // pattern so the page shows every card size. Runs once, before the cards are processed, so the
+        // Demo mode (see PP_DEMO): merge single-item cards into multi-SKU cards. The first three
+        // stay single, then every card is a 4-, 3- or 2-SKU order. Runs once, before the cards are processed, so the
         // pick list, highlights, compact rows and SKU sort all see the grouped cards as real ones.
         function ppDemoGroupCards() {
             if (!PP_DEMO) return;
             const cards = Array.from(document.querySelectorAll(CONFIG.selectors.orderItem)).filter(c =>
                 c.querySelector(CONFIG.selectors.tcellItem) && c.querySelectorAll('.item').length === 1);
-            const pattern = [4, 1, 1, 2, 1, 3, 1, 1];
+            // v5.12 (Javier): three single-SKU orders first, then only multi-SKU ones (4, 3, 2, ...).
+            const lead = [1, 1, 1], cycle = [4, 3, 2];
+            const sizeAt = (n) => n < lead.length ? lead[n] : cycle[(n - lead.length) % cycle.length];
             let i = 0, p = 0, grouped = 0, removed = 0;
             while (i < cards.length) {
-                const group = cards.slice(i, i + pattern[p++ % pattern.length]);
+                const group = cards.slice(i, i + sizeAt(p++));
                 i += group.length;
                 if (group.length < 2) continue;
                 const host = group[0];
