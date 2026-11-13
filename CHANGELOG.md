@@ -1,5 +1,11 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.10
+- **Qty lines up in compact rows.** The SKU and Qty columns of a 3+ item card are as wide as
+  the widest entry in that card, so Qty, price and size start at the same place on every row.
+  Before, the SKU column was a fixed 120px minimum and a long SKU like `F58 whiskey *` pushed
+  its Qty to the right.
+
 ## v5.09
 - **Compact rows (3+ items) use two lines** to match the 63px thumbnail: SKU, Qty, price and size
   on the first, the listing title at full width on the second. The title was squeezed into what

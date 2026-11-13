@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261113-v5.09-compact-rows-two-lines
+// @version      20261113-v5.10-compact-qty-aligned
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -2291,6 +2291,21 @@
             ranked.forEach((x, rank) => {
                 x.it.style.order = String(rank);
                 x.it.classList.toggle('pp-last-item', rank === ranked.length - 1);
+            });
+            alignCompactColumns(card);
+        }
+
+        // Compact rows line up like a table (v5.10, Javier: "put all the Qty fields aligned with
+        // each other"). Each item is its own list, so CSS cannot share a column width across them:
+        // the SKU and Qty cells of every row in the card are set to the widest one in that card.
+        function alignCompactColumns(card) {
+            if (!card.classList.contains('pp-compact')) return;
+            const lists = Array.from(card.querySelectorAll(`.item ${CONFIG.selectors.itemDetailsContainer}`));
+            [/^SKU:/, /^(Qty|Quantity):/i].forEach(re => {
+                const cells = lists.map(ul => Array.from(ul.children).find(li => re.test(li.textContent.trim()))).filter(Boolean);
+                cells.forEach(li => { li.style.minWidth = ''; });
+                const w = Math.max(0, ...cells.map(li => li.getBoundingClientRect().width));
+                if (w > 0) cells.forEach(li => { li.style.minWidth = Math.ceil(w) + 'px'; });
             });
         }
 
