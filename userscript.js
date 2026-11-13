@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261113-v5.18-fix-capitalizes-unit
+// @version      20261113-v5.19-demo-simulated-ship
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -41,7 +41,8 @@
     // single-item cards are merged into 2-, 3- and 4-SKU cards, VISUALLY ONLY: the donor cards are
     // removed from this tab and their items copied into the first card of the group. Nothing is
     // sent to eBay. Because a grouped card no longer matches a real order, demo mode also turns OFF
-    // ship, thank-you message, note and every automation tab in this tab.
+    // every automation tab in this tab, and (v5.19) ship, note and thank-you are SIMULATED: they
+    // succeed on screen exactly as through the Mini API, but nothing leaves the browser.
     const PP_DEMO = /\/ship\/bulk/.test(location.pathname) && new URLSearchParams(location.search).has('pp-demo');
 
     // ===================================================================
@@ -2859,7 +2860,7 @@
         // Called when eBay CONFIRMS a shipment, never when one is merely
         // requested — a row here means the order actually went out.
         function recordEnvelopeShipped(orderId) {
-            if (!orderId) return;
+            if (!orderId || PP_DEMO) return;   // demo shipments are not real: keep them out of History
             const map = envelopeHistory();
             const now = Date.now();
             const prev = map[orderId] || {};
@@ -4869,7 +4870,7 @@
                 // the tabs below, exactly as before.
                 const apiShippedIds = [];
                 let apiShipWhy = '';
-                if (ppApiEnabled()) {
+                if (PP_DEMO || ppApiEnabled()) {
                     target.textContent = 'Shipping via API…';
                     target.disabled = true;
                     for (const oid of orderIdString.split(',')) {
@@ -4908,7 +4909,7 @@
 
                     const tabNoteIds = [];
                     for (const oid of orderIdString.split(',')) {
-                        const res = ppApiEnabled() ? await ppNote(oid, noteText) : { ok: false, why: 'API off' };
+                        const res = (PP_DEMO || ppApiEnabled()) ? await ppNote(oid, noteText) : { ok: false, why: 'API off' };
                         SHIPDBG('order:api-note', { card: orderItemElement.id, ok: res.ok, why: res.why || '' });
                         if (!res.ok) tabNoteIds.push(oid);
                         const noteLink = orderItemElement.querySelector(`.${CONFIG.classNames.addNoteLink}[data-order-id="${oid}"]`);
@@ -4917,7 +4918,7 @@
                     // The tab path has only ever noted the card's first order;
                     // keep that when the API is off, and note every order the
                     // API failed on when it is on.
-                    const tabTargets = ppApiEnabled() ? tabNoteIds : [firstOrderId];
+                    const tabTargets = (PP_DEMO || ppApiEnabled()) ? tabNoteIds : [firstOrderId];
                     for (const oid of tabTargets) {
                         await queueOrderNote(oid, noteText);
                         openAutomationTab(`https://www.ebay.com/mesh/ord/details?orderid=${oid}&tm_action=add_note`, { active: false });
@@ -5041,11 +5042,15 @@
                     let apiMsg = null;
                     let autoSendOn = true;
                     try { autoSendOn = !!GM_getValue(AUTO_SEND_MESSAGES_KEY, true); } catch (e) {}
-                    if (ppApiEnabled() && autoSendOn) {
+                    if (PP_DEMO || (ppApiEnabled() && autoSendOn)) {
                         apiMsg = await ppMessage(firstOrderId, finalMessageText);
                         SHIPDBG('message:api', { card: orderItemElement.id, outcome: apiMsg.outcome, why: apiMsg.why || '' });
                     }
-                    if (apiMsg && apiMsg.outcome === 'sent') {
+                    if (apiMsg && apiMsg.demo) {
+                        // Demo: shown on this card only. The shared result key would reach any real bulk tab.
+                        orderItemElement.dataset.msgOutcome = 'sent';
+                        markCardMessageSent(orderItemElement, 'api', Date.now());
+                    } else if (apiMsg && apiMsg.outcome === 'sent') {
                         await reportMessageResult(firstOrderId, 'sent', '', { action: 'auto_message', via: 'api' });
                     } else if (apiMsg && apiMsg.outcome === 'unknown') {
                         // Not retryable on purpose: a retry would open the tab and
@@ -7744,8 +7749,13 @@
         await ppRequest('/pp/logout', {}, 10000);
         try { GM_setValue(PP_TOKEN_KEY, ''); } catch (e) {}
     }
+    // Demo mode (v5.19, Javier: "make the Mark as shipped buttons and experience work in the demo
+    // page as if it was real"): ship, note and thank-you answer as the Mini API would on success,
+    // after a similar pause, so the real button states, overlay, batch queue and pills all run.
+    // Nothing is sent to eBay or the Mini, and no tab ever opens (openAutomationTab refuses).
+    function ppDemoPause(min, max) { return new Promise(r => setTimeout(r, min + Math.random() * (max - min))); }
     async function ppShip(orderId) {
-        if (PP_DEMO) return { ok: false, why: 'Demo mode: nothing sent.' };
+        if (PP_DEMO) { await ppDemoPause(1200, 2000); return { ok: true, status: 'shipped', demo: true }; }
         // Known down: nothing is sent, so the tab path is safe and saves a timeout per order.
         if (ppMini.down) return { ok: false, why: ppMiniDownText() + ' Using tabs.' };
         const r = await ppRequest('/pp/ship', { order_id: orderId }, 90000);
@@ -7756,7 +7766,7 @@
         return { ok: false, why: ppDescribe(r) };
     }
     async function ppMessage(orderId, text) {
-        if (PP_DEMO) return { outcome: 'unknown', why: 'Demo mode: nothing sent.' };
+        if (PP_DEMO) { await ppDemoPause(700, 1100); return { outcome: 'sent', demo: true }; }
         // Known down: the request is never made, so nothing went out and the tab may send it.
         if (ppMini.down) return { outcome: 'fallback', why: ppMiniDownText() + ' Using tabs.' };
         const r = await ppRequest('/pp/message', { order_id: orderId, text: text }, 90000);
@@ -7822,7 +7832,7 @@
     };
 
     async function ppNote(orderId, text) {
-        if (PP_DEMO) return { ok: false, why: 'Demo mode: nothing sent.' };
+        if (PP_DEMO) { await ppDemoPause(250, 450); return { ok: true, demo: true }; }
         if (ppMini.down) return { ok: false, why: ppMiniDownText() + ' Using tabs.' };
         const r = await ppRequest('/pp/note', { order_id: orderId, text: text }, 60000);
         // A note replaces itself, so anything short of a clear yes goes to the tab.

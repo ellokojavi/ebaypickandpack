@@ -1,5 +1,13 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.19
+- **Demo mode: Mark as Shipped works as if it were real.** With `pp-demo` in the URL, "Mark as
+  Shipped & Msg", the per-card button and the batch ship run their normal flow: "Shipping via
+  API…", the note ✅, the thank-you pill, ✓ Shipped, the SKU box and profit total updating, and
+  the batch progress dock. Each step answers after a pause like the Mini's (about 2–3s a card).
+- **Still nothing is sent.** No request goes to eBay or the Mini and no tab opens. Demo shipments
+  are kept out of History and are not shared with other bulk tabs. Reload the page to start over.
+
 ## v5.18
 - **Fix also writes the unit in one style.** "12 Main St apt 3b" becomes "12 Main St" / "Apt. 3B".
   Abbreviations get a capital and a dot (Apt., Ste., Bldg., Fl., Rm.), whole words a capital (Unit,
