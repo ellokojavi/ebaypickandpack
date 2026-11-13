@@ -1,5 +1,10 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.21
+- **Readable text on every order colour.** Pills of a multi-SKU order with quantity above 1 (e.g.
+  "F49 x2") kept the amber multi-quantity text, which was hard to read on some of the new colours.
+  They now always use dark text.
+
 ## v5.20
 - **No two multi-SKU orders share a pill colour.** The fixed 40-colour list had near-twins (four
   pinks, several blues) and handed them out in order, so different orders often looked alike.

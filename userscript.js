@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261113-v5.20-distinct-colors-ship-spinner
+// @version      20261113-v5.21-pill-text-contrast
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -5993,7 +5993,9 @@
                             skuItemLink.style.backgroundColor = orderIdToColorMap[skuObject.orderId];
                             skuItemLink.style.fontWeight = 'bold';
                             skuItemLink.style.borderColor = isDarkMode ? '#666' : '#888';
-                            if (isDarkMode) skuItemLink.style.color = '#111';
+                            // Dark text on every order colour; the multi-qty class's
+                            // !important amber text was unreadable on some hues (v5.21).
+                            skuItemLink.style.setProperty('color', '#111', 'important');
                         } else {
                             if (skuObject.text.toLowerCase().includes("lg")) skuItemLink.classList.add(CONFIG.classNames.skuLg);
                             if (skuObject.text.toLowerCase().includes("manila")) skuItemLink.classList.add(CONFIG.classNames.skuManila);
