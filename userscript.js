@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261113-v5.06-demo-grouping-scope-fix
+// @version      20261113-v5.07-demo-real-group-profit
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -2397,6 +2397,9 @@
             orderItem.querySelector('.btn--undo-combine')?.remove();
             const orderIdLinks = orderItem.querySelectorAll('.unique_order_id_container a[href*="orderId"]');
             const orderIdsArray = Array.from(orderIdLinks).map(link => new URLSearchParams(link.href).get('orderId') || link.innerText.trim()).filter(id => id);
+            // Demo grouping (v5.07): the merged orders' ids ride on the host card, so profit is the
+            // real sum of every order shown on it, exactly as for one of eBay's combined cards.
+            if (PP_DEMO && orderItem.dataset.ppDemoIds) orderItem.dataset.ppDemoIds.split(',').forEach(id => { if (id && !orderIdsArray.includes(id)) orderIdsArray.push(id); });
             const allOrderIds = orderIdsArray.join(',');
             if (allOrderIds) orderItem.dataset.orderId = allOrderIds;
 
@@ -6639,12 +6642,16 @@
                 if (group.length < 2) continue;
                 const host = group[0];
                 const holder = host.querySelector('.item').parentElement;
+                const donorIds = [];
                 group.slice(1).forEach(donor => {
+                    donor.querySelectorAll('.unique_order_id_container a[href*="orderId"]').forEach(link =>
+                        donorIds.push(new URLSearchParams(link.href).get('orderId') || link.innerText.trim()));
                     donor.querySelectorAll('.item').forEach(it => holder.appendChild(it.cloneNode(true)));
                     donor.remove();
                     removed++;
                 });
                 host.dataset.ppDemoGrouped = String(group.length);
+                host.dataset.ppDemoIds = donorIds.filter(Boolean).join(',');
                 grouped++;
             }
             const badge = document.createElement('div');

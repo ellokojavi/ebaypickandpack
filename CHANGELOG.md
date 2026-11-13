@@ -1,5 +1,11 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.07
+- **Demo cards show real profit for the whole group.** A grouped card now carries the order ids of
+  every order merged into it, so its profit is the real sum of those orders (eBay payout, fees, ad
+  fees and sticker cost) minus one envelope's postage, the same math as one of eBay's combined
+  cards. Before, it showed the first order's payout against all the stickers' cost, e.g. −$2.30.
+
 ## v5.06
 - Fix: v5.05 demo grouping never ran (it was outside the scope that holds the page selectors).
 
