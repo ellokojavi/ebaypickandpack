@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261113-v5.15-pill-focus-glow
+// @version      20261113-v5.16-no-green-multi-cards
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -697,7 +697,7 @@
                 .footer-label { background-color: ${isDarkMode ? '#2a2a2a' : '#fff'} !important; color: ${isDarkMode ? '#e0e0e0' : '#555'} !important; }
                 .${CONFIG.classNames.highlightManila} { background-color: ${isDarkMode ? '#4a3f2a' : '#FFF8E1'}; }
                 .${CONFIG.classNames.highlightLg} { background-color: ${isDarkMode ? '#2a3f4a' : '#E1F5FE'}; }
-                .${CONFIG.classNames.highlightMultiItem} { background-color: ${isDarkMode ? '#2a4a3f' : '#E8F5E9'}; }
+                /* v5.16 (Javier): no green background on multi-SKU cards. The class stays for the filters and the SKU sort. */
                 .${CONFIG.classNames.borderLg} { border: 2px solid #ffffb1 !important; }
                 .${CONFIG.classNames.borderManila} { border: 3px solid orange !important; }
                 .${CONFIG.classNames.highlightManila} .unique-order-id a, .${CONFIG.classNames.highlightLg} .unique-order-id a, .${CONFIG.classNames.highlightMultiItem} .unique-order-id a, .${CONFIG.classNames.highlightMultiItem} .unique-order-ids a { color: ${isDarkMode ? '#78BFFF' : '#000'}; }

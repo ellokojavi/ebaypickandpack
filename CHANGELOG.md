@@ -1,5 +1,9 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.16
+- **Multi-SKU cards no longer have a green background.** They look like every other card. Their
+  SKU pills in the SKU box keep their green tint.
+
 ## v5.15
 - **The hovered order's pills also glow blue**, as when hovering a card. Pills of a single-SKU
   order are plain grey, so fading the others alone left them hard to spot.
