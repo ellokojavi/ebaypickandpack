@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261113-v5.14-demo-no-stray-single
+// @version      20261113-v5.15-pill-focus-glow
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -519,6 +519,7 @@
                 .${CONFIG.classNames.skuItem} { padding: 4px 8px; border-radius: 4px; font-size: 14px; background-color: ${isDarkMode ? '#3a3a3a' : '#f0f0f0'}; border: 1px solid ${isDarkMode ? '#555' : '#ddd'}; line-height: 1.4; white-space: nowrap; text-decoration: none; color: ${isDarkMode ? '#e0e0e0' : 'inherit'}; cursor: pointer; transition: all 0.2s ease-in-out; }
                 /* v5.13: hovering a pill fades every pill from other orders */
                 #${CONFIG.ids.skuList}.pp-order-focus .${CONFIG.classNames.skuItem}:not(.pp-focus-match) { opacity: 0.18; }
+                #${CONFIG.ids.skuList}.pp-order-focus .${CONFIG.classNames.skuItem}.pp-focus-match { opacity: 1; border-color: ${isDarkMode ? '#9BF6FF' : '#0070d2'} !important; box-shadow: 0 0 8px ${isDarkMode ? '#9BF6FF' : '#0070d2'}; } /* v5.15: a single-order pill is plain grey, so it needs the glow to stand out */
                 .sku-highlight-hover { transform: scale(1.05); border-color: ${isDarkMode ? '#9BF6FF' : '#0070d2'}; box-shadow: 0 0 8px ${isDarkMode ? '#9BF6FF' : '#0070d2'}; }
                 .${CONFIG.classNames.skuShipped}, .sku-shipped { opacity: 0.5 !important; }
                 .${CONFIG.classNames.skuGroupSeparator} { flex-basis: 100%; height: 0; margin-top: 8px; border-top: 1px solid ${isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}; margin-bottom: 2px; }
