@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261113-v5.08-demo-no-badge
+// @version      20261113-v5.09-compact-rows-two-lines
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -637,8 +637,8 @@
                 ${CONFIG.selectors.orderItem}.pp-compact .item.pp-last-item { border-bottom: 0; }
                 ${CONFIG.selectors.orderItem}.pp-compact .item > div, ${CONFIG.selectors.orderItem}.pp-compact .item > div > div { padding: 0 !important; margin: 0 !important; display: flex; align-items: center; gap: 12px; width: 100%; }
                 ${CONFIG.selectors.orderItem}.pp-compact .item__image { width: 63px !important; height: 63px !important; } /* 42px until v5.03 (Javier: too small to read while picking) */
-                ${CONFIG.selectors.orderItem}.pp-compact ${CONFIG.selectors.itemDescription} { display: flex !important; align-items: center; gap: 14px; max-width: none !important; min-width: 0 !important; font-size: 13px !important; padding: 0 !important; }
-                ${CONFIG.selectors.orderItem}.pp-compact ${CONFIG.selectors.itemDescription} h2 { order: 2; flex: 1 1 auto; min-width: 0; margin: 0 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px !important; font-weight: normal; }
+                ${CONFIG.selectors.orderItem}.pp-compact ${CONFIG.selectors.itemDescription} { display: flex !important; flex-direction: column !important; align-items: stretch; justify-content: center; gap: 4px; /* two lines since v5.09: SKU/Qty/price, then the title */ max-width: none !important; min-width: 0 !important; font-size: 13px !important; padding: 0 !important; }
+                ${CONFIG.selectors.orderItem}.pp-compact ${CONFIG.selectors.itemDescription} h2 { order: 2; flex: 0 0 auto; width: 100%; min-width: 0; margin: 0 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px !important; font-weight: normal; }
                 ${CONFIG.selectors.orderItem}.pp-compact ${CONFIG.selectors.itemDetailsContainer} { order: 1; flex-direction: row !important; align-items: baseline; gap: 10px; min-width: 0 !important; flex-shrink: 0; margin: 0; padding: 0; }
                 ${CONFIG.selectors.orderItem}.pp-compact ${CONFIG.selectors.itemDetailsContainer} li { white-space: nowrap; font-size: 12px !important; }
                 ${CONFIG.selectors.orderItem}.pp-compact ${CONFIG.selectors.itemDetailsContainer} li:empty { display: none; }

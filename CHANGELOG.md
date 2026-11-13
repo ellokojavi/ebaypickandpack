@@ -1,5 +1,10 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.09
+- **Compact rows (3+ items) use two lines** to match the 63px thumbnail: SKU, Qty, price and size
+  on the first, the listing title at full width on the second. The title was squeezed into what
+  was left of one line and cut off after a few words.
+
 ## v5.08
 - The orange `DEMO` pill is gone, so demo screenshots look like the real page. Demo mode is
   still on whenever the URL has `pp-demo`, and ship, message and note still send nothing.
