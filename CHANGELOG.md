@@ -1,5 +1,12 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.18
+- **Fix also writes the unit in one style.** "12 Main St apt 3b" becomes "12 Main St" / "Apt. 3B".
+  Abbreviations get a capital and a dot (Apt., Ste., Bldg., Fl., Rm.), whole words a capital (Unit,
+  Suite, Apartment), and the unit number is upper-cased (3b → 3B, #4c → #4C). Only when Fix has
+  something else to do: an address that needs no fix is never re-cased, so the ⚠ badge does not
+  appear on correct addresses. "Use USPS" gets the same style, since it goes through Fix too.
+
 ## v5.17
 - **Compact rows show the title first**, then SKU · Qty · price · size, the same order as a
   single-item card.

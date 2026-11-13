@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261113-v5.17-compact-title-first
+// @version      20261113-v5.18-fix-capitalizes-unit
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -8843,7 +8843,8 @@
     //   1. a designator glued to its number:      "Apt98"            -> "Apt 98"
     //   2. the unit on the street line:            "12 Main St Apt 98" -> "12 Main St" / "Apt 98"
     //   3. the same unit or line typed twice:      "Apt 98" twice      -> once
-    // Everything else is kept exactly as the buyer typed it (case, dots, "#"),
+    // When one of those applies, the unit is also written in one style ("apt 3b" -> "Apt. 3B",
+    // v5.18). Nothing else is touched, and an address needing no fix is never re-cased,
     // so a correct address is never "fixed" into a different one. US and Canada
     // only, and only lines between the name and the City/State/ZIP line.
     const ADDR_UNIT_RE = /(^|[\s,])(apartment|apt|unit|suite|ste|building|bldg|floor|fl|room|rm|lot|space|spc|trlr)(\.?)(\s*)(#?)(\s*)(\d[\w-]*|[A-Za-z]\d*)(?![\w])/gi;
@@ -8853,6 +8854,10 @@
         /^(.+?)\s+([A-Z]{2})\s+([A-Z]\d[A-Z]\s?\d[A-Z]\d)$/i
     ];
     const ADDR_UNIT_CANON = { apartment: 'apt', suite: 'ste', building: 'bldg', floor: 'fl', room: 'rm', space: 'spc' };
+    // How a unit is written once Fix runs (v5.18, Javier: "apt 3b" -> "Apt. 3B"). Abbreviations get
+    // a capital and a dot, whole words a capital only, and the unit number is upper-cased.
+    const ADDR_UNIT_PRETTY = { apt: 'Apt.', ste: 'Ste.', bldg: 'Bldg.', fl: 'Fl.', rm: 'Rm.', spc: 'Spc.', trlr: 'Trlr.',
+        apartment: 'Apartment', suite: 'Suite', building: 'Building', floor: 'Floor', room: 'Room', space: 'Space', unit: 'Unit', lot: 'Lot' };
     function addrEsc(s) {
         return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     }
@@ -8866,19 +8871,19 @@
         const units = [];     // { text, key, value }
         const keyOf = (des, value) => `${ADDR_UNIT_CANON[des.toLowerCase()] || des.toLowerCase()}|${value.toUpperCase()}`;
         const sameLine = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const addUnit = (text, key, value) => {
+        const addUnit = (text, key, value, pretty) => {
             const dup = units.find(u => u.key === key || ((u.key.startsWith('#|') || key.startsWith('#|')) && u.value.toUpperCase() === value.toUpperCase()));
             if (dup) {
                 // "#98" and "Apt 98" together: keep the one that says what it is.
                 if (dup.key.startsWith('#|') && !key.startsWith('#|')) {
                     changes.push(`Removed duplicate "${dup.text}"`);
-                    Object.assign(dup, { text, key, value });
+                    Object.assign(dup, { text, key, value, pretty });
                 } else {
                     changes.push(`Removed duplicate "${text}"`);
                 }
                 return;
             }
-            units.push({ text, key, value });
+            units.push({ text, key, value, pretty });
         };
 
         for (const raw of lines.slice(1, csz)) {
@@ -8889,11 +8894,12 @@
                 const glued = !sp1 && (hash || /^\d/.test(value));
                 const text = `${des}${dot}${glued || sp1 ? ' ' : ''}${hash}${hash && sp2 ? ' ' : ''}${value}`;
                 if (glued) changes.push(`"${des}${dot}${hash}${value}" → "${text}"`);
-                found.push({ text, key: keyOf(des, value), value });
+                const pretty = `${ADDR_UNIT_PRETTY[des.toLowerCase()] || des} ${hash}${value.toUpperCase()}`;
+                found.push({ text, pretty, key: keyOf(des, value), value });
                 return lead;
             });
             rest = rest.replace(ADDR_HASH_RE, (m, lead, value) => {
-                found.push({ text: m.trim().replace(/^,\s*/, ''), key: `#|${value.toUpperCase()}`, value });
+                found.push({ text: m.trim().replace(/^,\s*/, ''), pretty: `#${value.toUpperCase()}`, key: `#|${value.toUpperCase()}`, value });
                 return lead;
             });
             rest = rest.replace(/[\s,]+$/, '').replace(/^[\s,]+/, '').replace(/\s{2,}/g, ' ');
@@ -8912,7 +8918,7 @@
                     streets.push({ text: rest });
                 }
             }
-            found.forEach(u => addUnit(u.text, u.key, u.value));
+            found.forEach(u => addUnit(u.text, u.key, u.value, u.pretty));
         }
         // A bare number seen BEFORE its street line ("416577" then "416577 Flying Bridge").
         for (let i = streets.length - 1; i >= 0; i--) {
@@ -8923,8 +8929,11 @@
             }
         }
         if (!changes.length) return { lines, changes };
+        // Capitalisation rides along with a real fix, never on its own: a correct "Apt 3" must not
+        // turn every card into a fixable one.
+        units.forEach(u => { if (u.pretty && u.pretty !== u.text) changes.push(`"${u.text}" → "${u.pretty}"`); });
         return {
-            lines: [lines[0], ...streets.map(s => s.text), ...units.map(u => u.text), ...lines.slice(csz)],
+            lines: [lines[0], ...streets.map(s => s.text), ...units.map(u => u.pretty || u.text), ...lines.slice(csz)],
             changes
         };
     }
