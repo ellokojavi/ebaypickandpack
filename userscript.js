@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261113-v5.13-sku-pill-order-focus
+// @version      20261113-v5.14-demo-no-stray-single
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -6683,7 +6683,10 @@
             const sizeAt = (n) => n < lead.length ? lead[n] : cycle[(n - lead.length) % cycle.length];
             let i = 0, p = 0, grouped = 0, removed = 0;
             while (i < cards.length) {
-                const group = cards.slice(i, i + sizeAt(p++));
+                let size = sizeAt(p);
+                // Never leave a lone single at the end: it joins the last group instead.
+                if (p++ >= lead.length && cards.length - (i + size) === 1) size++;
+                const group = cards.slice(i, i + size);
                 i += group.length;
                 if (group.length < 2) continue;
                 const host = group[0];

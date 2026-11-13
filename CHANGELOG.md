@@ -1,5 +1,9 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.14
+- Demo: a single order left over at the end of the 4/3/2 cycle joins the last group, so no
+  single-SKU order appears after the first three.
+
 ## v5.13
 - **Hovering a SKU in the SKU box fades the other orders.** Every pill that belongs to a different
   order drops to low opacity, so the SKUs of the order under the mouse stand out together. Moving
