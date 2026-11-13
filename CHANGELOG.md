@@ -1,5 +1,14 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.05
+- **Demo mode groups orders into multi-SKU cards.** Add `&pp-demo=1` to a `/ship/bulk` URL of old,
+  already-shipped orders and single-item cards are merged into 2-, 3- and 4-SKU cards (pattern
+  4,1,1,2,1,3,1,1), so the demo page shows multi-SKU orders, compact rows and the in-card SKU sort.
+  Visual only: the merged cards are removed from that tab and their items copied into the first card.
+- **Demo mode sends nothing.** Ship, thank-you message, note and every automation tab are off in
+  that tab, because a grouped card no longer matches a real order. An orange `DEMO` pill at the
+  bottom left says so. Remove `pp-demo` from the URL and reload to leave it.
+
 ## v5.04
 - **The batch dialog's time estimate follows the route the orders will take.** It assumed 30s an
   order, measured on the eBay tab method. Through the Mini API, consecutive batch shipments land 6–7s

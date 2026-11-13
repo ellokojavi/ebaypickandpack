@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261112-v5.04-api-batch-time-estimate
+// @version      20261113-v5.05-demo-multi-sku-grouping
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -35,6 +35,14 @@
 
 (function() {
     'use strict';
+
+    // DEMO MODE (v5.05, Javier: "group some skus in one order to make the visual appeal of a
+    // multi-sku order"). Add &pp-demo=1 to a /ship/bulk URL of old, already-shipped orders and
+    // single-item cards are merged into 2-, 3- and 4-SKU cards, VISUALLY ONLY: the donor cards are
+    // removed from this tab and their items copied into the first card of the group. Nothing is
+    // sent to eBay. Because a grouped card no longer matches a real order, demo mode also turns OFF
+    // ship, thank-you message, note and every automation tab in this tab.
+    const PP_DEMO = /\/ship\/bulk/.test(location.pathname) && new URLSearchParams(location.search).has('pp-demo');
 
     // ===================================================================
     // LATEST VERSION WITHOUT REINSTALLING (v4.75 dev channel, v4.77 auto-update)
@@ -6625,6 +6633,7 @@
             updateSkuPanelPosition();
             updateSkuPanelOnScroll(); // Initial check
             const skuManager = setupSkuLogic();
+            try { ppDemoGroupCards(); } catch (e) { console.error('[Demo] grouping failed:', e); }
             document.querySelectorAll(CONFIG.selectors.orderItem).forEach((orderItem, index) => processOrderCard(orderItem, index));
             setupGlobalEventListeners(skuManager);
             skuManagerRef = skuManager; // so the batch queue can repaint the panel
@@ -7426,7 +7435,41 @@
     // (active:false) never take focus in the first place, but they still need
     // the flag, because closing one while it IS focused (you clicked over to
     // check on it) should also land you back on pick-and-pack.
+    // Demo mode (see PP_DEMO): merge single-item cards into multi-SKU cards, in a 4,1,1,2,1,3,1,1
+    // pattern so the page shows every card size. Runs once, before the cards are processed, so the
+    // pick list, highlights, compact rows and SKU sort all see the grouped cards as real ones.
+    function ppDemoGroupCards() {
+        if (!PP_DEMO) return;
+        const cards = Array.from(document.querySelectorAll(CONFIG.selectors.orderItem)).filter(c =>
+            c.querySelector(CONFIG.selectors.tcellItem) && c.querySelectorAll('.item').length === 1);
+        const pattern = [4, 1, 1, 2, 1, 3, 1, 1];
+        let i = 0, p = 0, grouped = 0, removed = 0;
+        while (i < cards.length) {
+            const group = cards.slice(i, i + pattern[p++ % pattern.length]);
+            i += group.length;
+            if (group.length < 2) continue;
+            const host = group[0];
+            const holder = host.querySelector('.item').parentElement;
+            group.slice(1).forEach(donor => {
+                donor.querySelectorAll('.item').forEach(it => holder.appendChild(it.cloneNode(true)));
+                donor.remove();
+                removed++;
+            });
+            host.dataset.ppDemoGrouped = String(group.length);
+            grouped++;
+        }
+        const badge = document.createElement('div');
+        badge.id = 'pp-demo-badge';
+        badge.textContent = `DEMO · ${grouped} orders grouped from ${grouped + removed} · ship, message and note are off`;
+        badge.title = 'Remove pp-demo from the URL and reload to leave demo mode.';
+        badge.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:2147483646;background:#c2410c;color:#fff;' +
+            'font:600 12px/1.2 system-ui,sans-serif;padding:6px 10px;border-radius:999px;box-shadow:0 2px 6px rgba(0,0,0,.25)';
+        document.body.appendChild(badge);
+        console.log(`[Demo] grouped ${grouped + removed} single-item cards into ${grouped}`);
+    }
+
     function openAutomationTab(url, options) {
+        if (PP_DEMO) { console.warn('[Demo] automation tab blocked:', url); return { close() {}, closed: true }; }
         const opts = Object.assign({ active: false }, options || {});
         opts.setParent = true;
         return GM_openInTab(url, opts);
@@ -7652,6 +7695,7 @@
         try { GM_setValue(PP_TOKEN_KEY, ''); } catch (e) {}
     }
     async function ppShip(orderId) {
+        if (PP_DEMO) return { ok: false, why: 'Demo mode: nothing sent.' };
         // Known down: nothing is sent, so the tab path is safe and saves a timeout per order.
         if (ppMini.down) return { ok: false, why: ppMiniDownText() + ' Using tabs.' };
         const r = await ppRequest('/pp/ship', { order_id: orderId }, 90000);
@@ -7662,6 +7706,7 @@
         return { ok: false, why: ppDescribe(r) };
     }
     async function ppMessage(orderId, text) {
+        if (PP_DEMO) return { outcome: 'unknown', why: 'Demo mode: nothing sent.' };
         // Known down: the request is never made, so nothing went out and the tab may send it.
         if (ppMini.down) return { outcome: 'fallback', why: ppMiniDownText() + ' Using tabs.' };
         const r = await ppRequest('/pp/message', { order_id: orderId, text: text }, 90000);
@@ -7727,6 +7772,7 @@
     };
 
     async function ppNote(orderId, text) {
+        if (PP_DEMO) return { ok: false, why: 'Demo mode: nothing sent.' };
         if (ppMini.down) return { ok: false, why: ppMiniDownText() + ' Using tabs.' };
         const r = await ppRequest('/pp/note', { order_id: orderId, text: text }, 60000);
         // A note replaces itself, so anything short of a clear yes goes to the tab.
