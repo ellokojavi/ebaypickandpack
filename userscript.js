@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261114-v5.25-sku-box-loading
+// @version      20261114-v5.26-address-checks-wait-for-box
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -199,8 +199,24 @@
     // The USPS address checks wait for the first profit/SKU answer (v5.02). They go out one at a
     // time at ~0.7s each, so on a 42-order page they used to hold profit and SKUs back ~30s.
     // Capped at 8s so a slow Mini never stalls the address checks for good.
+    // v5.26: the 8s now starts when the SKU box is first built, not when the script starts, and
+    // the gate waits for BOTH the profit and the SKU answers. Timed from script start, a page that
+    // took ~8s to build let the 17 address checks go first, and SKUs and profit then queued ~13s
+    // behind them (seen Nov 14 2026 in the Mini's request log). A 30s backstop from script start
+    // still releases the checks if the box is never built.
     let ppFirstFlushDone = null;
-    const ppFirstFlush = new Promise(r => { ppFirstFlushDone = r; setTimeout(r, 8000); });
+    const ppFirstFlush = new Promise(r => { ppFirstFlushDone = r; setTimeout(r, 30000); });
+    const ppFirstFlushParts = { earnings: false, skus: false };
+    let ppFirstFlushCapArmed = false;
+    function ppFirstFlushPart(name) {
+        ppFirstFlushParts[name] = true;
+        if (ppFirstFlushParts.earnings && ppFirstFlushParts.skus && ppFirstFlushDone) ppFirstFlushDone();
+    }
+    function ppArmFirstFlushCap() {
+        if (ppFirstFlushCapArmed) return;
+        ppFirstFlushCapArmed = true;
+        setTimeout(() => { if (ppFirstFlushDone) ppFirstFlushDone(); }, 8000);
+    }
     // Is the Mini answering? (v4.71) Set by every ppRequest: any HTTP answer
     // means up, a connection error or timeout means down. While down, ship,
     // message and note go straight to the tab fallback instead of waiting on
@@ -2329,6 +2345,7 @@
                 // Never leave the box spinning: a failed lookup shows what is known.
                 if (!ppSkuQueue.size) {
                     ppSkuLoading = false;
+                    ppFirstFlushPart('skus');
                     try { repaintSkuPanel(); } catch (e) { console.error('[SKU fill] panel repaint failed:', e); }
                 }
             }
@@ -6873,6 +6890,10 @@
             setupGlobalEventListeners(skuManager);
             skuManagerRef = skuManager; // so the batch queue can repaint the panel
             skuManager.createSKUPackingList();
+            // v5.26: the address checks' head start counts from here, once SKU and profit
+            // requests can actually be queued. No SKU lookup needed means that part is done.
+            ppArmFirstFlushCap();
+            if (!ppSkuLoading) ppFirstFlushPart('skus');
             refreshAddressBanner();
             autoHidePostageCostOnLabel();
             startOrderWatch();
@@ -7971,7 +7992,7 @@
             }
         }
         if (ppEarningsOnUpdate) ppEarningsOnUpdate();
-        if (ppFirstFlushDone) ppFirstFlushDone();
+        ppFirstFlushPart('earnings');
     }
     ppMini.hooks.earnings = () => {
         if (!ppMini.down && ppEarningsQueue.size) ppFlushEarnings();

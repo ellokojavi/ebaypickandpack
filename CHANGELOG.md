@@ -1,5 +1,13 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.26
+- **SKUs and profit no longer queue behind the address checks.** The USPS address checks go out
+  one at a time (~0.7s each) and were meant to wait up to 8s for the first SKU and profit answers.
+  That 8s was timed from script start, so on a page that took ~8s to build, all 17 checks went
+  first and SKUs and profit waited ~13s behind them. The 8s now starts when the SKU box is built,
+  and the checks wait for both answers. A 30s backstop still releases them if the box never builds.
+  The same requests go out as before; only their order changes.
+
 ## v5.25
 - **The SKU box shows a spinner while it loads, never a partial list.** Orders with no SKU on eBay
   get their SKU from the Mini a moment after the page loads. Until now the box was drawn first,
