@@ -1,5 +1,12 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.23
+- **The SKU-box hover fade no longer drops out.** The panel is rebuilt on every repaint, and a
+  rebuild under a still mouse fires no new hover event, so the fade could vanish, or never
+  start, until the mouse moved onto another pill. Single-order pills were hit hardest because
+  there is no other pill of the same order to move onto. The fade is now also applied on mouse
+  move and re-applied right after each repaint.
+
 ## v5.22
 - **Every order colour now passes 7:1 contrast with its text** (WCAG AAA). Each generated colour is
   checked against the dark pill text and lightened until it passes; before this the darkest blue

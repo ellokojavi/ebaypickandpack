@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261113-v5.22-pill-contrast-aaa
+// @version      20261113-v5.23-pill-focus-robust
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -5250,15 +5250,28 @@
                     list.classList.remove('pp-order-focus');
                     list.querySelectorAll('.pp-focus-match').forEach(p => p.classList.remove('pp-focus-match'));
                 };
-                document.addEventListener('mouseover', (event) => {
+                // v5.23: applied from mousemove as well as mouseover, and again after every panel
+                // repaint. A repaint rebuilds the pills under a still mouse and fires no new
+                // mouseover, so the fade used to vanish (or never appear) until the mouse moved
+                // onto another pill — most visible on single-order pills, which have no
+                // neighbour of the same order to move onto.
+                const applyFocus = (target) => {
                     const list = document.getElementById(CONFIG.ids.skuList);
                     if (!list) return;
-                    const pill = event.target.closest && event.target.closest(`.${CONFIG.classNames.skuItem}[data-order-item-id]`);
+                    const pill = target && target.closest && target.closest(`.${CONFIG.classNames.skuItem}[data-order-item-id]`);
                     if (!pill || !list.contains(pill)) { if (list.classList.contains('pp-order-focus')) clearFocus(list); return; }
                     const id = pill.dataset.orderItemId;
+                    if (list.classList.contains('pp-order-focus') && pill.classList.contains('pp-focus-match')) return;
                     list.querySelectorAll(`.${CONFIG.classNames.skuItem}`).forEach(p => p.classList.toggle('pp-focus-match', p.dataset.orderItemId === id));
                     list.classList.add('pp-order-focus');
-                });
+                };
+                document.addEventListener('mouseover', (event) => applyFocus(event.target));
+                document.addEventListener('mousemove', (event) => applyFocus(event.target), { passive: true });
+                window.ppReapplyPillFocus = () => {
+                    const list = document.getElementById(CONFIG.ids.skuList);
+                    const hovered = list && list.querySelector(`.${CONFIG.classNames.skuItem}:hover`);
+                    if (hovered) applyFocus(hovered);
+                };
             }
 
             ordersContainerForEvents.addEventListener('mouseover', (event) => {
@@ -6023,6 +6036,8 @@
                         flexContainer.appendChild(skuItemLink);
                     }
                     contentWrapper.appendChild(flexContainer);
+                    // Keep the hover fade across a repaint (v5.23).
+                    if (window.ppReapplyPillFocus) requestAnimationFrame(() => window.ppReapplyPillFocus());
                 }
 
                 const allOrderItems = document.querySelectorAll(CONFIG.selectors.orderItem);
