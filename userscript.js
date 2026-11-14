@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261113-v5.23-pill-focus-robust
+// @version      20261114-v5.24-hover-fade-multi-only
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -5261,6 +5261,10 @@
                     const pill = target && target.closest && target.closest(`.${CONFIG.classNames.skuItem}[data-order-item-id]`);
                     if (!pill || !list.contains(pill)) { if (list.classList.contains('pp-order-focus')) clearFocus(list); return; }
                     const id = pill.dataset.orderItemId;
+                    // v5.24 (Javier): a single-SKU order has nothing to group, so its pill
+                    // changes nothing: no fade on the others, no glow on itself.
+                    const sameOrder = list.querySelectorAll(`.${CONFIG.classNames.skuItem}[data-order-item-id="${id}"]`).length;
+                    if (sameOrder < 2) { if (list.classList.contains('pp-order-focus')) clearFocus(list); return; }
                     if (list.classList.contains('pp-order-focus') && pill.classList.contains('pp-focus-match')) return;
                     list.querySelectorAll(`.${CONFIG.classNames.skuItem}`).forEach(p => p.classList.toggle('pp-focus-match', p.dataset.orderItemId === id));
                     list.classList.add('pp-order-focus');

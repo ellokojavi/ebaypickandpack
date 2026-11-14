@@ -1,5 +1,11 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.24
+- **Hovering a single-SKU order's pill does nothing.** Only pills of an order with 2 or more SKUs
+  fade the other orders' pills, because a single-SKU order has nothing to pick out. That includes
+  a single SKU with quantity above 1 ("E59C x2"). v5.13–v5.23 faded the box for single-SKU pills
+  too, which was not what Javier asked for.
+
 ## v5.23
 - **The SKU-box hover fade no longer drops out.** The panel is rebuilt on every repaint, and a
   rebuild under a still mouse fires no new hover event, so the fade could vanish, or never
