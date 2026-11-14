@@ -1,5 +1,9 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.31
+- Clicking the username opens all of that buyer's orders in Seller Hub (Orders, search
+  `buyerusername:`, all statuses) instead of their public eBay profile.
+
 ## v5.30
 - The username no longer looks like part of the order id: a 👤 icon in front, normal weight,
   no underline (it underlines on hover), slightly smaller, a softer colour, and fainter pipes.

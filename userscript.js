@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261114-v5.30-buyer-username-style
+// @version      20261114-v5.31-buyer-orders-link
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -2032,9 +2032,10 @@
             const span = document.createElement('span');
             span.className = 'pp-buyer';
             const a = document.createElement('a');
-            a.href = 'https://www.ebay.com/usr/' + encodeURIComponent(username);
+            // All of this buyer's orders in Seller Hub (v5.31), not their public profile.
+            a.href = 'https://www.ebay.com/sh/ord?search=' + encodeURIComponent('buyerusername:' + username) + '&filter=' + encodeURIComponent('status:ALL_ORDERS');
             a.target = '_blank'; a.rel = 'noopener';
-            a.title = "Buyer's eBay profile";
+            a.title = "All orders from this buyer";
             const icon = document.createElement('span');
             icon.className = 'pp-buyer-icon';
             icon.textContent = '👤';
