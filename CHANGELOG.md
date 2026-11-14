@@ -1,5 +1,9 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.29
+- The username now sits after the order id you actually see. v5.28 put it next to eBay's own
+  order id, which the script keeps hidden.
+
 ## v5.28
 - **The buyer's eBay username now shows after the order id**, as `| username |`, linked to
   their eBay profile. It comes back with the USPS address answer (the Mini reads it from the

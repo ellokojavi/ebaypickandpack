@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261114-v5.28-buyer-username
+// @version      20261114-v5.29-buyer-username-visible-header
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -2023,7 +2023,10 @@
             return n;
         }
         function paintBuyer(card, username) {
-            const link = card.querySelector('.unique_order_id_container a[href*="orderId"]');
+            // The order id people see is the copy in the card's header; eBay's
+            // own sits hidden in .unique_order_id_container (the fallback).
+            const link = card.querySelector(`.${CONFIG.classNames.shippingInfoBlock} a[href*="orderId"]`)
+                || card.querySelector('.unique_order_id_container a[href*="orderId"]');
             if (!link || !username || card.querySelector('.pp-buyer')) return;
             const span = document.createElement('span');
             span.className = 'pp-buyer';
