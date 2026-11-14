@@ -1,5 +1,9 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.30
+- The username no longer looks like part of the order id: a 👤 icon in front, normal weight,
+  no underline (it underlines on hover), slightly smaller, a softer colour, and fainter pipes.
+
 ## v5.29
 - The username now sits after the order id you actually see. v5.28 put it next to eBay's own
   order id, which the script keeps hidden.

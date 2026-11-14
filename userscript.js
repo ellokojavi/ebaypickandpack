@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261114-v5.29-buyer-username-visible-header
+// @version      20261114-v5.30-buyer-username-style
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -640,9 +640,10 @@
                 /* eBay's span around the order links carries its own 8px right margin, which made the
                    gap before the pipe 16px against 8px after it (seen live, v4.94). */
                 .${CONFIG.classNames.shippingInfoBlock} p > .combined-ids > span:last-child { margin-right: 0 !important; }
-                .pp-buyer { color: ${isDarkMode ? '#9aa0a6' : '#555'}; margin: 0 4px; white-space: nowrap; }
-                .pp-buyer a { color: inherit !important; text-decoration: none; }
-                .pp-buyer a:hover { text-decoration: underline; }
+                .pp-buyer { color: ${isDarkMode ? '#5f6368' : '#bbb'}; margin: 0 6px; white-space: nowrap; font-weight: 400 !important; }
+                .pp-buyer a { color: ${isDarkMode ? '#a8b4c4' : '#4a5a6e'} !important; font-weight: 400 !important; font-size: 0.9em; text-decoration: none !important; margin: 0 4px; }
+                .pp-buyer a:hover { text-decoration: underline !important; }
+                .pp-buyer-icon { margin-right: 3px; font-size: 0.95em; }
                 .pp-earn { font-weight: 700; color: ${isDarkMode ? '#7ee2a8' : '#137333'}; cursor: help; }
                 .pp-earn.pp-earn-wait { font-weight: 400; color: ${isDarkMode ? '#888' : '#999'}; }
                 .pp-earn.pp-earn-loss { color: ${isDarkMode ? '#ff8a80' : '#c5221f'}; }
@@ -2034,8 +2035,11 @@
             a.href = 'https://www.ebay.com/usr/' + encodeURIComponent(username);
             a.target = '_blank'; a.rel = 'noopener';
             a.title = "Buyer's eBay profile";
-            a.textContent = username;
-            span.append('| ', a, ' |');
+            const icon = document.createElement('span');
+            icon.className = 'pp-buyer-icon';
+            icon.textContent = '👤';
+            a.append(icon, username);
+            span.append('|', a, '|');
             link.after(span);
         }
         async function applyUspsCheck(card, orderId) {
