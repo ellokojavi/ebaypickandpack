@@ -1,5 +1,15 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.25
+- **The SKU box shows a spinner while it loads, never a partial list.** Orders with no SKU on eBay
+  get their SKU from the Mini a moment after the page loads. Until now the box was drawn first,
+  showing only the orders that already had a SKU (the demo read "(1)" for about half a second
+  before "(42)"). The box now reads "Loading SKUs for N items…" until the lookup answers, and
+  the count appears only with the full list. If the lookup fails, it shows what is known rather
+  than spinning forever.
+- The empty box shell shown for about 2 seconds while the page settles now reads
+  "Loading orders…", instead of "Est. profit: $0.00".
+
 ## v5.24
 - **Hovering a single-SKU order's pill does nothing.** Only pills of an order with 2 or more SKUs
   fade the other orders' pills, because a single-SKU order has nothing to pick out. That includes

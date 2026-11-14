@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261114-v5.24-hover-fade-multi-only
+// @version      20261114-v5.25-sku-box-loading
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -1032,6 +1032,8 @@
                    indistinguishable from a real confirmation. It is now an
                    amber spinner that says what it is actually doing. */
                 @keyframes altheastix-spin { to { transform: rotate(360deg); } }
+                /* v5.25: SKU box loading row */
+                .pp-panel-loading { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 22px 14px; font-size: 13px; font-weight: 600; color: ${isDarkMode ? '#b8c4d4' : '#4b5563'}; }
                 /* v5.20: card busy while the Mini API (or the demo) ships it */
                 ${CONFIG.selectors.orderItem}.pp-card-busy { position: relative; }
                 .pp-busy-overlay {
@@ -1389,6 +1391,8 @@
             console.debug('[Tampermonkey][INIT] initializePageLayout() start');
             const skuPanelContainer = document.createElement('div');
             skuPanelContainer.id = CONFIG.ids.skuPanelContainer;
+            // v5.25: a spinner until the first real paint replaces the panel's contents.
+            skuPanelContainer.innerHTML = '<h2 class="sku-title"><span>SKUs to Pick and Pack</span></h2><div class="pp-panel-loading"><span class="pp-busy-spinner"></span><span>Loading orders…</span></div>';
             document.body.appendChild(skuPanelContainer);
             const configPanelContainer = document.createElement('div');
             configPanelContainer.id = 'altheastix-config-container';
@@ -2139,6 +2143,8 @@
                 if (title) title.insertAdjacentElement('afterend', own); else panel.prepend(own);
             }
             if (!ppApiEnabled()) { el.textContent = ''; el.dataset.sig = ''; return; }
+            // v5.25: no "Est. profit: $0.00" before any card has been read.
+            if (!document.querySelector(`${CONFIG.selectors.orderItem}[data-order-id]`)) { el.textContent = ''; el.dataset.sig = ''; return; }
             let n = 0, waiting = 0, unknown = 0, profitSum = 0, paid = 0;
             batchSelectCandidates().forEach(card => {
                 const ids = (card.dataset.orderId || '').split(',').filter(Boolean);
@@ -2274,6 +2280,11 @@
         const ppItemSkus = new Map();          // item number -> candidates (or [] when unknown)
         const ppSkuQueue = new Set();
         let ppSkuTimer = null;
+        // v5.25: true from the moment a SKU lookup is queued until the Mini answers (or fails).
+        // While it is true the SKU box shows a spinner instead of a partial pick list:
+        // orders with no SKU on eBay are missing from the box until the lookup lands, and a
+        // box reading "(1)" for a second before jumping to "(42)" looks like a wrong count.
+        let ppSkuLoading = false;
         function itemNumberOf(item) {
             const a = item.querySelector(`${CONFIG.selectors.itemDescription} h2 a:not(.${CONFIG.classNames.reviseLink})`);
             const m = (a && a.getAttribute('href') || '').match(/[?&]item=(\d{9,15})/);
@@ -2308,10 +2319,21 @@
                 ul.prepend(li);
                 changed = true;
             });
-            if (ppSkuQueue.size) { clearTimeout(ppSkuTimer); ppSkuTimer = setTimeout(ppFlushSkus, 300); }
+            if (ppSkuQueue.size) { ppSkuLoading = true; clearTimeout(ppSkuTimer); ppSkuTimer = setTimeout(ppFlushSkus, 300); }
             return changed;
         }
         async function ppFlushSkus() {
+            try {
+                await ppFlushSkusInner();
+            } finally {
+                // Never leave the box spinning: a failed lookup shows what is known.
+                if (!ppSkuQueue.size) {
+                    ppSkuLoading = false;
+                    try { repaintSkuPanel(); } catch (e) { console.error('[SKU fill] panel repaint failed:', e); }
+                }
+            }
+        }
+        async function ppFlushSkusInner() {
             const ids = Array.from(ppSkuQueue).filter(id => !ppItemSkus.has(id));
             ppSkuQueue.clear();
             for (let i = 0; i < ids.length; i += 200) {
@@ -5968,7 +5990,7 @@
                 const title = document.createElement('h2');
                 title.className = 'sku-title';
                 const titleText = document.createElement('span');
-                titleText.textContent = `SKUs to Pick and Pack (${SKU.length})`;
+                titleText.textContent = ppSkuLoading ? 'SKUs to Pick and Pack' : `SKUs to Pick and Pack (${SKU.length})`;
                 // Dark mode moved to the defaults-panel header in v4.37; the
                 // SKU title bar is now just the title.
                 title.append(titleText);
@@ -5983,7 +6005,12 @@
                 contentWrapper.id = CONFIG.ids.skuContentWrapper;
                 container.appendChild(contentWrapper);
 
-                if (SKU.length > 0) {
+                if (ppSkuLoading) {
+                    const waiting = document.querySelectorAll(`${CONFIG.selectors.orderItem} .item`).length;
+                    contentWrapper.insertAdjacentHTML('beforeend',
+                        `<div class="pp-panel-loading"><span class="pp-busy-spinner"></span><span>Loading SKUs for ${waiting} item${waiting === 1 ? '' : 's'}…</span></div>`);
+                }
+                if (SKU.length > 0 && !ppSkuLoading) {
                     const flexContainer = document.createElement('div');
                     flexContainer.id = CONFIG.ids.skuList;
                     let orderIdToColorMap = {};
