@@ -1,5 +1,11 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.28
+- **The buyer's eBay username now shows after the order id**, as `| username |`, linked to
+  their eBay profile. It comes back with the USPS address answer (the Mini reads it from the
+  same eBay order), so it adds no request and no wait. It is kept in the page only: the Mini
+  never writes it to its cache or its log.
+
 ## v5.27
 - **The page is ready about 1.5s sooner.** After eBay's page is ready, the script used to wait a
   fixed 1.8s for eBay to finish combining orders before reading the cards. It now goes as soon

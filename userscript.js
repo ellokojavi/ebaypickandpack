@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261114-v5.27-faster-load-batched-address
+// @version      20261114-v5.28-buyer-username
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -640,6 +640,9 @@
                 /* eBay's span around the order links carries its own 8px right margin, which made the
                    gap before the pipe 16px against 8px after it (seen live, v4.94). */
                 .${CONFIG.classNames.shippingInfoBlock} p > .combined-ids > span:last-child { margin-right: 0 !important; }
+                .pp-buyer { color: ${isDarkMode ? '#9aa0a6' : '#555'}; margin: 0 4px; white-space: nowrap; }
+                .pp-buyer a { color: inherit !important; text-decoration: none; }
+                .pp-buyer a:hover { text-decoration: underline; }
                 .pp-earn { font-weight: 700; color: ${isDarkMode ? '#7ee2a8' : '#137333'}; cursor: help; }
                 .pp-earn.pp-earn-wait { font-weight: 400; color: ${isDarkMode ? '#888' : '#999'}; }
                 .pp-earn.pp-earn-loss { color: ${isDarkMode ? '#ff8a80' : '#c5221f'}; }
@@ -1962,7 +1965,7 @@
                 cn.addTrackingLink, cn.reviseLink, cn.addrWarningBadge,
                 cn.addrOkBadge, cn.messageContainer, cn.markAsShippedBtn,
                 cn.envPrintRow, cn.printEnvelopeBtn, cn.buyLabelLink, cn.shippedLabel,
-                cn.shipFailedBanner, cn.shipQueuedBadge, cn.msgFailedPill, cn.msgSentPill, cn.envReprintPill
+                cn.shipFailedBanner, cn.shipQueuedBadge, cn.msgFailedPill, cn.msgSentPill, cn.envReprintPill, 'pp-buyer'
             ].map(c => '.' + c).join(', ');
             orderItem.querySelectorAll(staleSelectors).forEach(el => el.remove());
             // The pending overlay is handled separately: an order that is
@@ -2011,9 +2014,31 @@
         // Adds the USPS answer to the card's address badge. A USPS warning turns
         // a ✔ into ⚠ (and so into the banner); a pass only adds a line to the
         // tooltip. Skipped or failed checks say why, and change nothing else.
+        // The buyer's eBay username after the order id, as "| username |" (v5.28).
+        // It rides on the address answer (the Mini reads it from the same eBay
+        // order), so it costs no extra request. Held in the page only.
+        function ppNextInjected(link) {
+            let n = link.nextElementSibling;
+            while (n && n.classList.contains('pp-buyer')) n = n.nextElementSibling;
+            return n;
+        }
+        function paintBuyer(card, username) {
+            const link = card.querySelector('.unique_order_id_container a[href*="orderId"]');
+            if (!link || !username || card.querySelector('.pp-buyer')) return;
+            const span = document.createElement('span');
+            span.className = 'pp-buyer';
+            const a = document.createElement('a');
+            a.href = 'https://www.ebay.com/usr/' + encodeURIComponent(username);
+            a.target = '_blank'; a.rel = 'noopener';
+            a.title = "Buyer's eBay profile";
+            a.textContent = username;
+            span.append('| ', a, ' |');
+            link.after(span);
+        }
         async function applyUspsCheck(card, orderId) {
             const res = await ppAddress(orderId);
             if (!res || !card.isConnected) return;
+            paintBuyer(card, res.buyer);
             card.dataset.uspsStatus = res.status || 'error';
             card.dataset.uspsNotes = JSON.stringify(res.notes || []);
             card.dataset.uspsSuggestion = JSON.stringify(res.suggestion || []);
@@ -2628,7 +2653,7 @@
                 if (shipsWithLabel) {
                     orderIdLinks.forEach(link => {
                         const orderId = new URLSearchParams(link.href).get('orderId') || link.innerText.trim();
-                        if (!link.nextElementSibling || !link.nextElementSibling.classList.contains(CONFIG.classNames.addTrackingLink)) {
+                        if (!ppNextInjected(link) || !ppNextInjected(link).classList.contains(CONFIG.classNames.addTrackingLink)) {
                             const actionType = USER_CONFIG.useAlternativeTracking ? 'track-v2' : 'track-v1';
                             link.insertAdjacentHTML('afterend', `<a href="#" class="${CONFIG.classNames.addTrackingLink}" data-action="${actionType}" data-order-id="${orderId}">+tracking</a>`);
                         }
@@ -2638,7 +2663,7 @@
                 orderIdLinks.forEach(link => {
                     const orderId = new URLSearchParams(link.href).get('orderId') || link.innerText.trim();
                     const noteLink = `<a href="#" class="${CONFIG.classNames.addNoteLink}" data-order-id="${orderId}">+note</a>`;
-                    const trackingLink = link.nextElementSibling;
+                    const trackingLink = ppNextInjected(link);
 
                     if (trackingLink && trackingLink.classList.contains(CONFIG.classNames.addTrackingLink)) {
                         // If tracking link exists, insert note link after it
