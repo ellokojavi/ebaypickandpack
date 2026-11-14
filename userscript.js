@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261114-v5.26-address-checks-wait-for-box
+// @version      20261114-v5.27-faster-load-batched-address
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -6879,9 +6879,25 @@
         async function main() {
             console.debug('[Tampermonkey][MAIN] main() start');
             initializePageLayout();
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            // Give combining a short extra window before building UI
-            await (async () => { try { await new Promise(r => setTimeout(r, 300)); } catch(e) {} })();
+            // v5.27: wait only until the cards have settled, not a fixed 1.8s. The pause exists so
+            // eBay can combine orders (initializePageLayout clicks "combine") before the cards are
+            // read. Settled = no combine button left to act on, and the same cards and items for
+            // 400ms. Still capped at the old 1.8s, so it can only ever be faster than before.
+            await (async () => {
+                const t0 = Date.now(), CAP = 1800, QUIET = 400;
+                const sig = () => document.querySelectorAll(CONFIG.selectors.orderItem).length + ':' +
+                    document.querySelectorAll(`${CONFIG.selectors.orderItem} .item`).length;
+                const combinePending = () => !document.querySelector('.btn--undo-combine, .tag--combined') &&
+                    !!document.querySelector(CONFIG.selectors.combineOrdersButton);
+                let last = sig(), since = Date.now();
+                while (Date.now() - t0 < CAP) {
+                    await new Promise(r => setTimeout(r, 100));
+                    const now = sig();
+                    if (now !== last) { last = now; since = Date.now(); continue; }
+                    if (!combinePending() && Date.now() - since >= QUIET) break;
+                }
+                console.debug(`[Tampermonkey][MAIN] cards settled after ${Date.now() - t0}ms`);
+            })();
             updateSkuPanelPosition();
             updateSkuPanelOnScroll(); // Initial check
             const skuManager = setupSkuLogic();
@@ -7951,17 +7967,42 @@
     // USPS deliverability, via Google Address Validation on the Mini (v4.64).
     // Read-only and cached per order on both ends, so a re-render costs nothing.
     const ppAddressCache = new Map();
+    // v5.27: the cards' checks are collected for 50ms and sent as ONE request
+    // (/pp/address-batch), which the Mini runs 12 at a time: ~1.3s for 17 cards
+    // instead of ~13s one by one. If the batch route fails for any reason, each
+    // order falls back to the single /pp/address request, exactly as before.
+    const ppAddressWaiting = new Map();   // order id -> [resolve, ...]
+    let ppAddressTimer = null;
+    async function ppAddressSingle(orderId) {
+        const r = await ppRequest('/pp/address', { order_id: orderId }, 30000);
+        return (r.transport === 'ok' && r.http === 200 && r.data) ? r.data : null;
+    }
+    async function ppAddressFlush() {
+        ppAddressTimer = null;
+        const batch = Array.from(ppAddressWaiting.keys()).slice(0, 60);
+        const waiters = batch.map(id => { const w = ppAddressWaiting.get(id); ppAddressWaiting.delete(id); return [id, w]; });
+        if (ppAddressWaiting.size) ppAddressTimer = setTimeout(ppAddressFlush, 0);
+        const r = await ppRequest('/pp/address-batch', { order_ids: batch }, 60000);
+        const results = (r.transport === 'ok' && r.http === 200 && r.data && r.data.results) ? r.data.results : null;
+        await Promise.all(waiters.map(async ([id, resolvers]) => {
+            const res = results ? (results[id] || null) : (ppMini.down ? null : await ppAddressSingle(id));
+            // Remember every answer for this page load, errors included: eBay
+            // re-renders cards often, and re-asking after an error spent a check
+            // from the Mini's daily allowance each time. A reload asks again.
+            if (res) ppAddressCache.set(id, res);
+            resolvers.forEach(fn => fn(res));
+        }));
+    }
     async function ppAddress(orderId) {
         if (ppAddressCache.has(orderId)) return ppAddressCache.get(orderId);
         await ppFirstFlush;
+        if (ppAddressCache.has(orderId)) return ppAddressCache.get(orderId);
         if (ppMini.down) return null; // no badge change; the card's own layout check still shows
-        const r = await ppRequest('/pp/address', { order_id: orderId }, 30000);
-        const res = (r.transport === 'ok' && r.http === 200 && r.data) ? r.data : null;
-        // Remember every answer for this page load, errors included: eBay
-        // re-renders cards often, and re-asking after an error spent a check
-        // from the Mini's daily allowance each time. A reload asks again.
-        if (res) ppAddressCache.set(orderId, res);
-        return res;
+        return new Promise(resolve => {
+            if (!ppAddressWaiting.has(orderId)) ppAddressWaiting.set(orderId, []);
+            ppAddressWaiting.get(orderId).push(resolve);
+            if (!ppAddressTimer) ppAddressTimer = setTimeout(ppAddressFlush, 50);
+        });
     }
 
     // Real earnings per order, from the Mini (v4.69). Cards ask for their ids;

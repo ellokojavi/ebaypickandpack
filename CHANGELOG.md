@@ -1,5 +1,16 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.27
+- **The page is ready about 1.5s sooner.** After eBay's page is ready, the script used to wait a
+  fixed 1.8s for eBay to finish combining orders before reading the cards. It now goes as soon
+  as the cards have settled (same cards and items for 0.4s, no combine left to do), still
+  capped at 1.8s. The console says how long it waited.
+- **USPS address badges arrive in ~1.5s instead of ~13s.** All the cards' checks go to the
+  Mini in one request (`/pp/address-batch`), which runs them 12 at a time and reuses an eBay
+  address read from the last 15 minutes. If the batch request fails, each order falls back to
+  the old single request. Trade-off: a buyer's address change can take up to 15 minutes to
+  show. Fix and Edit still check the card's own lines straight away.
+
 ## v5.26
 - **SKUs and profit no longer queue behind the address checks.** The USPS address checks go out
   one at a time (~0.7s each) and were meant to wait up to 8s for the first SKU and profit answers.
