@@ -1,5 +1,10 @@
 # Changelog — Altheastix eBay Order Manager
 
+## v5.32
+- New wording for the **Preorder Sticker** message: says it may ship a bit earlier than the
+  date, depending on the supplier, and offers a no-questions-asked refund to buyers who can't
+  wait. Fields unchanged (sticker name, shipping date).
+
 ## v5.31
 - Clicking the username opens all of that buyer's orders in Seller Hub (Orders, search
   `buyerusername:`, all statuses) instead of their public eBay profile.

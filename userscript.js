@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Altheastix eBay pick-and-pack workflow optimizer
 // @namespace    http://tampermonkey.net/
-// @version      20261114-v5.31-buyer-orders-link
+// @version      20261116-v5.32-preorder-message
 // @description  A nicer redesign of the eBay bulk shipping page with a polished, modern address box. Logic is now decoupled from configuration (templates/quotes) via external Gist.
 // @author       Javier, with modifications from Grok, Gemini, Claude, and GitHub Copilot <3
 // @match        https://gslblui.ebay.com/gslblui/bulk
@@ -470,7 +470,7 @@
             manualMessageDrafts: {
                 'canned1': "Hi {BUYER_FIRST}. Thanks for your order. Wanted to let you know that due to sudden high demand we ran out of these {STICKER_NAME} stickers, so your order won't ship until roughly {ARRIVAL_DATE}.\n\nIf you can wait, thanks a lot for it — we'll toss in a {SURPRISE_STICKER} sticker as a gift for the hassle, and we'll ship ASAP and personally let you know the moment it goes out. If you're not cool with waiting, we can issue a refund, no questions asked. Either way, just let us know.\n\nThanks a lot for your patience and apologies! These stickers have been a whole hit.\n\nA.\n\nP.S. eBay may auto-send you a shipping notice before the sticker actually leaves — feel free to ignore it. Ours is the one that counts.",
                 'canned3': "Hi {BUYER_FIRST}. Thanks for your order. Wanted to let you know that due to sudden high demand we ran out of these {STICKER_NAME} stickers, so your order won't ship until roughly {ARRIVAL_DATE}.\n\nIf you can wait, thanks a lot for it — we'll ship ASAP and personally let you know the moment it goes out. If you're not cool with waiting, we can issue a refund, no questions asked. Either way, just let us know.\n\nThanks a lot for your patience and apologies! These stickers have been a whole hit.\n\nA.\n\nP.S. eBay may auto-send you a shipping notice before the sticker actually leaves — feel free to ignore it. Ours is the one that counts.",
-                'canned4': "Hi {BUYER_FIRST}. Thanks for your pre-order of the {STICKER_NAME} sticker. As stated in the product details, this item is a pre-order and will ship by {SHIPPING_DATE}. Please disregard any automated eBay message stating that your item has shipped. We will personally contact you as soon as it's on its way.\n\nThanks a lot for your patience!\n\nA."
+                'canned4': "Hi {BUYER_FIRST}. Thanks for your interest in the {STICKER_NAME} sticker order. Just a note that this item is a pre-order and will ship by {SHIPPING_DATE} (although it may come a bit earlier, depending on our supplier). Please disregard any automated eBay message stating that your item has shipped. We will personally contact you as soon as it's on its way.\n\nIf you think you cannot wait, we can issue a refund. No questions asked.\n\nThanks a lot for your patience! You will 100% love your sticker,\n\nA."
             },
             deliveryNotes: EXT_CONFIG.deliveryNotes || {
                 canada: 'Orders to Canada may take several weeks to arrive, so please be patient.',
